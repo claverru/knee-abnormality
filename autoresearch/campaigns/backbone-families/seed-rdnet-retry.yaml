@@ -1,0 +1,28 @@
+ideas:
+- id: rdnet-tiny-retry
+  mechanism_id: family-rdnet
+  parent_idea_id: null
+  title: RDNet-T (rdnet_tiny.nv_in1k), DenseNet-style feature concatenation, on the MambaVision recipe unchanged (relaunch
+    of rdnet-tiny, whose first batch hit a transient CUDA driver error 7 s after the FocalNet run was killed; its code needed
+    no repair)
+  opportunity: 'Evidence (prior-work.md, The families): dense connections that concatenate earlier features instead of summing
+    them, so fine early features reach the deep reads directly; Apache-2.0. LayerNorm, no BatchNorm; weights flat over depth
+    (RMS 0.039 to 0.043). Guess on size: level to +0.003.'
+  mechanism: 'An rdnet backbone from timm''s rdnet_tiny.nv_in1k: 256, 440, 744 and 1040 channels at strides 4, 8, 16 and 32
+    (outputs of dense stages 0, 1, 5 and 6). to_stride_8 runs the stem and dense stages 0 and 1; the middle map is dense stage
+    5''s output, the final map dense stage 6''s through the final norm. Image counts padded to a multiple of 16 (depthwise
+    convolutions, no BatchNorm). Settings: model.backbone the new name; rate and anchors the recipe''s.'
+  precedents:
+  - 'RadioDINO-S/16 (weights 0.05 to 0.06): the MambaVision rate and anchors held within ±0.0006.'
+  novelty: First densely connected backbone here.
+  coverage: Every study and every label.
+  exploitation: 'Read ×4 and ×1 against the reference, the per-label changes and the blends. Activation: the effective config.'
+  budget: '5.0 GMAC per image (measured): expected 1.0 to 1.2 of a local MambaVision-T run; memory 12 to 15 GB with the concatenated
+    channels.'
+  implementation: 'Files: modeling/backbone_stages.py (the stage adapter with the multiple-of-16 padding, stage groups stem,
+    dense stage 0, 1, 2 to 5, 6), modeling/spatial_tokens.py (mappings derived from the stem and transition downsampling),
+    configs/campaign.yaml. Check on CPU the stage shapes and padding equivalence.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Feature reuse instead of residual sums; the user's choice.
+exhausted_directions: ''

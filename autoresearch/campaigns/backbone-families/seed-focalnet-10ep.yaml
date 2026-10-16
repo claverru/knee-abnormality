@@ -1,0 +1,27 @@
+ideas:
+- id: focalnet-tiny-srf-10ep
+  mechanism_id: family-focalnet-epochs
+  parent_idea_id: focalnet-tiny-srf
+  title: FocalNet-T SRF incumbent (focalnet-tiny-srf #2) at ten epochs instead of twelve, nothing else changed
+  opportunity: 'Evidence (run-notes.md, run 6): the incumbent trained twelve epochs, MambaVision-T''s recipe, before ten
+    became the campaign default at the user''s request. Its ×1 peaked at epoch 10 (0.933241) and ended at 0.931536 at
+    epoch 12, so the last two epochs at the lowest rates did not add. Ten epochs with the same linear decay reaches the
+    low rates sooner. Requested by the user. Guess on size: −0.002 to +0.002 at ×4, at five sixths of the time.'
+  mechanism: 'The incumbent unchanged (FocalNet-T SRF, its 1×1 convolutions as linear layers, padding to 16, rate 2e-4,
+    anchors 0.001 and 0.00001) with trainer.max_epochs 10 instead of 12. The warm-up and the linear decay scale with the
+    epoch count as the recipe defines them.'
+  precedents:
+  - 'focalnet-tiny-srf #2: ×4 0.938816, ×1 best 0.933241 at epoch 10 of 12, 4,067 s.'
+  - 'dinov3-convnext-tiny at twelve and at ten epochs: ×1 0.8757 and 0.8779 after epoch 2.'
+  novelty: First epoch-count change on the incumbent family.
+  coverage: Every study and every label.
+  exploitation: 'Read ×4 and ×1 against the incumbent, the per-epoch ×1 curve against its twelve-epoch curve, the
+    per-label changes and the blends. Activation: the effective config has trainer.max_epochs 10 and the run logs ten
+    epochs.'
+  budget: 'About 3,400 s (five sixths of 4,067 s), inside the window; memory as the incumbent''s 21.5 GiB.'
+  implementation: 'Files: configs/campaign.yaml (trainer.max_epochs 10). No source change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's request; settles the incumbent's epoch count before the remaining families compare
+    against it.
+exhausted_directions: ''

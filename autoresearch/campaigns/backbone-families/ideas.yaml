@@ -1,0 +1,2254 @@
+revision: 689
+ideas:
+- id: sam2-hiera-tiny
+  mechanism_id: family-hiera
+  parent_idea_id: null
+  title: SAM2.1 Hiera-T (sam2_hiera_tiny.fb_r896_2pt1) on the MambaVision recipe,
+    rate 1e-4 and anchors 0.01 early, 0.0001 late for its ResNet-like weight scale
+  opportunity: 'Evidence (prior-work.md, The families): the most different family
+    available at our size, attention only with no convolutions, local mask-unit attention
+    early and global attention in the last stages, pretrained by MAE then promptable
+    segmentation on SA-1B and SA-V, so its features are trained to delineate objects;
+    Apache-2.0. Its weights shrink with depth like the ResNet-50''s (RMS 0.049 in
+    block 0 to 0.021 in block 11, stem 0.018), not flat like MambaVision-T''s (0.08
+    to 0.09), so the MambaVision rate and anchors do not transfer. Guess on size:
+    level to +0.004 against the reference, and blend value from a different family.'
+  mechanism: 'A hiera backbone built from timm''s sam2_hiera_tiny.fb_r896_2pt1 with
+    pretrained weights; at 224 px its stage outputs are 96, 192, 384 and 768 channels
+    at strides 4, 8, 16 and 32 (stage ends at blocks 0, 2, 9 and 11). to_stride_8
+    runs the patch embedding with its position embeddings and the first two stages;
+    the middle map is the third stage''s output, the final map the fourth''s. No image-count
+    padding (no depthwise convolution, no BatchNorm). Settings: model.backbone the
+    new name, optimizer.backbone_lr 0.0001, optimizer.anchor_alpha_early 0.01, optimizer.anchor_alpha_late
+    0.0001; everything else the recipe''s.'
+  precedents:
+  - "Swin-T on the MambaVision recipe, fold 2, 2026-10-14: \xD74 0.937176, blend with\
+    \ the ResNet-50 +0.0016 (docs/validation/results/2026-10-14-swin-t.md)."
+  - 'ResNet-50 recipe (weights 0.062 stem to 0.0073 last stage): rate 5e-5, anchors
+    0.01 and 0.001.'
+  novelty: First attention-only backbone with dense segmentation pretraining here.
+  coverage: Every study and every label.
+  exploitation: "Read \xD74 and \xD71 against the reference, the per-label changes,\
+    \ and the blends with the ResNet-50 and the reference. Activation: the recorded\
+    \ effective config names the backbone, and the logged drift of the first and last\
+    \ stage groups after epoch 1 is above zero."
+  budget: '4.9 GMAC per image against MambaVision-T''s 4.4 (measured): training expected
+    near a local MambaVision-T run (about 3,100 s locally, 0.65 of the reference''s
+    4,812 s); memory near 12 GB.'
+  implementation: 'Files: src/knee_abnormality/modeling/staged_backbones.py or backbone_stages.py
+    (the family''s stage adapter, following the existing StagedBackbone or stage classes;
+    parameter names with a stem and stages.N so the early anchor covers the patch
+    embedding, position embeddings and the first stage), modeling/spatial_tokens.py
+    (the mapping entries for the final and layer3 reads, derived from the patch embedding
+    and the pooling between stages and checked against the built model), configs/campaign.yaml.
+    Check on CPU that the four stage outputs have the shapes above at 224 px and that
+    the mapping verifies.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The most different family in operator and pretraining, and the
+    one the user chose first.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-backbone-families/autoresearch/campaigns/backbone-families/seed-ideas.yaml
+  experiments:
+  - sam2-hiera-tiny-20261015T161515Z-3fdf6ec0
+  decision: invalid
+- id: hrnet-w18
+  mechanism_id: family-hrnet
+  parent_idea_id: null
+  title: HRNet-W18 (hrnet_w18.ms_aug_in1k), parallel high-resolution streams, on the
+    recipe with the ResNet-50's rate 5e-5 and anchors 0.005 early, 0.0003 late for
+    its BatchNorm convolution weights
+  opportunity: 'Evidence (prior-work.md, The families): the only design that keeps
+    a high-resolution stream through the whole network, aimed at the located labels
+    (menisci, OA compartments) where the other families lose most. A BatchNorm convolution
+    network with weights like the ResNet-50''s (RMS 0.04 early to 0.013 in stage 4,
+    stem conv 0.15), so the ResNet-50 recipe''s relative step and anchor cost apply,
+    not MambaVision''s. MIT. Guess on size: level to +0.004 on the located labels.'
+  mechanism: 'An hrnet backbone from timm''s hrnet_w18.ms_aug_in1k with pretrained
+    weights, read through its incre features: 128, 256, 512 and 1024 channels at strides
+    4, 8, 16 and 32 at 224 px. to_stride_8 runs the stem, layer1 and the second stage,
+    and the feature-statistics augmentation acts on the stride-8 branch; the middle
+    map is the stride-16 incre output, the final map the stride-32 one. No image-count
+    padding (BatchNorm). Settings: model.backbone the new name, optimizer.backbone_lr
+    0.00005, optimizer.anchor_alpha_early 0.005, optimizer.anchor_alpha_late 0.0003.'
+  precedents:
+  - "ResNet-50 recipe: rate 5e-5, anchors 0.01 early on a 0.062 stem and 0.001 late\
+    \ on a 0.0073 last stage; here 0.001 \xD7 (0.0073/0.0135)\xB2 \u2248 0.0003 late."
+  novelty: First multi-resolution backbone here.
+  coverage: Every study; aimed at Medial and Lateral Meniscus and the three OA labels.
+  exploitation: "Read \xD74 and \xD71 against the reference, the five located labels\
+    \ first, and the blends. Activation: the effective config and the logged drift\
+    \ of the stem and stage-4 groups after epoch 1 above zero."
+  budget: '4.3 GMAC per image (measured by the search); many small parallel convolutions
+    run slower than their GMAC: expected 1.0 to 1.3 of a local MambaVision-T run (0.65
+    to 0.85 of the reference''s time); memory 12 to 16 GB.'
+  implementation: 'Files: modeling/backbone_stages.py (a stage class that runs HRNet''s
+    stem, layer1 and stage 2 in to_stride_8, applies the augmentation to the stride-8
+    branch tensor while carrying the other branches, then the rest in deep), modeling/spatial_tokens.py
+    (mappings derived from the stem and incre downsampling convolutions), training/lightning.py
+    only if the early-anchor prefixes need conv2 and bn2 of the stem, configs/campaign.yaml.
+    Check on CPU the incre output shapes at 224 px and the mapping.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The family whose design targets the labels where every family
+    so far loses.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-backbone-families/autoresearch/campaigns/backbone-families/seed-ideas.yaml
+  experiments:
+  - hrnet-w18-20261015T162045Z-fa40f509
+  decision: invalid
+- id: pvt-v2-b2
+  mechanism_id: family-pvtv2
+  parent_idea_id: null
+  title: PVTv2-b2 (pvt_v2_b2.in1k), global spatial-reduction attention from stride
+    4 with overlapping patch embeddings, on the MambaVision recipe unchanged
+  opportunity: 'Evidence (prior-work.md, The families): global attention at every
+    stage (with spatially reduced keys and values), not windowed like Swin-T, plus
+    overlapping patch embeddings and a depthwise convolution in each MLP, the encoder
+    of many medical segmentation models (Polyp-PVT). Apache-2.0. Its weights are flat
+    over depth (RMS 0.045 to 0.056), between RadioDINO''s 0.05 to 0.06, where the
+    MambaVision rate and anchors held, and MambaVision''s 0.08. Guess on size: level
+    to +0.003, blend value from global attention.'
+  mechanism: 'A pvt_v2 backbone from timm''s pvt_v2_b2.in1k: 64, 128, 320 and 512
+    channels at strides 4, 8, 16 and 32. to_stride_8 runs the patch embedding and
+    the first two stages; the middle map is the third stage''s output, the final map
+    the fourth''s. Image counts padded to a multiple of 16 (depthwise convolutions,
+    no BatchNorm). Settings: model.backbone the new name; rate and anchors the recipe''s
+    (2e-4, 0.001, 0.00001).'
+  precedents:
+  - "RadioDINO-S/16 (weights 0.05 to 0.06): rates 1.4e-4 to 4e-4 and the MambaVision\
+    \ anchors all within \xB10.0006 at \xD74; doubled anchors \u22120.0024 (autoresearch/campaigns/radiodino-settings)."
+  novelty: First global-attention pyramid here.
+  coverage: Every study and every label.
+  exploitation: "Read \xD74 and \xD71 against the reference, the per-label changes\
+    \ and the blends. Activation: the effective config and the padded image count\
+    \ logged or checked once."
+  budget: '4.0 GMAC per image (measured): expected near a local MambaVision-T run;
+    memory near 12 GB.'
+  implementation: 'Files: modeling/backbone_stages.py (the stage adapter with the
+    multiple-of-16 padding ConvNeXt uses), modeling/staged_backbones.py if a wrapper
+    is needed, modeling/spatial_tokens.py (mappings derived from the overlapping patch
+    embeddings: kernel 7 stride 4 padding 3, then kernel 3 stride 2 padding 1), configs/campaign.yaml.
+    Check on CPU the stage shapes and that padded and unpadded image counts give the
+    same outputs for the real images.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The easiest drop-in of the attention families, with global attention
+    from the start.
+  status: blocked
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-backbone-families/autoresearch/campaigns/backbone-families/seed-ideas.yaml
+  experiments:
+  - pvt-v2-b2-20261015T165852Z-3afb3f1f
+  - pvt-v2-b2-20261015T171500Z-eab83cc2
+  blocked_reason: 'Block and park PVTv2: its single bounded repair is exhausted, the
+    runtime failure remains unresolved, and the failed gate prevents approval. Inspection
+    confirms that the repair workspace is identical to the original candidate. Supply
+    the complete remaining queue after parking PVTv2, preserving RDNet before DINOv3
+    ConvNeXt; this corrects the rejected report''s queue representation without changing
+    their relative priority. The block concerns implementation readiness and provides
+    no evidence against the family''s predictive value.'
+- id: focalnet-tiny-srf
+  mechanism_id: family-focalnet
+  parent_idea_id: null
+  title: FocalNet-T SRF (focalnet_tiny_srf.ms_in1k), focal modulation instead of attention,
+    on the MambaVision recipe unchanged
+  opportunity: 'Evidence (prior-work.md, The families): focal modulation aggregates
+    context in a gated hierarchy of depthwise convolutions and modulates each token
+    with it, neither attention nor a plain convolution stack; BiomedParse built its
+    encoder on Focal. MIT. Weights flat over depth (RMS 0.043 to 0.051), in the range
+    where the MambaVision rate and anchors held for RadioDINO. Guess on size: level
+    to +0.003.'
+  mechanism: 'A focalnet backbone from timm''s focalnet_tiny_srf.ms_in1k: 96, 192,
+    384 and 768 channels at strides 4, 8, 16 and 32. to_stride_8 runs the stem and
+    the first two layers; the middle map is the third layer''s output, the final map
+    the fourth''s through the final norm. Image counts padded to a multiple of 16
+    (depthwise convolutions, no BatchNorm). Settings: model.backbone the new name;
+    rate and anchors the recipe''s.'
+  precedents:
+  - 'ConvNeXt-T padding of image counts to multiples of 16 (docs/modeling/mambavision-backbone.md,
+    New batch sizes): 4.3 s per unseen count without it.'
+  novelty: First modulation-based backbone here.
+  coverage: Every study and every label.
+  exploitation: "Read \xD74 and \xD71 against the reference, the per-label changes\
+    \ and the blends. Activation: the effective config."
+  budget: '4.4 GMAC per image (measured): expected near a local MambaVision-T run;
+    memory near 12 GB.'
+  implementation: 'Files: modeling/backbone_stages.py (the stage adapter with the
+    multiple-of-16 padding), modeling/spatial_tokens.py (mappings derived from the
+    patch-embedding and downsampling convolutions), configs/campaign.yaml. Check on
+    CPU the stage shapes and padding equivalence.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A different operator at our size; the user's choice.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-backbone-families/autoresearch/campaigns/backbone-families/seed-ideas.yaml
+  experiments:
+  - focalnet-tiny-srf-20261015T170914Z-53bc14d4
+  - focalnet-tiny-srf-20261015T172800Z-0542173d
+  decision: provisional_accept
+- id: rdnet-tiny
+  mechanism_id: family-rdnet
+  parent_idea_id: null
+  title: RDNet-T (rdnet_tiny.nv_in1k), DenseNet-style feature concatenation, on the
+    MambaVision recipe unchanged
+  opportunity: 'Evidence (prior-work.md, The families): dense connections that concatenate
+    earlier features instead of summing them, so fine early features reach the deep
+    reads directly; Apache-2.0. LayerNorm, no BatchNorm; weights flat over depth (RMS
+    0.039 to 0.043). Guess on size: level to +0.003.'
+  mechanism: 'An rdnet backbone from timm''s rdnet_tiny.nv_in1k: 256, 440, 744 and
+    1040 channels at strides 4, 8, 16 and 32 (outputs of dense stages 0, 1, 5 and
+    6). to_stride_8 runs the stem and dense stages 0 and 1; the middle map is dense
+    stage 5''s output, the final map dense stage 6''s through the final norm. Image
+    counts padded to a multiple of 16 (depthwise convolutions, no BatchNorm). Settings:
+    model.backbone the new name; rate and anchors the recipe''s.'
+  precedents:
+  - "RadioDINO-S/16 (weights 0.05 to 0.06): the MambaVision rate and anchors held\
+    \ within \xB10.0006."
+  novelty: First densely connected backbone here.
+  coverage: Every study and every label.
+  exploitation: "Read \xD74 and \xD71 against the reference, the per-label changes\
+    \ and the blends. Activation: the effective config."
+  budget: '5.0 GMAC per image (measured): expected 1.0 to 1.2 of a local MambaVision-T
+    run; memory 12 to 15 GB with the concatenated channels.'
+  implementation: 'Files: modeling/backbone_stages.py (the stage adapter with the
+    multiple-of-16 padding, stage groups stem, dense stage 0, 1, 2 to 5, 6), modeling/spatial_tokens.py
+    (mappings derived from the stem and transition downsampling), configs/campaign.yaml.
+    Check on CPU the stage shapes and padding equivalence.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Feature reuse instead of residual sums; the user's choice.
+  status: blocked
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-backbone-families/autoresearch/campaigns/backbone-families/seed-ideas.yaml
+  ranking_rationale: 'Block and park PVTv2: its single bounded repair is exhausted,
+    the runtime failure remains unresolved, and the failed gate prevents approval.
+    Inspection confirms that the repair workspace is identical to the original candidate.
+    Supply the complete remaining queue after parking PVTv2, preserving RDNet before
+    DINOv3 ConvNeXt; this corrects the rejected report''s queue representation without
+    changing their relative priority. The block concerns implementation readiness
+    and provides no evidence against the family''s predictive value.'
+  experiments:
+  - rdnet-tiny-20261015T171802Z-0d9ac6ea
+  - rdnet-tiny-20261015T173300Z-0bc0a5ab
+  blocked_reason: Block and park RDNet at its implementation review. Its one bounded
+    repair returned blocked without a prepared diff, source, integration declaration
+    or activation signature; the failed gate cannot be approved. The recorded CUDA
+    failure supplies no justified source correction and requires supervisor investigation.
+    Explicitly list the complete remaining eligible queue after parking RDNet, preserving
+    its relative order and correcting the previous ranking rejection.
+- id: dinov3-convnext-tiny
+  mechanism_id: family-dinov3-convnext
+  parent_idea_id: null
+  title: DINOv3 ConvNeXt-T (convnext_tiny.dinov3_lvd1689m) on the MambaVision recipe,
+    rate 5e-5 and anchors 0.01 early, 0.0002 late for its small flat weight scale
+  opportunity: 'Evidence (prior-work.md, DINOv3 ConvNeXt-T): ConvNeXt-T distilled
+    from the DINOv3 7B teacher on 1.7B images, self-supervised dense features instead
+    of ImageNet labels; second of 34 in the 2026 backbone search (docs/modeling/backbone-search.md,
+    0.904386). Added at the user''s request on 2026-10-15. Its weights are flat over
+    depth but small (RMS 0.0096 stem, 0.014 to 0.018 in the stages, against 0.021
+    to 0.028 for the in12k ConvNeXt-T), so the MambaVision rate and anchors do not
+    transfer. Guess on size: level to +0.004 against the reference, and blend value
+    from a self-supervised pretraining.'
+  mechanism: 'The existing ConvNeXt adapter with timm''s convnext_tiny.dinov3_lvd1689m
+    (pretrained_weights timm): 96, 192, 384 and 768 channels at strides 4, 8, 16 and
+    32, ImageNet mean and std, LayerNorm only, image counts padded to a multiple of
+    16 as for convnext_tiny.in12k_ft_in1k. Register the name beside convnext_tiny.in12k_ft_in1k
+    in modeling/spatial_tokens.py (CONVNEXT_BACKBONES); the mapping function and the
+    stage adapter are the ConvNeXt ones. Settings: model.backbone the new name, optimizer.backbone_lr
+    0.00005, optimizer.anchor_alpha_early 0.01, optimizer.anchor_alpha_late 0.0002;
+    everything else the recipe''s (stochastic depth 0, stage decay 1.0, linear decay,
+    late anchor following the rate).'
+  precedents:
+  - 'Rate: 5e-5 over RMS 0.014 to 0.018 is a relative step of 2.8e-3 to 3.6e-3, inside
+    the ResNet-50 recipe''s 8e-4 to 6.8e-3 and near MambaVision''s 2.2e-3 to 2.5e-3.'
+  - "Late anchor: 0.0002 \xD7 0.0159\xB2 = 5.1e-8 per relative movement on the last\
+    \ stage, matching the ResNet-50's (5.3e-8) and MambaVision's (8.5e-8). Early anchor\
+    \ 0.01 as the ResNet-50, the in12k ConvNeXt-T config and Hiera-T."
+  - "ConvNeXt-T and -S with DINOv3 weights on the ReXNet-style recipe, fold 0, 2026-10-03:\
+    \ \xD74 0.927235 at best against 0.932477 for the ResNet-18 control, on an older\
+    \ recipe (docs/modeling/backbone-swaps.md)."
+  novelty: First DINOv3 weights on the current recipe.
+  coverage: Every study and every label.
+  exploitation: "Read \xD74 and \xD71 against the reference, the per-label changes\
+    \ and the blends with the ResNet-50 and the reference. Activation: the recorded\
+    \ effective config names the backbone."
+  budget: '4.5 GMAC per image, the in12k ConvNeXt-T''s cost: expected 0.9 to 1.1 of
+    a local MambaVision-T run; memory near 12 GB.'
+  implementation: 'Files: modeling/spatial_tokens.py (the name in CONVNEXT_BACKBONES),
+    configs/campaign.yaml. Check on CPU that the model builds with the pretrained
+    weights and the mapping verifies; the in12k ConvNeXt-T must behave exactly as
+    before.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's request; a self-supervised pretraining none of the
+    other families has.
+  status: completed
+  created_revision: 20
+  seeded: /home/claudio/src/knee-abnormality-backbone-families/autoresearch/campaigns/backbone-families/seed-dinov3-convnext.yaml
+  ranking_rationale: Block and park RDNet at its implementation review. Its one bounded
+    repair returned blocked without a prepared diff, source, integration declaration
+    or activation signature; the failed gate cannot be approved. The recorded CUDA
+    failure supplies no justified source correction and requires supervisor investigation.
+    Explicitly list the complete remaining eligible queue after parking RDNet, preserving
+    its relative order and correcting the previous ranking rejection.
+  experiments:
+  - dinov3-convnext-tiny-20261015T173518Z-daddefcb
+  - dinov3-convnext-tiny-20261015T184515Z-9c5d7328
+  decision: invalid
+- id: pvt-v2-b2-retry
+  mechanism_id: family-pvtv2
+  parent_idea_id: null
+  title: PVTv2-b2 (pvt_v2_b2.in1k), global spatial-reduction attention from stride
+    4 with overlapping patch embeddings, on the MambaVision recipe unchanged (relaunch
+    of pvt-v2-b2, whose first batch hit a transient CUDA driver error right after
+    the HRNet abort; its code needed no repair)
+  opportunity: 'Evidence (prior-work.md, The families): global attention at every
+    stage (with spatially reduced keys and values), not windowed like Swin-T, plus
+    overlapping patch embeddings and a depthwise convolution in each MLP, the encoder
+    of many medical segmentation models (Polyp-PVT). Apache-2.0. Its weights are flat
+    over depth (RMS 0.045 to 0.056), between RadioDINO''s 0.05 to 0.06, where the
+    MambaVision rate and anchors held, and MambaVision''s 0.08. Guess on size: level
+    to +0.003, blend value from global attention.'
+  mechanism: 'A pvt_v2 backbone from timm''s pvt_v2_b2.in1k: 64, 128, 320 and 512
+    channels at strides 4, 8, 16 and 32. to_stride_8 runs the patch embedding and
+    the first two stages; the middle map is the third stage''s output, the final map
+    the fourth''s. Image counts padded to a multiple of 16 (depthwise convolutions,
+    no BatchNorm). Settings: model.backbone the new name; rate and anchors the recipe''s
+    (2e-4, 0.001, 0.00001).'
+  precedents:
+  - "RadioDINO-S/16 (weights 0.05 to 0.06): rates 1.4e-4 to 4e-4 and the MambaVision\
+    \ anchors all within \xB10.0006 at \xD74; doubled anchors \u22120.0024 (autoresearch/campaigns/radiodino-settings)."
+  novelty: First global-attention pyramid here.
+  coverage: Every study and every label.
+  exploitation: "Read \xD74 and \xD71 against the reference, the per-label changes\
+    \ and the blends. Activation: the effective config and the padded image count\
+    \ logged or checked once."
+  budget: '4.0 GMAC per image (measured): expected near a local MambaVision-T run;
+    memory near 12 GB.'
+  implementation: 'Files: modeling/backbone_stages.py (the stage adapter with the
+    multiple-of-16 padding ConvNeXt uses), modeling/staged_backbones.py if a wrapper
+    is needed, modeling/spatial_tokens.py (mappings derived from the overlapping patch
+    embeddings: kernel 7 stride 4 padding 3, then kernel 3 stride 2 padding 1), configs/campaign.yaml.
+    Check on CPU the stage shapes and that padded and unpadded image counts give the
+    same outputs for the real images.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The easiest drop-in of the attention families, with global attention
+    from the start.
+  status: retired
+  created_revision: 64
+  seeded: /home/claudio/src/knee-abnormality-backbone-families/autoresearch/campaigns/backbone-families/seed-pvt-retry.yaml
+  ranking_rationale: Block and park RDNet at its implementation review. Its one bounded
+    repair returned blocked without a prepared diff, source, integration declaration
+    or activation signature; the failed gate cannot be approved. The recorded CUDA
+    failure supplies no justified source correction and requires supervisor investigation.
+    Explicitly list the complete remaining eligible queue after parking RDNet, preserving
+    its relative order and correcting the previous ranking rejection.
+  experiments:
+  - pvt-v2-b2-retry-20261015T184854Z-7367ebe4
+  - pvt-v2-b2-retry-20261015T191014Z-36ab6dc7
+  - pvt-v2-b2-retry-20261015T200646Z-81d6b8cd
+  - pvt-v2-b2-retry-20261015T201244Z-d4991f2c
+- id: rdnet-tiny-retry
+  mechanism_id: family-rdnet
+  parent_idea_id: null
+  title: RDNet-T (rdnet_tiny.nv_in1k), DenseNet-style feature concatenation, on the
+    MambaVision recipe unchanged (relaunch of rdnet-tiny, whose first batch hit a
+    transient CUDA driver error 7 s after the FocalNet run was killed; its code needed
+    no repair)
+  opportunity: 'Evidence (prior-work.md, The families): dense connections that concatenate
+    earlier features instead of summing them, so fine early features reach the deep
+    reads directly; Apache-2.0. LayerNorm, no BatchNorm; weights flat over depth (RMS
+    0.039 to 0.043). Guess on size: level to +0.003.'
+  mechanism: 'An rdnet backbone from timm''s rdnet_tiny.nv_in1k: 256, 440, 744 and
+    1040 channels at strides 4, 8, 16 and 32 (outputs of dense stages 0, 1, 5 and
+    6). to_stride_8 runs the stem and dense stages 0 and 1; the middle map is dense
+    stage 5''s output, the final map dense stage 6''s through the final norm. Image
+    counts padded to a multiple of 16 (depthwise convolutions, no BatchNorm). Settings:
+    model.backbone the new name; rate and anchors the recipe''s.'
+  precedents:
+  - "RadioDINO-S/16 (weights 0.05 to 0.06): the MambaVision rate and anchors held\
+    \ within \xB10.0006."
+  novelty: First densely connected backbone here.
+  coverage: Every study and every label.
+  exploitation: "Read \xD74 and \xD71 against the reference, the per-label changes\
+    \ and the blends. Activation: the effective config."
+  budget: '5.0 GMAC per image (measured): expected 1.0 to 1.2 of a local MambaVision-T
+    run; memory 12 to 15 GB with the concatenated channels.'
+  implementation: 'Files: modeling/backbone_stages.py (the stage adapter with the
+    multiple-of-16 padding, stage groups stem, dense stage 0, 1, 2 to 5, 6), modeling/spatial_tokens.py
+    (mappings derived from the stem and transition downsampling), configs/campaign.yaml.
+    Check on CPU the stage shapes and padding equivalence.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Feature reuse instead of residual sums; the user's choice.
+  status: retired
+  created_revision: 94
+  seeded: /home/claudio/src/knee-abnormality-backbone-families/autoresearch/campaigns/backbone-families/seed-rdnet-retry.yaml
+  experiments:
+  - rdnet-tiny-retry-20261015T200250Z-785f004e
+  - rdnet-tiny-retry-20261015T201148Z-05ae2e4a
+- id: davit-tiny
+  mechanism_id: family-davit
+  parent_idea_id: null
+  title: DaViT-T (davit_tiny.msft_in1k), window attention alternating with image-wide
+    channel attention, on the MambaVision recipe unchanged
+  opportunity: "Evidence (prior-work.md, Four families added on 2026-10-15): Swin-like\
+    \ spatial window attention alternating with channel attention that spans the whole\
+    \ image, and a 3\xD73 depthwise position convolution in every block, the local\
+    \ convolution Hiera-T lacked. Closest precedent: Swin-T on this recipe, \xD74\
+    \ 0.937176 and +0.0016 in the ResNet-50 blend; DaViT-T beats Swin-T on dense prediction\
+    \ (ADE20K 46.3 against 44.5 mIoU, COCO Mask R-CNN 1\xD7 45.0/41.1 against 43.7/39.8\
+    \ AP). Apache-2.0. Weights flat at RMS 0.086 to 0.089, MambaVision-T's scale.\
+    \ Added at the user's request. Guess on size: +0.000 to +0.004 against the reference,\
+    \ blend value from a different operator."
+  mechanism: "timm's davit_tiny.msft_in1k with pretrained weights: 96, 192, 384 and\
+    \ 768 channels at strides 4, 8, 16 and 32 (7\xD77 stride-4 stem, 2\xD72 downsamples\
+    \ at the start of stages 1 to 3). to_stride_8 runs the stem and stages 0 and 1;\
+    \ the middle map is stage 2's output, the final map stage 3's through head.norm.\
+    \ Image counts padded to a multiple of 16 (depthwise convolutions, LayerNorm only),\
+    \ as for ConvNeXt. Windows of 7 divide every map at 224 px. Mapping derived from\
+    \ the stem and downsample convolutions (origins 2, 6 and 14 px at strides 8, 16\
+    \ and 32) and checked against the built model. Settings: model.backbone the new\
+    \ name; rate 2e-4 and anchors 0.001 and 0.00001, the recipe's (relative step 2.2e-3\
+    \ to 2.6e-3, as MambaVision-T's)."
+  precedents:
+  - "Swin-T on the MambaVision recipe, fold 2, 2026-10-14: \xD74 0.937176, 4,023 s,\
+    \ 23.4 GB (docs/validation/results/2026-10-14-swin-t.md)."
+  - 'FocalNet-T SRF in this campaign: 23 GB at 332 W in P2 without spilling; 5.5 min
+    per epoch after its speed repair.'
+  novelty: First channel-attention backbone here.
+  coverage: Every study and every label.
+  exploitation: "Read \xD74 and \xD71 against the incumbent and the reference, the\
+    \ per-label changes from largest gain to largest loss, the token-map metrics,\
+    \ and the blends with the ResNet-50 and the reference. Activation: the recorded\
+    \ effective config names the backbone, and backbone_drift_stage4 is above zero\
+    \ after epoch 1."
+  budget: 4.45 GMAC per image; cost proxies like Swin-T's (V100 throughput 1,059 against
+    Swin-T's 1,024 img/s), so about 5.2 to 5.6 min per epoch (near Swin-T's 4,023
+    s, inside 4,090 s only without extra copies); memory 21 to 23 GB. Keep every per-step
+    tensor in the layout timm uses and add no permutes or copies beyond the padding.
+  implementation: 'Files: modeling/backbone_stages.py (the stage adapter with the
+    multiple-of-16 padding, following StemStages and FocalNet''s adapter), modeling/spatial_tokens.py
+    (mapping entries for the final and layer3 reads and a mapping function from the
+    stem and downsample convolutions), training/lightning.py only if the early-anchor
+    prefixes miss the stem or stage 0, configs/campaign.yaml. Check on CPU the four
+    stage shapes at 224 px, the mapping, and that padding leaves the real rows unchanged.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's pick with the closest precedent above the reference
+    (Swin-T) and the lowest adapter effort.
+  status: completed
+  created_revision: 101
+  seeded: /home/claudio/src/knee-abnormality-backbone-families/autoresearch/campaigns/backbone-families/seed-four-families.yaml
+  ranking_rationale: 'Block and park rdnet-tiny-checkpointed: its one bounded repair
+    was already approved and subsequently failed the runtime gate, projecting 4,221
+    s against the 4,090.50 s ceiling. The bound candidate has repair_count 2; the
+    automatic repair request does not override the one-repair rule. This is no evidence
+    against RDNet''s predictive quality. Supply the complete remaining queue after
+    parking, preserving its relative order, to resolve the previous report''s ranking
+    rejection.'
+  experiments:
+  - davit-tiny-20261015T221031Z-0c1a454e
+  decision: reject
+- id: edgenext-base
+  mechanism_id: family-edgenext
+  parent_idea_id: null
+  title: EdgeNeXt-B (edgenext_base.in21k_ft_in1k), growing-kernel depthwise stages
+    with split-depthwise channel attention, ImageNet-21k pretraining, on the MambaVision
+    recipe unchanged
+  opportunity: "Evidence (prior-work.md, Four families added on 2026-10-15): ConvNeXt-like\
+    \ depthwise stages whose kernels grow with depth (3 to 9), plus split depthwise\
+    \ transposed attention (channel attention over multi-scale depthwise splits) at\
+    \ the end of stages 1 to 3; pretrained on ImageNet-21k then 1k. MIT. Weights flat\
+    \ at RMS 0.085 to 0.090 (stem 0.073), MambaVision-T's scale. The cheapest family\
+    \ here (2.9 GMAC, about 17 GB). Added at the user's request. Guess on size: \u2212\
+    0.002 to +0.003 against the reference."
+  mechanism: "timm's edgenext_base.in21k_ft_in1k with pretrained weights: 80, 160,\
+    \ 288 and 584 channels at strides 4, 8, 16 and 32 (4\xD74 stride-4 stem and 2\xD7\
+    2 downsamples identical to ConvNeXt's). to_stride_8 runs the stem and stages 0\
+    \ and 1; the middle map is stage 2's output, the final map stage 3's through head.norm.\
+    \ Image counts padded to a multiple of 16. Mapping: the ConvNeXt mapping (origins\
+    \ 1.5, 3.5, 7.5 and 15.5 px) extended to accept the split-depthwise blocks, checked\
+    \ against the built model. Settings: model.backbone the new name; rate 2e-4 and\
+    \ anchors 0.001 and 0.00001, the recipe's (relative step 2.2e-3 to 2.7e-3). Layer-scale\
+    \ gammas reach 6.07 in the last block, as large as ConvNeXt's; no change for them."
+  precedents:
+  - 'ConvNeXt-T in12k: same stem and downsample geometry, the existing _convnext_mapping
+    and padding.'
+  - "RadioDINO-S/16 (weights 0.05 to 0.06): the MambaVision rate and anchors held\
+    \ within \xB10.0006."
+  novelty: First channel-attention ConvNeXt variant and first ImageNet-21k family
+    in this campaign.
+  coverage: Every study and every label.
+  exploitation: "Read \xD74 and \xD71 against the incumbent and the reference, the\
+    \ per-label changes, the token-map metrics and the blends. Activation: the effective\
+    \ config names the backbone; backbone_drift_stage4 above zero after epoch 1."
+  budget: '2.9 GMAC per image: about 4.0 to 4.6 min per epoch, memory about 17 GB.'
+  implementation: 'Files: modeling/backbone_stages.py (the stage adapter with the
+    multiple-of-16 padding), modeling/spatial_tokens.py (the ConvNeXt-style mapping
+    extended to the split blocks), configs/campaign.yaml. Check on CPU the stage shapes
+    at 224 px and the mapping.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's pick; the safest on time and memory, and ImageNet-21k
+    pretraining.
+  status: completed
+  created_revision: 101
+  seeded: /home/claudio/src/knee-abnormality-backbone-families/autoresearch/campaigns/backbone-families/seed-four-families.yaml
+  ranking_rationale: 'Block and park rdnet-tiny-checkpointed: its one bounded repair
+    was already approved and subsequently failed the runtime gate, projecting 4,221
+    s against the 4,090.50 s ceiling. The bound candidate has repair_count 2; the
+    automatic repair request does not override the one-repair rule. This is no evidence
+    against RDNet''s predictive quality. Supply the complete remaining queue after
+    parking, preserving its relative order, to resolve the previous report''s ranking
+    rejection.'
+  experiments:
+  - edgenext-base-20261015T230524Z-339e40b1
+  - edgenext-base-20261015T230939Z-a154c7e7
+  decision: reject
+- id: efficientvit-b2
+  mechanism_id: family-efficientvit
+  parent_idea_id: null
+  title: EfficientViT-B2 (efficientvit_b2.r224_in1k), multi-scale ReLU linear attention
+    at strides 16 and 32, image counts padded to 16 with BatchNorm statistics from
+    the real images only, rate 2e-4, anchors 0.001 and 0.00003
+  opportunity: "Evidence (prior-work.md, Four families added on 2026-10-15): MobileNet\
+    \ inverted-residual blocks at strides 4 and 8, then global ReLU linear attention\
+    \ with multi-scale token aggregation at strides 16 and 32: global context at linear\
+    \ cost, strong segmentation per compute (Cityscapes 82.1, ADE20K 45.9 mIoU). Apache-2.0.\
+    \ BatchNorm throughout (47 layers) and 30 depthwise plus 10 grouped convolutions:\
+    \ unpadded, every new image count would trigger cuDNN planning (ConvNeXt paid\
+    \ 4.3 s per count). Weights fall mildly with depth (stem 0.076, stages 0.057,\
+    \ 0.053, 0.049, 0.044). Added at the user's request. Guess on size: \u22120.004\
+    \ to +0.002 against the reference; blend value from a linear-attention family."
+  mechanism: "timm's efficientvit_b2.r224_in1k with pretrained weights: stem at stride\
+    \ 2, stages 0 to 3 at strides 4, 8, 16 and 32 (48, 96, 192 and 384 channels).\
+    \ to_stride_8 runs the stem and stages 0 and 1; the middle map is stage 2's output,\
+    \ the final map stage 3's (no final norm in the model; the final read takes stage\
+    \ 3 as it is). Image counts padded to a multiple of 16, and every BatchNorm in\
+    \ the backbone takes its batch statistics, and its running-statistics update,\
+    \ from the real rows only: a wrapper replaces each BatchNorm2d, computes mean\
+    \ and variance over the first count rows in training mode, normalises all rows\
+    \ with them and updates the running statistics as BatchNorm2d would; in eval mode\
+    \ it is BatchNorm2d. The real row count reaches the wrappers through the stage\
+    \ adapter without a host synchronisation. With that, padding leaves the real rows'\
+    \ outputs and the statistics exactly as unpadded. Mapping: origin 0 at every stride\
+    \ as derived from the stem and the stride-2 convolutions, checked against the\
+    \ built model. Settings: model.backbone the new name; rate 2e-4 (relative step\
+    \ 2.6e-3 to 4.5e-3); early anchor 0.001; late anchor 0.00003, whose cost per relative\
+    \ movement on the last stage (0.00003 \xD7 0.044\xB2 = 5.8e-8) matches the ResNet-50's\
+    \ (5.3e-8) and MambaVision-T's (8.5e-8), where the recipe's 0.00001 would give\
+    \ a third of it."
+  precedents:
+  - 'MaViT-S: BatchNorm with depthwise convolutions cost 8 s per new image count unpadded
+    (docs/modeling/mambavision-backbone.md).'
+  - 'PVTv2-b2 (weights 0.045 to 0.056) and RadioDINO-S/16: the recipe''s rate held.'
+  novelty: First linear-attention backbone and first padded BatchNorm family here.
+  coverage: Every study and every label.
+  exploitation: "Read \xD74 and \xD71 against the incumbent and the reference, the\
+    \ per-label changes, the token-map metrics and the blends. Activation: the effective\
+    \ config names the backbone; backbone_drift_stage4 above zero after epoch 1."
+  budget: '1.5 GMAC per image but 101 MB of saved activations per image and fp32 attention
+    (timm turns autocast off in it): about 4.0 to 4.8 min per epoch once padded; memory
+    near FocalNet-T''s minus a tenth.'
+  implementation: 'Files: modeling/backbone_stages.py (the stage adapter with the
+    multiple-of-16 padding and the real-row BatchNorm wrapper), modeling/spatial_tokens.py
+    (mapping), configs/campaign.yaml. Check on CPU at two image counts that the real
+    rows'' outputs, the batch statistics and the running statistics after one training-mode
+    forward are equal with and without padding, and the mapping.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's pick; the one global-attention family that is cheap
+    at stride 16 and 32.
+  status: blocked
+  created_revision: 101
+  seeded: /home/claudio/src/knee-abnormality-backbone-families/autoresearch/campaigns/backbone-families/seed-four-families.yaml
+  ranking_rationale: 'Block and park rdnet-tiny-checkpointed: its one bounded repair
+    was already approved and subsequently failed the runtime gate, projecting 4,221
+    s against the 4,090.50 s ceiling. The bound candidate has repair_count 2; the
+    automatic repair request does not override the one-repair rule. This is no evidence
+    against RDNet''s predictive quality. Supply the complete remaining queue after
+    parking, preserving its relative order, to resolve the previous report''s ranking
+    rejection.'
+  experiments:
+  - efficientvit-b2-20261016T000622Z-682e10c8
+  - efficientvit-b2-20261016T001249Z-12ba2ad9
+  blocked_reason: 'Block and park EfficientViT-B2: launch preflight failed with CUDA
+    out of memory under the 22.5 GiB cap, and the idea has exhausted its one bounded
+    repair. A failed gate cannot be approved. Correct the rejected queue report by
+    explicitly listing the full remaining queue after parking: wtconvnext-tiny. This
+    changes no relative priority.'
+- id: wtconvnext-tiny
+  mechanism_id: family-wtconvnext
+  parent_idea_id: null
+  title: "WTConvNeXt-T (official checkpoint), ConvNeXt-T with wavelet convolutions\
+    \ in place of the 7\xD77 depthwise convolutions, through the official fused Triton\
+    \ kernels, on the MambaVision recipe unchanged"
+  opportunity: "Evidence (prior-work.md, Four families added on 2026-10-15): each\
+    \ block's depthwise convolution becomes a wavelet convolution, a 5\xD75 depthwise\
+    \ base plus 5, 4, 3 and 2 Haar levels in stages 0 to 3, each level a 5\xD75 depthwise\
+    \ convolution on the four Haar subbands: a large low-frequency receptive field\
+    \ while the edge subbands keep thin detail. Against ConvNeXt-T in its paper: ADE20K\
+    \ 46.6 against 46.0 mIoU, COCO 51.0/44.4 against 50.4/43.7 AP, shape bias 29.2%\
+    \ against 21.7%, ImageNet-C mCE 52.0 against 53.2. MIT. Weights flat at RMS about\
+    \ 0.10. Added at the user's request. Guess on size: level to +0.004 against the\
+    \ reference."
+  mechanism: "A backbone in a new file modeling/wtconv.py: the wavelet convolution\
+    \ layer vendored from the official MIT repository (local clone /home/claudio/.cache/wtconv-src/WTConv):\
+    \ the pure Triton implementation in fast_wtconv/wtconv_triton.py and fast_wtconv/triton_haar/\
+    \ (fused Haar, conv and scale forward, fused inverse Haar, scaled depthwise base\
+    \ convolution), with the Haar filters written out (no PyWavelets) and the MIT\
+    \ copyright notice kept as the licence requires. The network is timm's ConvNeXt-T\
+    \ layout (convnext_tiny, conv stem 4\xD74 stride 4, 2\xD72 downsamples, 96, 192,\
+    \ 384 and 768 channels) built without pretrained weights, each block's conv_dw\
+    \ replaced by the wavelet layer with kernel 5 and the stage's levels, then loaded\
+    \ strictly from the official checkpoint /home/claudio/.cache/torch/hub/checkpoints/wtconvnext_tiny_official.pth\
+    \ (sha256 1df1052d1bd288d481adbf227833f33e1bf5c0644da453c427a90d3a406d091f), mapping\
+    \ its key names (wtconvnext/wtconvnext.py and wtconv/wtconv2d.py in the clone)\
+    \ onto the vendored layer's; every checkpoint tensor used and no new parameter\
+    \ left random. The Triton layer takes contiguous NCHW: convert from channels_last\
+    \ inside the layer only, and back. Image counts padded to a multiple of 16; stem,\
+    \ downsamples and mapping as ConvNeXt's (origins 1.5, 3.5, 7.5 and 15.5 px; the\
+    \ wavelet convolutions keep the cell centres, check it against the layers). model.backbone\
+    \ a new name (wtconvnext_tiny), pretrained_weights as the existing families use\
+    \ it. Settings: rate 2e-4 and anchors 0.001 and 0.00001, the recipe's (relative\
+    \ step 2.0e-3)."
+  precedents:
+  - "Fast WTConv (arXiv 2608.10805): the Triton backend runs the layer about 3.0\xD7\
+    \ faster than the original on an RTX A6000; the original WTConvNeXt-T trains at\
+    \ 0.67\xD7 ConvNeXt-T's throughput on a 3090."
+  - 'ConvNeXt-T in12k: the stem and downsample geometry and the padding.'
+  novelty: First frequency-domain operator here.
+  coverage: Every study and every label.
+  exploitation: "Read \xD74 and \xD71 against the incumbent and the reference, the\
+    \ per-label changes (menisci, cartilage-borne OA labels and ACL first), the token-map\
+    \ metrics and the blends. Activation: the effective config names the backbone;\
+    \ backbone_drift_stage4 above zero after epoch 1."
+  budget: 4.5 GMAC per image; with the Triton layer expected about 4.6 to 5.3 min
+    per epoch, memory near FocalNet-T's. The original PyTorch layer would take 6.5
+    to 7.5 min per epoch, over the bound, so the Triton path is the implementation.
+  implementation: 'Files: src/knee_abnormality/modeling/wtconv.py (new: the vendored
+    layer, the kernels and the backbone builder), modeling/backbone_stages.py (the
+    stage adapter with the multiple-of-16 padding), modeling/spatial_tokens.py (mapping),
+    configs/campaign.yaml. Check on CPU: the strict checkpoint load; the vendored
+    Triton forward and backward against the original PyTorch layer (wtconv/wtconv2d.py
+    logic, Haar filters written out) on tiny tensors with TRITON_INTERPRET=1, in float32,
+    to 1e-5 relative; the stage shapes at 224 px; the mapping.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's pick with the most adapter work, so last.
+  status: blocked
+  created_revision: 101
+  seeded: /home/claudio/src/knee-abnormality-backbone-families/autoresearch/campaigns/backbone-families/seed-four-families.yaml
+  ranking_rationale: 'Block and park EfficientViT-B2: launch preflight failed with
+    CUDA out of memory under the 22.5 GiB cap, and the idea has exhausted its one
+    bounded repair. A failed gate cannot be approved. Correct the rejected queue report
+    by explicitly listing the full remaining queue after parking: wtconvnext-tiny.
+    This changes no relative priority.'
+  experiments:
+  - wtconvnext-tiny-20261016T005805Z-b03b5f00
+  - wtconvnext-tiny-20261016T011029Z-444af988
+  blocked_reason: 'Block WTConvNeXt because its launch gate failed after the idea''s
+    one bounded repair. Correct the rejected queue disposition by explicitly listing
+    the complete remaining queue after parking WTConvNeXt: efficientvit-b2-checkpointed.
+    This removes the blocked head without changing any other priority.'
+- id: dinov3-convnext-tiny-10ep
+  mechanism_id: family-dinov3-convnext
+  parent_idea_id: null
+  title: 'DINOv3 ConvNeXt-T (convnext_tiny.dinov3_lvd1689m) on the MambaVision recipe,
+    rate 5e-5 and anchors 0.01 early, 0.0002 late for its small flat weight scale,
+    ten epochs (relaunch: the first run was aborted at epoch 2 when the user made
+    ten epochs the default; twelve was MambaVision-Ts recipe)'
+  opportunity: 'Evidence (prior-work.md, DINOv3 ConvNeXt-T): ConvNeXt-T distilled
+    from the DINOv3 7B teacher on 1.7B images, self-supervised dense features instead
+    of ImageNet labels; second of 34 in the 2026 backbone search (docs/modeling/backbone-search.md,
+    0.904386). Added at the user''s request on 2026-10-15. Its weights are flat over
+    depth but small (RMS 0.0096 stem, 0.014 to 0.018 in the stages, against 0.021
+    to 0.028 for the in12k ConvNeXt-T), so the MambaVision rate and anchors do not
+    transfer. Guess on size: level to +0.004 against the reference, and blend value
+    from a self-supervised pretraining.'
+  mechanism: 'The existing ConvNeXt adapter with timm''s convnext_tiny.dinov3_lvd1689m
+    (pretrained_weights timm): 96, 192, 384 and 768 channels at strides 4, 8, 16 and
+    32, ImageNet mean and std, LayerNorm only, image counts padded to a multiple of
+    16 as for convnext_tiny.in12k_ft_in1k. Register the name beside convnext_tiny.in12k_ft_in1k
+    in modeling/spatial_tokens.py (CONVNEXT_BACKBONES); the mapping function and the
+    stage adapter are the ConvNeXt ones. Settings: model.backbone the new name, optimizer.backbone_lr
+    0.00005, optimizer.anchor_alpha_early 0.01, optimizer.anchor_alpha_late 0.0002;
+    everything else the recipe''s (stochastic depth 0, stage decay 1.0, linear decay,
+    late anchor following the rate). trainer.max_epochs 10.'
+  precedents:
+  - 'Rate: 5e-5 over RMS 0.014 to 0.018 is a relative step of 2.8e-3 to 3.6e-3, inside
+    the ResNet-50 recipe''s 8e-4 to 6.8e-3 and near MambaVision''s 2.2e-3 to 2.5e-3.'
+  - "Late anchor: 0.0002 \xD7 0.0159\xB2 = 5.1e-8 per relative movement on the last\
+    \ stage, matching the ResNet-50's (5.3e-8) and MambaVision's (8.5e-8). Early anchor\
+    \ 0.01 as the ResNet-50, the in12k ConvNeXt-T config and Hiera-T."
+  - "ConvNeXt-T and -S with DINOv3 weights on the ReXNet-style recipe, fold 0, 2026-10-03:\
+    \ \xD74 0.927235 at best against 0.932477 for the ResNet-18 control, on an older\
+    \ recipe (docs/modeling/backbone-swaps.md)."
+  novelty: First DINOv3 weights on the current recipe.
+  coverage: Every study and every label.
+  exploitation: "Read \xD74 and \xD71 against the reference, the per-label changes\
+    \ and the blends with the ResNet-50 and the reference. Activation: the recorded\
+    \ effective config names the backbone."
+  budget: '4.5 GMAC per image, the in12k ConvNeXt-T''s cost: expected 0.9 to 1.1 of
+    a local MambaVision-T run; memory near 12 GB.'
+  implementation: 'Files: modeling/spatial_tokens.py (the name in CONVNEXT_BACKBONES),
+    configs/campaign.yaml. Check on CPU that the model builds with the pretrained
+    weights and the mapping verifies; the in12k ConvNeXt-T must behave exactly as
+    before.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's request; a self-supervised pretraining none of the
+    other families has.
+  status: completed
+  created_revision: 131
+  seeded: /home/claudio/src/knee-abnormality-backbone-families/autoresearch/campaigns/backbone-families/seed-dinov3-10ep.yaml
+  experiments:
+  - dinov3-convnext-tiny-10ep-20261015T190136Z-09dac92a
+  - dinov3-convnext-tiny-10ep-20261015T190303Z-79b291cb
+  - dinov3-convnext-tiny-10ep-20261015T190705Z-43830f09
+  decision: reject
+- id: pvt-v2-b2-checkpointed
+  mechanism_id: family-pvtv2
+  parent_idea_id: null
+  title: PVTv2-b2 (pvt_v2_b2.in1k), global spatial-reduction attention from stride
+    4 with overlapping patch embeddings, on the MambaVision recipe unchanged, ten
+    epochs, with activation checkpointing of stage 0 in training
+  opportunity: 'Evidence (prior-work.md, The families): global attention at every
+    stage (with spatially reduced keys and values), not windowed like Swin-T, plus
+    overlapping patch embeddings and a depthwise convolution in each MLP, the encoder
+    of many medical segmentation models (Polyp-PVT). Apache-2.0. Its weights are flat
+    over depth (RMS 0.045 to 0.056), between RadioDINO''s 0.05 to 0.06, where the
+    MambaVision rate and anchors held, and MambaVision''s 0.08. Guess on size: level
+    to +0.003, blend value from global attention.'
+  mechanism: 'A pvt_v2 backbone from timm''s pvt_v2_b2.in1k: 64, 128, 320 and 512
+    channels at strides 4, 8, 16 and 32. to_stride_8 runs the patch embedding and
+    the first two stages; the middle map is the third stage''s output, the final map
+    the fourth''s. Image counts padded to a multiple of 16 (depthwise convolutions,
+    no BatchNorm). Settings: model.backbone the new name; rate and anchors the recipe''s
+    (2e-4, 0.001, 0.00001). trainer.max_epochs 10. In training mode the adapter runs
+    stage 0 (stride 4) under torch.utils.checkpoint.checkpoint(use_reentrant=False),
+    so their activations are recomputed in the backward pass instead of stored; outputs
+    and gradients are unchanged (no dropout or stochastic depth), and in eval mode
+    the stages run directly. The feature-statistics augmentation stays outside the
+    checkpointed stages.'
+  precedents:
+  - "RadioDINO-S/16 (weights 0.05 to 0.06): rates 1.4e-4 to 4e-4 and the MambaVision\
+    \ anchors all within \xB10.0006 at \xD74; doubled anchors \u22120.0024 (autoresearch/campaigns/radiodino-settings)."
+  - 'Keeper measurement 2026-10-15, backbone alone, 256 images (the mean training
+    batch is 253), bf16, channels_last, forward and backward on the 3090: peak 22.3
+    GB to 12.7 GB with checkpointing, 0.401 to 0.417 s per step; FocalNet-T, which
+    trained at a 23.0 GB peak, is 17.2 GB and 0.389 s there. Without checkpointing
+    the full training exceeds the 24 GB card and every launch failed on its first
+    batch with ''CUDA driver error: device not ready'' (WSL spill).'
+  novelty: First global-attention pyramid here.
+  coverage: Every study and every label.
+  exploitation: "Read \xD74 and \xD71 against the reference, the per-label changes\
+    \ and the blends. Activation: the effective config and the padded image count\
+    \ logged or checked once."
+  budget: 'Backbone step time within about 20% of FocalNet-T''s: ten epochs in about
+    50 to 62 min, inside the 68 min bound; peak memory well under FocalNet-T''s 23
+    GB.'
+  implementation: 'Files: modeling/backbone_stages.py (the stage adapter with the
+    multiple-of-16 padding ConvNeXt uses), modeling/staged_backbones.py if a wrapper
+    is needed, modeling/spatial_tokens.py (mappings derived from the overlapping patch
+    embeddings: kernel 7 stride 4 padding 3, then kernel 3 stride 2 padding 1), configs/campaign.yaml.
+    Check on CPU the stage shapes and that padded and unpadded image counts give the
+    same outputs for the real images.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The easiest drop-in of the attention families, with global attention
+    from the start.
+  status: completed
+  created_revision: 208
+  seeded: /home/claudio/src/knee-abnormality-backbone-families/autoresearch/campaigns/backbone-families/seed-checkpointed.yaml
+  experiments:
+  - pvt-v2-b2-checkpointed-20261015T201343Z-120f22f4
+  decision: reject
+- id: rdnet-tiny-checkpointed
+  mechanism_id: family-rdnet
+  parent_idea_id: null
+  title: RDNet-T (rdnet_tiny.nv_in1k), DenseNet-style feature concatenation, on the
+    MambaVision recipe unchanged, ten epochs, with activation checkpointing of dense
+    stages 0 and 1 in training
+  opportunity: 'Evidence (prior-work.md, The families): dense connections that concatenate
+    earlier features instead of summing them, so fine early features reach the deep
+    reads directly; Apache-2.0. LayerNorm, no BatchNorm; weights flat over depth (RMS
+    0.039 to 0.043). Guess on size: level to +0.003.'
+  mechanism: 'An rdnet backbone from timm''s rdnet_tiny.nv_in1k: 256, 440, 744 and
+    1040 channels at strides 4, 8, 16 and 32 (outputs of dense stages 0, 1, 5 and
+    6). to_stride_8 runs the stem and dense stages 0 and 1; the middle map is dense
+    stage 5''s output, the final map dense stage 6''s through the final norm. Image
+    counts padded to a multiple of 16 (depthwise convolutions, no BatchNorm). Settings:
+    model.backbone the new name; rate and anchors the recipe''s. trainer.max_epochs
+    10. In training mode the adapter runs dense stages 0 and 1 (strides 4 and 8) under
+    torch.utils.checkpoint.checkpoint(use_reentrant=False), so their activations are
+    recomputed in the backward pass instead of stored; outputs and gradients are unchanged
+    (no dropout or stochastic depth), and in eval mode the stages run directly. The
+    feature-statistics augmentation stays outside the checkpointed stages.'
+  precedents:
+  - "RadioDINO-S/16 (weights 0.05 to 0.06): the MambaVision rate and anchors held\
+    \ within \xB10.0006."
+  - 'Keeper measurement 2026-10-15, backbone alone, 256 images (the mean training
+    batch is 253), bf16, channels_last, forward and backward on the 3090: peak 20.4
+    GB to 10.0 GB with checkpointing, 0.471 to 0.459 s per step; FocalNet-T, which
+    trained at a 23.0 GB peak, is 17.2 GB and 0.389 s there. Without checkpointing
+    the full training exceeds the 24 GB card and every launch failed on its first
+    batch with ''CUDA driver error: device not ready'' (WSL spill).'
+  novelty: First densely connected backbone here.
+  coverage: Every study and every label.
+  exploitation: "Read \xD74 and \xD71 against the reference, the per-label changes\
+    \ and the blends. Activation: the effective config."
+  budget: 'Backbone step time within about 20% of FocalNet-T''s: ten epochs in about
+    50 to 62 min, inside the 68 min bound; peak memory well under FocalNet-T''s 23
+    GB.'
+  implementation: 'Files: modeling/backbone_stages.py (the stage adapter with the
+    multiple-of-16 padding, stage groups stem, dense stage 0, 1, 2 to 5, 6), modeling/spatial_tokens.py
+    (mappings derived from the stem and transition downsampling), configs/campaign.yaml.
+    Check on CPU the stage shapes and padding equivalence.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Feature reuse instead of residual sums; the user's choice.
+  status: blocked
+  created_revision: 208
+  seeded: /home/claudio/src/knee-abnormality-backbone-families/autoresearch/campaigns/backbone-families/seed-checkpointed.yaml
+  experiments:
+  - rdnet-tiny-checkpointed-20261015T201753Z-97391446
+  - rdnet-tiny-checkpointed-20261015T213647Z-be9fd18f
+  - rdnet-tiny-checkpointed-20261015T220439Z-7ecbf4d3
+  blocked_reason: 'Block and park rdnet-tiny-checkpointed: its one bounded repair
+    was already approved and subsequently failed the runtime gate, projecting 4,221
+    s against the 4,090.50 s ceiling. The bound candidate has repair_count 2; the
+    automatic repair request does not override the one-repair rule. This is no evidence
+    against RDNet''s predictive quality. Supply the complete remaining queue after
+    parking, preserving its relative order, to resolve the previous report''s ranking
+    rejection.'
+- id: focalnet-tiny-srf-10ep
+  mechanism_id: family-focalnet-epochs
+  parent_idea_id: focalnet-tiny-srf
+  title: FocalNet-T SRF incumbent (focalnet-tiny-srf
+  opportunity: "Evidence (run-notes.md, run 6): the incumbent trained twelve epochs,\
+    \ MambaVision-T's recipe, before ten became the campaign default at the user's\
+    \ request. Its \xD71 peaked at epoch 10 (0.933241) and ended at 0.931536 at epoch\
+    \ 12, so the last two epochs at the lowest rates did not add. Ten epochs with\
+    \ the same linear decay reaches the low rates sooner. Requested by the user. Guess\
+    \ on size: \u22120.002 to +0.002 at \xD74, at five sixths of the time."
+  mechanism: "The incumbent unchanged (FocalNet-T SRF, its 1\xD71 convolutions as\
+    \ linear layers, padding to 16, rate 2e-4, anchors 0.001 and 0.00001) with trainer.max_epochs\
+    \ 10 instead of 12. The warm-up and the linear decay scale with the epoch count\
+    \ as the recipe defines them."
+  precedents:
+  - "focalnet-tiny-srf #2: \xD74 0.938816, \xD71 best 0.933241 at epoch 10 of 12,\
+    \ 4,067 s."
+  - "dinov3-convnext-tiny at twelve and at ten epochs: \xD71 0.8757 and 0.8779 after\
+    \ epoch 2."
+  novelty: First epoch-count change on the incumbent family.
+  coverage: Every study and every label.
+  exploitation: "Read \xD74 and \xD71 against the incumbent, the per-epoch \xD71 curve\
+    \ against its twelve-epoch curve, the per-label changes and the blends. Activation:\
+    \ the effective config has trainer.max_epochs 10 and the run logs ten epochs."
+  budget: About 3,400 s (five sixths of 4,067 s), inside the window; memory as the
+    incumbent's 21.5 GiB.
+  implementation: 'Files: configs/campaign.yaml (trainer.max_epochs 10). No source
+    change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's request; settles the incumbent's epoch count before
+    the remaining families compare against it.
+  status: completed
+  created_revision: 243
+  seeded: /home/claudio/src/knee-abnormality-backbone-families/autoresearch/campaigns/backbone-families/seed-focalnet-10ep.yaml
+  experiments:
+  - focalnet-tiny-srf-10ep-20261015T214526Z-a32b443e
+  - focalnet-tiny-srf-10ep-20261015T214711Z-bd7affe1
+  decision: reject
+- id: efficientvit-b2-checkpointed
+  mechanism_id: family-efficientvit
+  parent_idea_id: null
+  title: EfficientViT-B2 (efficientvit_b2.r224_in1k), multi-scale ReLU linear attention
+    at strides 16 and 32, image counts padded to 16 with BatchNorm statistics from
+    the real images only, rate 2e-4, anchors 0.001 and 0.00003, ten epochs, with activation
+    checkpointing of stages 0 and 1 in training
+  opportunity: "Evidence (prior-work.md, Four families added on 2026-10-15): MobileNet\
+    \ inverted-residual blocks at strides 4 and 8, then global ReLU linear attention\
+    \ with multi-scale token aggregation at strides 16 and 32: global context at linear\
+    \ cost, strong segmentation per compute (Cityscapes 82.1, ADE20K 45.9 mIoU). Apache-2.0.\
+    \ BatchNorm throughout (47 layers) and 30 depthwise plus 10 grouped convolutions:\
+    \ unpadded, every new image count would trigger cuDNN planning (ConvNeXt paid\
+    \ 4.3 s per count). Weights fall mildly with depth (stem 0.076, stages 0.057,\
+    \ 0.053, 0.049, 0.044). Added at the user's request. Guess on size: \u22120.004\
+    \ to +0.002 against the reference; blend value from a linear-attention family."
+  mechanism: "timm's efficientvit_b2.r224_in1k with pretrained weights: stem at stride\
+    \ 2, stages 0 to 3 at strides 4, 8, 16 and 32 (48, 96, 192 and 384 channels).\
+    \ to_stride_8 runs the stem and stages 0 and 1; the middle map is stage 2's output,\
+    \ the final map stage 3's (no final norm in the model; the final read takes stage\
+    \ 3 as it is). Image counts padded to a multiple of 16, and every BatchNorm in\
+    \ the backbone takes its batch statistics, and its running-statistics update,\
+    \ from the real rows only: a wrapper replaces each BatchNorm2d, computes mean\
+    \ and variance over the first count rows in training mode, normalises all rows\
+    \ with them and updates the running statistics as BatchNorm2d would; in eval mode\
+    \ it is BatchNorm2d. The real row count reaches the wrappers through the stage\
+    \ adapter without a host synchronisation. With that, padding leaves the real rows'\
+    \ outputs and the statistics exactly as unpadded. Mapping: origin 0 at every stride\
+    \ as derived from the stem and the stride-2 convolutions, checked against the\
+    \ built model. Settings: model.backbone the new name; rate 2e-4 (relative step\
+    \ 2.6e-3 to 4.5e-3); early anchor 0.001; late anchor 0.00003, whose cost per relative\
+    \ movement on the last stage (0.00003 \xD7 0.044\xB2 = 5.8e-8) matches the ResNet-50's\
+    \ (5.3e-8) and MambaVision-T's (8.5e-8), where the recipe's 0.00001 would give\
+    \ a third of it. trainer.max_epochs 10. In training mode the adapter runs stages\
+    \ 0 and 1 (strides 4 and 8) under torch.utils.checkpoint.checkpoint(use_reentrant=False),\
+    \ so their activations are recomputed in the backward pass instead of stored.\
+    \ The recomputed forward must not update the BatchNorm running statistics or num_batches_tracked\
+    \ a second time: pass a context_fn to checkpoint whose recompute context sets\
+    \ a flag the real-row BatchNorm wrappers read, and under that flag they normalise\
+    \ with the batch statistics of the real rows (the same values as the first pass)\
+    \ without touching the running buffers. Outputs, gradients and running statistics\
+    \ then equal the uncheckpointed model's. In eval mode the stages run directly.\
+    \ The feature-statistics augmentation stays outside the checkpointed stages."
+  precedents:
+  - 'MaViT-S: BatchNorm with depthwise convolutions cost 8 s per new image count unpadded
+    (docs/modeling/mambavision-backbone.md).'
+  - 'PVTv2-b2 (weights 0.045 to 0.056) and RadioDINO-S/16: the recipe''s rate held.'
+  - 'efficientvit-b2 (2026-10-16): the preflight ran out of memory at its 52nd training
+    batch under the 22.5 GiB cap (22.29 GiB allocated), so it never trained; blocked
+    after its one repair.'
+  - 'Keeper measurement 2026-10-16, timm efficientvit_b2 backbone alone, 256 images,
+    bf16, channels_last, forward and backward on the 3090: 18.5 GB and 0.306 s unpatched;
+    stages 0 and 1 checkpointed 8.6 GB and 0.353 s (FocalNet-T 17.2 GB and 0.389 s
+    there). PVTv2-b2 and RDNet-T trained with the same kind of checkpointing.'
+  novelty: First linear-attention backbone and first padded BatchNorm family here.
+  coverage: Every study and every label.
+  exploitation: "Read \xD74 and \xD71 against the incumbent and the reference, the\
+    \ per-label changes, the token-map metrics and the blends. Activation: the effective\
+    \ config names the backbone; backbone_drift_stage4 above zero after epoch 1."
+  budget: 'Backbone step below FocalNet-T''s (0.353 against 0.389 s per 256 images):
+    ten epochs well inside the 4,090 s bound; peak memory far below the 22.5 GiB cap.
+    The preflight checks both before training.'
+  implementation: 'Files: modeling/backbone_stages.py (the stage adapter with the
+    multiple-of-16 padding and the real-row BatchNorm wrapper), modeling/spatial_tokens.py
+    (mapping), configs/campaign.yaml. Check on CPU at two image counts that the real
+    rows'' outputs, the batch statistics and the running statistics after one training-mode
+    forward are equal with and without padding, and the mapping. Check on CPU at two
+    image counts that one training-mode forward and backward with checkpointing gives
+    the same outputs, gradients, running means and variances and num_batches_tracked
+    as without it.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's pick; the one global-attention family that is cheap
+    at stride 16 and 32.
+  status: completed
+  created_revision: 351
+  seeded: /home/claudio/src/knee-abnormality-backbone-families/autoresearch/campaigns/backbone-families/seed-efficientvit-checkpointed.yaml
+  ranking_rationale: 'Block WTConvNeXt because its launch gate failed after the idea''s
+    one bounded repair. Correct the rejected queue disposition by explicitly listing
+    the complete remaining queue after parking WTConvNeXt: efficientvit-b2-checkpointed.
+    This removes the blocked head without changing any other priority.'
+  experiments:
+  - efficientvit-b2-checkpointed-20261016T011621Z-3b868528
+  decision: reject
+- id: wtconvnext-tiny-relaunch
+  mechanism_id: family-wtconvnext
+  parent_idea_id: null
+  title: "WTConvNeXt-T (official checkpoint), ConvNeXt-T with wavelet convolutions\
+    \ in place of the 7\xD77 depthwise convolutions, through the official fused Triton\
+    \ kernels, on the MambaVision recipe unchanged, ten epochs (relaunch of the reviewed\
+    \ candidate after a harness failure)"
+  opportunity: "Evidence (prior-work.md, Four families added on 2026-10-15): each\
+    \ block's depthwise convolution becomes a wavelet convolution, a 5\xD75 depthwise\
+    \ base plus 5, 4, 3 and 2 Haar levels in stages 0 to 3, each level a 5\xD75 depthwise\
+    \ convolution on the four Haar subbands: a large low-frequency receptive field\
+    \ while the edge subbands keep thin detail. Against ConvNeXt-T in its paper: ADE20K\
+    \ 46.6 against 46.0 mIoU, COCO 51.0/44.4 against 50.4/43.7 AP, shape bias 29.2%\
+    \ against 21.7%, ImageNet-C mCE 52.0 against 53.2. MIT. Weights flat at RMS about\
+    \ 0.10. Added at the user's request. Guess on size: level to +0.004 against the\
+    \ reference."
+  mechanism: "Reuse unchanged the reviewed candidate of wtconvnext-tiny (experiment\
+    \ wtconvnext-tiny-20261016T011029Z-444af988): copy its changed files from /home/claudio/src/knee-abnormality/outputs/autoresearch/backbone-families/experiments/wtconvnext-tiny-20261016T011029Z-444af988/workspace\
+    \ (src/knee_abnormality/modeling/wtconv.py, modeling/backbone_stages.py, modeling/spatial_tokens.py,\
+    \ training/lightning.py, modeling/model.py and configs/campaign.yaml as they differ\
+    \ from the parent) into the new workspace, rebased on the current incumbent, with\
+    \ trainer.max_epochs 10. That candidate never trained: its job died in 17 s because\
+    \ Triton's kernel cache defaulted to ~/.triton, read-only in the training sandbox;\
+    \ the keeper set TRITON_CACHE_DIR to ~/.cache/triton for training jobs. A backbone\
+    \ in a new file modeling/wtconv.py: the wavelet convolution layer vendored from\
+    \ the official MIT repository (local clone /home/claudio/.cache/wtconv-src/WTConv):\
+    \ the pure Triton implementation in fast_wtconv/wtconv_triton.py and fast_wtconv/triton_haar/\
+    \ (fused Haar, conv and scale forward, fused inverse Haar, scaled depthwise base\
+    \ convolution), with the Haar filters written out (no PyWavelets) and the MIT\
+    \ copyright notice kept as the licence requires. The network is timm's ConvNeXt-T\
+    \ layout (convnext_tiny, conv stem 4\xD74 stride 4, 2\xD72 downsamples, 96, 192,\
+    \ 384 and 768 channels) built without pretrained weights, each block's conv_dw\
+    \ replaced by the wavelet layer with kernel 5 and the stage's levels, then loaded\
+    \ strictly from the official checkpoint /home/claudio/.cache/torch/hub/checkpoints/wtconvnext_tiny_official.pth\
+    \ (sha256 1df1052d1bd288d481adbf227833f33e1bf5c0644da453c427a90d3a406d091f), mapping\
+    \ its key names (wtconvnext/wtconvnext.py and wtconv/wtconv2d.py in the clone)\
+    \ onto the vendored layer's; every checkpoint tensor used and no new parameter\
+    \ left random. The Triton layer takes contiguous NCHW: convert from channels_last\
+    \ inside the layer only, and back. Image counts padded to a multiple of 16; stem,\
+    \ downsamples and mapping as ConvNeXt's (origins 1.5, 3.5, 7.5 and 15.5 px; the\
+    \ wavelet convolutions keep the cell centres, check it against the layers). model.backbone\
+    \ a new name (wtconvnext_tiny), pretrained_weights as the existing families use\
+    \ it. Settings: rate 2e-4 and anchors 0.001 and 0.00001, the recipe's (relative\
+    \ step 2.0e-3)."
+  precedents:
+  - "Fast WTConv (arXiv 2608.10805): the Triton backend runs the layer about 3.0\xD7\
+    \ faster than the original on an RTX A6000; the original WTConvNeXt-T trains at\
+    \ 0.67\xD7 ConvNeXt-T's throughput on a 3090."
+  - 'ConvNeXt-T in12k: the stem and downsample geometry and the padding.'
+  - 'Keeper GPU parity 2026-10-16 (prior-work.md, WTConvNeXt-T GPU parity; evidence/wtconv_gpu_parity.py):
+    that candidate''s wtconv.py against the official wtconv2d.py, float32 with TF32
+    off, at the four stage shapes including five levels and the odd 7 px map: output
+    1.2e-7 to 1.4e-7, input gradient 8.0e-8 to 9.1e-8, every parameter gradient at
+    most 6.4e-7 relative; this is the backward parity the review asked for.'
+  novelty: First frequency-domain operator here.
+  coverage: Every study and every label.
+  exploitation: "Read \xD74 and \xD71 against the incumbent and the reference, the\
+    \ per-label changes (menisci, cartilage-borne OA labels and ACL first), the token-map\
+    \ metrics and the blends. Activation: the effective config names the backbone;\
+    \ backbone_drift_stage4 above zero after epoch 1."
+  budget: 4.5 GMAC per image; with the Triton layer expected about 4.6 to 5.3 min
+    per epoch, memory near FocalNet-T's. The original PyTorch layer would take 6.5
+    to 7.5 min per epoch, over the bound, so the Triton path is the implementation.
+  implementation: Copy the files of the reviewed candidate named in the mechanism;
+    no new code. Check on CPU the strict checkpoint load, the config, and that the
+    files equal the reviewed candidate's except for rebasing.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's pick with the most adapter work, so last.
+  status: blocked
+  created_revision: 377
+  seeded: /home/claudio/src/knee-abnormality-backbone-families/autoresearch/campaigns/backbone-families/seed-wtconvnext-relaunch.yaml
+  experiments:
+  - wtconvnext-tiny-relaunch-20261016T012705Z-ea33fbd0
+  - wtconvnext-tiny-relaunch-20261016T023531Z-328fea54
+  blocked_reason: 'Block and park wtconvnext-tiny-relaunch: its one bounded runtime
+    repair is exhausted and the revised candidate still fails preflight, projecting
+    4,182.73 s against the fixed 4,090.50 s ceiling. Missing accounting and effective-config
+    artifacts follow the preflight exit. The supplied ranking explicitly contains
+    the sole remaining live queue entry after parking, correcting the rejected report
+    without changing its priority.'
+- id: wtconvnext-tiny-9ep
+  mechanism_id: family-wtconvnext
+  parent_idea_id: wtconvnext-tiny
+  title: WTConvNeXt-T, the repaired candidate unchanged, at nine epochs to fit the
+    time bound
+  opportunity: "Evidence (run-notes.md, runs 18 and 20): the repaired WTConvNeXt-T\
+    \ candidate (experiment wtconvnext-tiny-relaunch-20261016T023531Z-328fea54) runs\
+    \ 0.726 s per step; its preflight projected 4,183 s for ten epochs, 2.3% over\
+    \ the 4,090 s bound, and stopped it before training. Epochs are a family setting\
+    \ in this campaign; nine epochs project about 3,770 s. Evidence (prior-work.md,\
+    \ Four families added on 2026-10-15): each block's depthwise convolution becomes\
+    \ a wavelet convolution, a 5\xD75 depthwise base plus 5, 4, 3 and 2 Haar levels\
+    \ in stages 0 to 3, each level a 5\xD75 depthwise convolution on the four Haar\
+    \ subbands: a large low-frequency receptive field while the edge subbands keep\
+    \ thin detail. Against ConvNeXt-T in its paper: ADE20K 46.6 against 46.0 mIoU,\
+    \ COCO 51.0/44.4 against 50.4/43.7 AP, shape bias 29.2% against 21.7%, ImageNet-C\
+    \ mCE 52.0 against 53.2. MIT. Weights flat at RMS about 0.10. Added at the user's\
+    \ request. Guess on size: level to +0.004 against the reference."
+  mechanism: Copy unchanged the changed files of the repaired candidate from /home/claudio/src/knee-abnormality/outputs/autoresearch/backbone-families/experiments/wtconvnext-tiny-relaunch-20261016T023531Z-328fea54/workspace
+    (configs/campaign.yaml, src/knee_abnormality/modeling/wtconv.py, backbone_stages.py,
+    model.py, spatial_tokens.py and training/lightning.py), rebased on the current
+    incumbent, and set trainer.max_epochs 9. No other change.
+  precedents:
+  - "Fast WTConv (arXiv 2608.10805): the Triton backend runs the layer about 3.0\xD7\
+    \ faster than the original on an RTX A6000; the original WTConvNeXt-T trains at\
+    \ 0.67\xD7 ConvNeXt-T's throughput on a 3090."
+  - 'ConvNeXt-T in12k: the stem and downsample geometry and the padding.'
+  - 'wtconvnext-tiny-relaunch-20261016T023531Z-328fea54 preflight: 0.726 s median
+    step, 40 s validation per epoch, 22.5 GiB predicted peak, 4,183 s projected for
+    ten epochs.'
+  - 'Keeper GPU parity of the vendored WTConv layer against the official one (prior-work.md):
+    every gradient below 6.4e-7 relative.'
+  novelty: First frequency-domain operator here.
+  coverage: Every study and every label.
+  exploitation: "Read \xD74 and \xD71 against the incumbent and the reference, the\
+    \ per-label changes (menisci, cartilage-borne OA labels and ACL first), the token-map\
+    \ metrics and the blends. Activation: the effective config names the backbone;\
+    \ backbone_drift_stage4 above zero after epoch 1."
+  budget: About 3,770 s projected for nine epochs (preflight rule); memory as measured,
+    at the 22.5 GiB cap.
+  implementation: Copy the repaired candidate's files and set trainer.max_epochs 9;
+    no new code. Check on CPU the strict checkpoint load and that the files equal
+    the repaired candidate's except for rebasing and the epoch count.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's pick with the most adapter work, so last.
+  status: completed
+  created_revision: 412
+  seeded: /home/claudio/src/knee-abnormality-backbone-families/autoresearch/campaigns/backbone-families/seed-wtconvnext-9ep.yaml
+  ranking_rationale: 'Block and park wtconvnext-tiny-relaunch: its one bounded runtime
+    repair is exhausted and the revised candidate still fails preflight, projecting
+    4,182.73 s against the fixed 4,090.50 s ceiling. Missing accounting and effective-config
+    artifacts follow the preflight exit. The supplied ranking explicitly contains
+    the sole remaining live queue entry after parking, correcting the rejected report
+    without changing its priority.'
+  experiments:
+  - wtconvnext-tiny-9ep-20261016T025118Z-17d600f1
+  - wtconvnext-tiny-9ep-20261016T025225Z-0728bdf2
+  - wtconvnext-tiny-9ep-20261016T025614Z-0d29be0b
+  - wtconvnext-tiny-9ep-20261016T030355Z-43b90fbd
+  decision: reject
+- id: focalnet-early-anchor-follows-rate
+  mechanism_id: family-focalnet
+  parent_idea_id: focalnet-tiny-srf
+  title: "Let FocalNet\u2019s early anchor follow its learning-rate schedule"
+  opportunity: 'Measured: in the accepted twelve-epoch FocalNet run, stage-1 drift
+    peaks at 0.0471 in epoch 2 and retreats to 0.0335 by epoch 11, while later-stage
+    drift continues increasing. Source inspection shows that the early anchor remains
+    constant while the late anchor follows the learning rate. Hypothesis: the constant
+    early penalty increasingly restricts useful adaptation during decay. This pattern
+    does not establish that the retreat caused the late validation decline.'
+  mechanism: For FocalNet only, multiply the existing early-anchor coefficient by
+    the actual backbone learning-rate ratio, using the same warm-up and decay convention
+    already applied to late anchors. Retain alpha_early=0.001, alpha_late=0.00001,
+    backbone_lr=0.0002 and twelve epochs. This changes the temporal allocation of
+    regularization, rather than selecting another anchor strength. Prove execution
+    with focalnet_early_anchor_scaled_updates>0 in epoch 0; also log the applied multiplier
+    and early-anchor penalty, alongside existing stage-1 drift.
+  precedents:
+  - "Accepted focalnet-tiny-srf-20261015T172800Z-0542173d: \xD71 0.933241, \xD74 0.938816;\
+    \ stage-1 drift 0.0471\u21920.0335 after its peak. Original epoch scalars are\
+    \ in the assignment\u2019s curves.json and the run\u2019s metrics.csv."
+  - 'training/lightning.py: anchor construction schedules only non-early anchors when
+    late_anchor_follows_lr is enabled; training_step applies the actual backbone-group
+    learning-rate ratio.'
+  - "External mambavision-settings ledger: late-anchor-follows-rate-on-linear-decay-20261014T095230Z-c63b90a0\
+    \ was adopted. It supports the schedule mechanism, without establishing that FocalNet\u2019\
+    s early layers benefit."
+  novelty: Extends the accepted family by changing which anchored parameters follow
+    the existing schedule. It preserves the accepted pointwise execution repair and
+    introduces no strength sweep.
+  coverage: "Applies to all existing early-anchor matrices in FocalNet\u2019s stem\
+    \ and first stage. It uses the unchanged macro objective and every label."
+  exploitation: Builds directly on the strongest completed family and its observed
+    early-versus-late drift separation. The positive original 80% interval supports
+    spending one follow-up on this line.
+  budget: 'Measured parent: 4,067.31 s and 23.042 GB peak CUDA allocation. Expected
+    candidate: approximately 4,067 s and 23.1 GB, a guess based on unchanged tensor
+    computation plus device-side scalar accumulation. Only 23.19 s of training-time
+    headroom remains; this proposal does not shorten the schedule to compensate.'
+  implementation: Change training/lightning.py so FocalNet early anchors join the
+    existing scheduled-anchor set. Make this fixed FocalNet behavior, without a new
+    compatibility flag. Add the execution counter and two aggregate diagnostics without
+    per-step host synchronization. Retain the FocalNet builder, pointwise replacements,
+    padding, read normalization, late-anchor behavior and surrounding recipe. If another
+    incumbent is accepted during development, retain unrelated improvements and apply
+    this rule only when FocalNet remains the selected family; do not stack an already
+    implemented equivalent rule.
+  open_choices: "Whether early-drift retreat reflects useful regularization or excessive\
+    \ pull remains unknown. Use the actual learning-rate ratio, including warm-up,\
+    \ rather than inventing another schedule. Macro adoption remains exclusively the\
+    \ shared \xD71/\xD74 rule."
+  dependencies:
+  - focalnet-tiny-srf
+  priority_rationale: 'First: strongest parent evidence, a specific logged pattern,
+    little implementation cost and no additional model computation. Runtime headroom
+    is the main risk.'
+  source_change: true
+  targeted_curve: "focalnet-tiny-srf-20261015T172800Z-0542173d, epochs 2\u201311:\
+    \ reduce the stage-1 drift retreat from 0.0471 to 0.0335 and improve late \xD7\
+    1 macro AUC beyond the epoch-9 peak, without changing the horizon."
+  status: blocked
+  created_revision: 460
+  ranking_rationale: 'Admit three proposals; proposal_admission reports their dependencies
+    satisfied. FocalNet ranks first as a specific extension of the adopted family:
+    its early-anchor schedule differs materially from the accepted implementation.
+    The documentation search found early-anchor-follows-learning-rate in MambaVision,
+    but that attempt was stopped without a result, so it supplies no measured duplicate.
+    EfficientViT ranks second: its smaller quality gap, reported blend value and runtime
+    margin justify a normalization experiment despite uncertain causality and greater
+    implementation risk. DINOv3 ranks third: its final three validation epochs improve,
+    the twelve-epoch attempt was incomplete, and the projected cost fits; the substantial
+    quality deficit limits expected yield. Leave RDNet and Hiera proposed. RDNet offers
+    no completed quality evidence after repeated operational failures; shortening
+    may obtain a measurement but has weaker expected yield than the admitted work.
+    Hiera''s identity final normalization is a concrete implementation fact, but neither
+    a demonstrated defect nor evidence that added normalization will close its large
+    partial-run gap. Neither is queued, so neither is parked. Checked all five mechanisms
+    against the family ledger, prior-work precedents and searches of results/history;
+    no completed equivalent run was found.'
+  experiments:
+  - focalnet-early-anchor-follows-rate-20261016T032201Z-d469892a
+  - focalnet-early-anchor-follows-rate-20261016T041306Z-6a6030e4
+  blocked_reason: Block the candidate after its one bounded repair failed launch preflight.
+    Park the blocked idea as required by the review rule. Supply the complete remaining
+    queue explicitly to resolve the previous ranking rejection; its relative order
+    is unchanged. No further repair is available.
+- id: efficientvit-real-row-batch-renorm
+  mechanism_id: family-efficientvit
+  parent_idea_id: efficientvit-b2-checkpointed
+  title: "Use bounded Batch Renormalization in EfficientViT\u2019s real-row normalization"
+  opportunity: "Measured: EfficientViT reaches \xD74 0.937280, within 0.001536 of\
+    \ FocalNet, and its ResNet blend reaches 0.941334. Its epoch-0 anatomy loss is\
+    \ 1.1676 during training versus 1.5122 in validation; epoch-4 macro AUC falls\
+    \ despite falling training loss. Source inspection confirms that views are concatenated\
+    \ before the backbone and padding is already excluded from BatchNorm statistics.\
+    \ Hypothesis: dependence on correlated study-image batches and batch-versus-running\
+    \ statistics contributes to the remaining gap. These observations do not diagnose\
+    \ that cause."
+  mechanism: "Replace EfficientViT\u2019s ordinary real-row BatchNorm training normalization\
+    \ with bounded Batch Renormalization, retaining affine parameters, running-statistic\
+    \ updates and ordinary running-statistic evaluation. Apply gamma*(r*xhat+d)+beta,\
+    \ with detached corrections computed from pre-update running moments. Retain ordinary\
+    \ BN for the first 10% of optimizer steps, then relax bounds linearly to r_max=3\
+    \ and d_max=5 by 30%, using the historical repository schedule. Keep ten epochs\
+    \ and every existing optimizer setting. Activation: efficientvit_renorm_applied_abs_d>0\
+    \ in epoch 1. Additional diagnostics: applied |r\u22121|, correction clipping\
+    \ fraction, raw moment gap and running-update count."
+  precedents:
+  - "efficientvit-b2-checkpointed-20261016T011621Z-3b868528: \xD71 0.931092, \xD7\
+    4 0.937280, 3,406.44 s, 12.204 GB peak allocation; final validation AUC continues\
+    \ rising."
+  - Its backbone_stages.py contains 47 real-row BatchNorm replacements and checkpoint
+    contexts that prevent persistent running-buffer updates during recomputation.
+  - '[Batch Renormalization](https://arxiv.org/html/1702.03275) motivates detached
+    corrections for small or dependent minibatches and reports terminal bounds r_max=3
+    and d_max=5. Applicability to these MRI batches is a hypothesis.'
+  - 'External radimagenet-rn18 state: rn18-upper-stage-batch-renorm-20260929T060824Z-abe19cf4
+    activated, with applied |d|=0.031108, but exceeded its 1,627.32 s ceiling at 1,630.60
+    s. It supplies implementation and cost precedent, not a valid quality comparison.'
+  novelty: "Tests normalization dependence in EfficientViT\u2019s existing padding-aware,\
+    \ checkpointed execution. It is neither a frozen-BN retry nor a correction for\
+    \ separate per-view backbone calls; those calls are already pooled."
+  coverage: Changes only normalization inside this backbone, across all labels and
+    views. Real images alone determine moments; padded rows remain excluded.
+  exploitation: Targets a near-incumbent family with measured blend complementarity
+    and substantially more runtime headroom than FocalNet. The proposed cause remains
+    uncertain.
+  budget: "Measured parent: 3,406.44 s and 12.204 GB. Working estimate: 3,650\u2013\
+    4,000 s and 13\u201315 GB, including extra affine operations and diagnostics;\
+    \ these are guesses. The historical ResNet implementation incurred material overhead,\
+    \ so cost is a real development risk."
+  implementation: Port the completed EfficientViT adapter onto the current incumbent,
+    then replace its real-row training normalization in backbone_stages.py and add
+    schedule/epoch diagnostics in lightning.py. Preserve pretrained affine values,
+    epsilon, momentum, padding rules and both checkpoint boundaries. Cache detached
+    forward corrections for checkpoint recomputation; reuse them and avoid a second
+    persistent running-statistic update. Apply corrections before the affine transform.
+    Remove the superseded EfficientViT BN training branch rather than exposing alternatives.
+    Retain unrelated incumbent improvements; declare replacement of its active backbone,
+    including focalnet-tiny-srf when applicable.
+  open_choices: The correction ramp is transferred from the prior implementation,
+    not selected on this fold. Batch dependence, augmentation and pretraining transfer
+    remain competing explanations. No normalization recalibration pass or prediction-mode
+    change is proposed.
+  dependencies: []
+  priority_rationale: 'Second: plausible family-specific mechanism, near-incumbent
+    performance, positive blend value and sufficient estimated compute margin. More
+    implementation and causal uncertainty than the FocalNet follow-up.'
+  source_change: true
+  targeted_curve: "EfficientViT epochs 0\u20135: reduce the early train/validation\
+    \ anatomy discrepancy and the epoch-4 \xD71 macro dip while preserving the continuing\
+    \ epochs-7\u20139 rise. Improvement must occur in whole-macro \xD71 and \xD74\
+    \ AUC."
+  status: completed
+  created_revision: 460
+  ranking_rationale: 'Admit the named FocalNet combination and WTConv export normalization;
+    proposal_admission reports their dependencies satisfied. Ledger, prior-work precedents
+    and documentation searches reveal no completed equivalent measurement. The FocalNet
+    combination materially changes the horizon relative to the blocked attempt and
+    explicitly names both components; it is a new combined experiment, not another
+    repair or adoption of the rejected ten-epoch setting. Rank it immediately after
+    the reserved head because it follows the accepted family''s open extend line.
+    Admit WTConv normalization because inspected source establishes a concrete difference
+    from the published dense adapter. Keep DINOv3 ahead of WTConv: its rising final
+    validation trajectory supports additional fitting, whereas WTConv has a larger
+    measured deficit and tight memory headroom. Leave FocalNet DropPath proposed:
+    the official 0.2 setting establishes provenance, but the ten-epoch base''s rising
+    final curve weakens the regularization diagnosis, and other-family stochastic-depth
+    results are negative. Leave Hiera and RDNet proposals proposed; neither displaces
+    these better-supported follow-ups.'
+  experiments:
+  - efficientvit-real-row-batch-renorm-20261016T042218Z-f3b07b7b
+  - efficientvit-real-row-batch-renorm-20261016T043256Z-366d9ffe
+  decision: reject
+- id: dinov3-convnext-twelve-epoch-fit
+  mechanism_id: family-dinov3-convnext
+  parent_idea_id: dinov3-convnext-tiny-10ep
+  title: Give DINOv3 ConvNeXt-T twelve epochs to finish its observed fitting trajectory
+  opportunity: "Measured: DINOv3\u2019s final three \xD71 AUC values are 0.9247, 0.9262\
+    \ and 0.9278, while its own total training loss falls 0.5190\u21920.5121\u2192\
+    0.5064. Its selected checkpoint is the final epoch. Hypothesis: ten epochs ends\
+    \ adaptation too early under the family\u2019s lower learning rate and stronger\
+    \ anchors. The earlier twelve-epoch attempt was interrupted after two epochs and\
+    \ supplies no completed twelve-epoch quality result."
+  mechanism: "Change only the family\u2019s training horizon from ten to twelve epochs.\
+    \ Retain backbone_lr=0.00005, anchors 0.01/0.0002, stage rates, stochastic depth,\
+    \ pretrained weights and ConvNeXt adapter. Let the existing warm-up/linear-decay\
+    \ implementation use the new horizon. Log the actual scheduler horizon: 5,304\
+    \ steps, rather than 4,420, proves the mechanism active in epoch 0; existing final-stage\
+    \ drift proves backbone updates."
+  precedents:
+  - "dinov3-convnext-tiny-10ep-20261015T190705Z-43830f09: \xD71 0.927793, \xD74 0.934199,\
+    \ 2,976.39 s and 20.309 GB peak allocation; its final validation curve is still\
+    \ rising."
+  - "prior-work.md records DINOv3\u2019s smaller pretrained matrix scale and the prescribed\
+    \ 5e-5 learning rate with 0.01/0.0002 anchors."
+  - "dinov3-convnext-tiny-20261015T184515Z-9c5d7328 was cancelled after 698.58 s;\
+    \ only epochs 0\u20131 are available. It does not establish the outcome of this\
+    \ horizon."
+  novelty: A curve-motivated horizon change against the completed ten-epoch family
+    run. It obtains the missing completed longer-fit comparison without changing the
+    seed or requesting a confirmation run.
+  coverage: All labels, images and studies retain the existing recipe. The mechanism
+    changes exposure and scheduler duration together, as the recipe defines them.
+  exploitation: Uses the clearest unfinished endpoint among completed alternatives.
+    Its blend with MambaVision improves over both constituents, although its ResNet
+    blend remains below ResNet alone.
+  budget: 'Measured ten-epoch parent: 2,976.39 s and 20.309 GB. Linear projection
+    for twelve epochs: approximately 3,572 s, leaving about 519 s below the ceiling.
+    Expected peak allocation remains approximately 20.3 GB. Runtime scaling is an
+    estimate.'
+  implementation: "Reuse the completed DINOv3 registration and existing ConvNeXt adapter\
+    \ unchanged, reconciled with unrelated current-incumbent improvements. Set trainer.max_epochs=12\
+    \ in configs/campaign.yaml. Restore its already reviewed spatial registration\
+    \ if absent, and add actual scheduler-horizon logging in lightning.py; these Python\
+    \ changes make source_change true, while the only new training setting is the\
+    \ horizon. Replace the incumbent\u2019s active backbone and declare removal of\
+    \ focalnet-tiny-srf when applicable. Initialize afresh from the specified pretrained\
+    \ checkpoint at seed 1110484336."
+  open_choices: The endpoint may reflect slow useful adaptation or a lower eventual
+    ceiling. Hold rates and anchors fixed so this run answers the horizon question.
+    Do not combine it with an anchor change.
+  dependencies: []
+  priority_rationale: 'Third: low engineering uncertainty and ample projected time
+    margin, but a substantial existing quality deficit and weaker ResNet complementarity
+    than the leading alternatives.'
+  source_change: true
+  targeted_curve: "DINOv3\u2019s epochs 7\u20139 \xD71 macro trajectory, 0.9247\u2192\
+    0.9262\u21920.9278, should continue through epochs 10\u201311 rather than terminate\
+    \ while both its own loss and validation AUC improve."
+  status: completed
+  created_revision: 460
+  ranking_rationale: 'Admit FocalNet export normalization first after the reserved
+    head: it extends the accepted family through a specific, independently verified
+    adapter difference supported by its official dense-backbone implementation. Admit
+    EfficientViT''s eleven-epoch retry next: original metrics confirm four rising
+    terminal validation values with falling loss, and prior-work documents eleven-epoch
+    feasibility for its ordinary-BatchNorm implementation. Its smaller incumbent deficit
+    makes this retry more promising than the queued WTConvNeXt conditioning retry.
+    Both admissions have satisfied proposal_admission dependencies. Keep cosine proposed:
+    its ten-epoch base is still improving, so the claimed late-generalization diagnosis
+    is weaker. Keep the other surplus proposals proposed. Ledger, prior-work precedent-table
+    checks and targeted searches of docs/validation/results and docs/history found
+    no measured duplicate of these three new mechanisms.'
+  experiments:
+  - dinov3-convnext-twelve-epoch-fit-20261016T053949Z-abb9f719
+  decision: invalid
+- id: rdnet-nine-epoch-budget
+  mechanism_id: family-rdnet
+  parent_idea_id: rdnet-tiny-checkpointed
+  title: Fit the evaluated RDNet pointwise repair into nine epochs
+  opportunity: "Measured: the pointwise-repaired ten-epoch RDNet attempt activated\
+    \ both checkpointed stages but projected 4,221.12 s against the 4,090.50 s ceiling.\
+    \ Its two available epochs improve \xD71 AUC 0.8693\u21920.8888 and loss 0.7261\u2192\
+    0.6002; these are insufficient for a quality conclusion. Nine epochs directly\
+    \ addresses the diagnosed runtime failure without taking the blocked selective-cache\
+    \ implementation."
+  mechanism: "Use the evaluated pointwise/channels-last repair with unchanged stage-0/1\
+    \ checkpointing and change only its horizon from ten to nine epochs. Preserve\
+    \ rates, anchors, inputs and batch size. Existing rdnet_checkpointed_images must\
+    \ remain positive. Add actual lr_schedule_progress logging: epoch-0 progress should\
+    \ be 1/9\u22480.111111 rather than 0.1, proving that decay uses the shorter horizon."
+  precedents:
+  - "rdnet-tiny-checkpointed-20261015T213647Z-be9fd18f: activation 111,976 real images\
+    \ in epoch 0; sustained projection 4,221.12 s; no completed \xD71/\xD74 comparison."
+  - Its linked preflight/preflight.json measured 12.885 GiB on sampled batches and
+    projected 13.774 GiB for its assumed largest batch. These are preflight measurements
+    and estimates, not a final-run peak.
+  - History-index entry rdnet-tiny-checkpointed-20261015T220439Z-7ecbf4d3 added selective
+    caching but was blocked before training because it exceeded the bounded-repair
+    allowance. This proposal does not use that implementation.
+  novelty: An explicit family-horizon retry of a diagnosed budget failure. It retains
+    the evaluated execution repair instead of adding another caching mechanism.
+  coverage: All labels and the full prescribed sampling remain. Nine epochs imply
+    3,978 optimizer steps at the recorded 442 steps per epoch.
+  exploitation: Completes the still-unmeasured RDNet family within a conservative
+    projection, preserving the already activated adapter and runtime work.
+  budget: "Scaling the rejected 4,221.12 s ten-epoch projection gives approximately\
+    \ 3,799 s for nine epochs, about 291 s of headroom. Expected peak allocation is\
+    \ approximately 14 GiB, based on the linked preflight\u2019s 13.774 GiB projection;\
+    \ a full-run peak remains unknown. Shortening the horizon should not reduce peak\
+    \ memory."
+  implementation: Copy the RDNet behavior from the 213647Z pointwise-repaired source,
+    reconciled with the current incumbent. Retain both checkpoint boundaries, count
+    padding, final normalization and parameter-preserving projections. Exclude the
+    later selective-cache repair. Set trainer.max_epochs=9 and add scheduler-progress
+    instrumentation in lightning.py; this restoration/instrumentation requires Python
+    changes. Preserve the full-validation completeness assertion. Retain unrelated
+    incumbent improvements and declare replacement of its active family, including
+    focalnet-tiny-srf when applicable.
+  open_choices: Predictive quality is unknown. Nine epochs is chosen from the measured
+    runtime overrun, not a validation optimum. Preflight memory extrapolation and
+    sustained training time may differ from the completed run.
+  dependencies: []
+  priority_rationale: 'Fourth: fixes a concrete operational failure with little new
+    computation, but supplies no existing completed quality or blend evidence.'
+  source_change: true
+  targeted_curve: "RDNet\u2019s invalid ten-epoch run: retain the epoch-0/1 activation\
+    \ and early fitting trajectory while reducing the projected 4,221 s horizon below\
+    \ 4,090.50 s and obtaining a complete validation curve."
+  status: proposed
+  created_revision: 460
+- id: hiera-final-map-layer-norm
+  mechanism_id: family-hiera
+  parent_idea_id: sam2-hiera-tiny
+  title: "Normalize Hiera\u2019s final spatial map before the unchanged downstream\
+    \ projection"
+  opportunity: "Measured: Hiera\u2019s interrupted run improves \xD71 AUC from 0.7009\
+    \ to 0.9021 over epochs 0\u20136, with loss falling 0.8099\u21920.5686. Source\
+    \ inspection finds pre-normalized residual blocks followed by an identity final-map\
+    \ normalization. The SAM2 checkpoint has no pretrained final classifier normalization.\
+    \ Hypothesis: channel conditioning of the final dense read slows transfer into\
+    \ this recipe. This is an adapter hypothesis, not a demonstrated defect or an\
+    \ explanation for the cancellation."
+  mechanism: "Replace only Hiera\u2019s identity final-map normalization with channel\
+    \ LayerNorm over its 768-channel stride-32 map, initialized with unit scale and\
+    \ zero bias. Keep the raw stride-16 read, stage split, stride-8 augmentation,\
+    \ rate 0.0001, anchors 0.01/0.0001 and the original twelve-epoch horizon. Prove\
+    \ execution through hiera_final_norm_active_updated_channels>0 in epoch 0, counting\
+    \ channels whose affine parameters receive finite nonzero gradients and move.\
+    \ Also log raw/normalized map RMS."
+  precedents:
+  - 'sam2-hiera-tiny-20261015T161515Z-3fdf6ec0: seven complete epoch curves, positive
+    stage-4 drift and cancellation after 2,226.01 s; no completed predictive or runtime
+    comparison.'
+  - Its staged_backbones.py constructs the Hiera wrapper with nn.Identity() as final
+    norm. Installed timm hieradet_sam2.py confirms that the SAM2 pretrained weights
+    have no final classifier norm.
+  - '[Official FocalNet dense-prediction adapter](https://raw.githubusercontent.com/microsoft/FocalNet/main/detection/mmdet/models/backbones/focalnet.py)
+    normalizes exported stage maps. This supplies an adapter precedent, not evidence
+    that Hiera requires the same treatment.'
+  novelty: Changes one permitted backbone-read normalization setting. It does not
+    replace the downstream projection, MIL normalization or readout structure, and
+    does not claim to restore a missing pretrained layer.
+  coverage: The final map used by the unchanged shared downstream path is normalized
+    for every image and label. The stride-16 auxiliary read and spatial geometry remain
+    unchanged.
+  exploitation: Tests a concrete source-level difference in a family whose complete
+    quality remains unknown. Confidence is lower than for the completed near-incumbent
+    families.
+  budget: "Rough scaling of 2,226.01 s over seven completed epochs gives approximately\
+    \ 3,816 s for twelve; partial-epoch work and startup make that estimate uncertain.\
+    \ Working expectation: 3,600\u20134,050 s. No final peak-memory artifact exists;\
+    \ estimate 20\u201325 GB from the successful partial execution and a small added\
+    \ normalization footprint. Both estimates are guesses."
+  implementation: Restore the reviewed Hiera constructor, stages and verified geometry
+    onto the current incumbent, then register a channel LayerNorm as its final norm
+    after native pretrained loading. Keep the new affine parameters in the model/optimizer;
+    their one-dimensional shapes retain existing anchor exclusions. Add aggregate
+    activation/RMS diagnostics without changing input preparation. Remove the identity
+    final-norm behavior for Hiera rather than adding a flag. Preserve existing family
+    builders and unrelated incumbent improvements; declare replacement of the active
+    incumbent backbone, including focalnet-tiny-srf when applicable.
+  open_choices: The slow partial fit could instead reflect pretraining-domain differences,
+    learning rate or anchoring. Keep those settings and the parent horizon fixed.
+    Cancellation cause and full-run memory remain unknown.
+  dependencies: []
+  priority_rationale: 'Fifth: a distinct, bounded adapter mechanism with direct source
+    evidence, but weaker predictive evidence and less certain runtime/memory estimates.'
+  source_change: true
+  targeted_curve: "Hiera epochs 0\u20136: improve the slow \xD71 macro rise ending\
+    \ at 0.9021 and the corresponding loss trajectory through better final-map conditioning,\
+    \ while completing the original horizon."
+  status: proposed
+  created_revision: 460
+- id: focalnet-early-anchor-rate-ten-epoch-combination
+  mechanism_id: family-focalnet
+  parent_idea_id: focalnet-early-anchor-follows-rate
+  title: "Combine FocalNet\u2019s scheduled early anchor with its completed ten-epoch\
+    \ setting"
+  opportunity: 'Measured: stage-1 drift retreats from 0.0471 to 0.0335 in the twelve-epoch
+    incumbent and from 0.0454 to 0.0347 in ten-epoch FocalNet. The proposed anchor
+    schedule remains predictively unevaluated: its eager twelve-epoch implementation
+    projected 4,308.53 s, and the compilation repair failed during preflight. The
+    completed ten-epoch setting took 3,313.47 s. Hypothesis: that measured horizon
+    makes the anchor mechanism executable without the failed compilation repair.'
+  mechanism: 'Combine two named precedents: focalnet-tiny-srf-10ep supplies ten epochs;
+    focalnet-early-anchor-follows-rate supplies the behavioral change from its first,
+    eager implementation. Multiply existing FocalNet early-anchor penalties by the
+    actual backbone learning-rate ratio, including warmup. Preserve anchor membership
+    and strengths, the existing late-anchor schedule and all other optimizer settings.
+    This changes the schedule shape, rather than selecting another strength. Prove
+    execution with focalnet_early_anchor_scaled_updates > 0 at epoch 0, counting only
+    batches with positive applied early penalties and a multiplier different from
+    one. Also report focalnet_early_anchor_multiplier and focalnet_early_anchor_penalty.'
+  precedents:
+  - "focalnet-tiny-srf-10ep-20261015T214711Z-bd7affe1: ten epochs, \xD71 0.932380,\
+    \ \xD74 0.938154, 3,313.47 s, peak allocation 23.042 GB. Its rejected horizon\
+    \ alone becomes a named combination component, not an adopted improvement."
+  - 'focalnet-early-anchor-follows-rate-20261016T032201Z-d469892a: eager anchor implementation
+    and applied-penalty instrumentation; twelve-epoch preflight projected 4,308.53
+    s against 4,090.50 s.'
+  - '[Final compilation review](/home/claudio/src/knee-abnormality/outputs/autoresearch/backbone-families/jobs/orchestrator-20261016T042148Z-f83d6b44/report.json):
+    the bounded repair hit FailOnRecompileLimitHit; no completed epoch or predictive
+    result exists.'
+  - '[Family cost evidence](/home/claudio/src/knee-abnormality-backbone-families/autoresearch/campaigns/backbone-families/prior-work.md#epochs-that-fit-the-time-bound-per-family)
+    explicitly identifies ten or eleven epochs as the feasible FocalNet horizon.'
+  novelty: A new combination of two explicitly named settings resolves the measured
+    horizon failure. The original blocked idea remains parked; this proposal excludes
+    its compilation repair and does not claim new predictive evidence for anchoring.
+  coverage: All matrices already classified as FocalNet early anchors in the stem
+    and first stage. Every label retains the unchanged macro objective, targets and
+    evaluation.
+  exploitation: "Fulfils the accepted FocalNet family\u2019s open follow-up using\
+    \ a measured cost-feasible setting. The repeated early-drift retreat motivates\
+    \ the mechanism; whether that retreat is harmful remains a hypothesis."
+  budget: "Measured ten-epoch component: 3,313.47 s and 23.042 GB peak allocation.\
+    \ Expected combination: 3,300\u20133,550 s and approximately 23.1 GB, estimates\
+    \ based on unchanged image computation plus scalar bookkeeping. These estimates\
+    \ fit the 1,684.32\u20134,090.50 s window; preflight remains authoritative."
+  implementation: "In training/lightning.py, reuse only the first eager attempt\u2019\
+    s FocalNet scheduled-anchor membership and applied-penalty diagnostics. Set configs/campaign.yaml\
+    \ trainer.max_epochs to 10. Retain the incumbent\u2019s eager pointwise repair,\
+    \ padding, pretrained loading, normalization, stage split, downstream behavior\
+    \ and late-anchor implementation. Add no compilation path or schedule flag. Retain\
+    \ focalnet-tiny-srf as an active improvement. If a new FocalNet incumbent arrives,\
+    \ preserve unrelated improvements and omit an equivalent schedule already present.\
+    \ If FocalNet ceases to be active, the supervisor must reassess the declared prerequisite\
+    \ before development."
+  open_choices: The outcome measures the named combination against the live incumbent;
+    it cannot isolate the anchor effect from the horizon difference. Do not change
+    strengths, add a control, or rescue a failed gate with another setting.
+  dependencies:
+  - focalnet-tiny-srf
+  priority_rationale: 'First: resolves an open follow-up on the accepted family, with
+    a specific cost diagnosis and an already measured feasible horizon.'
+  source_change: true
+  targeted_curve: "FocalNet incumbent epochs 2\u201311 and ten-epoch FocalNet epochs\
+    \ 2\u20139: reduce stage-1 drift retreat while improving late \xD71 macro AUC.\
+    \ The desired predictive change remains a strict macro gain at both multipliers."
+  status: completed
+  created_revision: 504
+  ranking_rationale: 'Admit the named FocalNet combination and WTConv export normalization;
+    proposal_admission reports their dependencies satisfied. Ledger, prior-work precedents
+    and documentation searches reveal no completed equivalent measurement. The FocalNet
+    combination materially changes the horizon relative to the blocked attempt and
+    explicitly names both components; it is a new combined experiment, not another
+    repair or adoption of the rejected ten-epoch setting. Rank it immediately after
+    the reserved head because it follows the accepted family''s open extend line.
+    Admit WTConv normalization because inspected source establishes a concrete difference
+    from the published dense adapter. Keep DINOv3 ahead of WTConv: its rising final
+    validation trajectory supports additional fitting, whereas WTConv has a larger
+    measured deficit and tight memory headroom. Leave FocalNet DropPath proposed:
+    the official 0.2 setting establishes provenance, but the ten-epoch base''s rising
+    final curve weakens the regularization diagnosis, and other-family stochastic-depth
+    results are negative. Leave Hiera and RDNet proposals proposed; neither displaces
+    these better-supported follow-ups.'
+  experiments:
+  - focalnet-early-anchor-rate-ten-epoch-combination-20261016T044252Z-cc546581
+  decision: reject
+- id: wtconvnext-normalized-dense-exports
+  mechanism_id: family-wtconvnext
+  parent_idea_id: wtconvnext-tiny-9ep
+  title: "Normalize WTConvNeXt\u2019s exported stride-16 and stride-32 maps"
+  opportunity: "Measured: WTConvNeXt\u2019s nine-epoch run loses 0.003169 at \xD7\
+    4 and 0.004077 at \xD71 against FocalNet. Its epoch-8 medial/lateral/PF OA soft-tissue\
+    \ logit magnitudes are 0.2067/0.3146/0.1533, versus FocalNet\u2019s 0.5712/0.7645/0.5046\
+    \ at the same epoch. Magnitudes do not establish predictive quality. Source inspection\
+    \ supplies a concrete adapter hypothesis: this candidate exports raw residual\
+    \ maps, whereas the official WTConvNeXt dense backbone normalizes exported stage\
+    \ maps."
+  mechanism: "Change one adapter setting: apply channel LayerNorm to both exported\
+    \ reads. Normalize the stride-16 read only on its downstream export branch; feed\
+    \ its original tensor into stage 3. Initialize its 384-channel affine normalization\
+    \ to unit scale and zero bias, using native epsilon 1e-6. Apply the existing pretrained\
+    \ 768-channel head normalization spatially to the stride-32 export. This changes\
+    \ where the classification normalization acts; it does not reproduce classification\u2019\
+    s pool-then-normalize computation. Retain all wavelet blocks and nine epochs.\
+    \ Log at most six scalars: wtconv_dense_read_train_coverage, wtconv_read16_relative_change,\
+    \ wtconv_read32_relative_change, wtconv_read16_output_rms, wtconv_read32_output_rms\
+    \ and existing wtconv_wavelet_train_coverage. The first metric reaches one only\
+    \ when both transformed reads change and receive nonzero downstream gradients\
+    \ on sampled real rows; require > 0.5 at epoch 0."
+  precedents:
+  - "wtconvnext-tiny-9ep-20261016T030355Z-43b90fbd: wavelet activation coverage 1.0,\
+    \ training 3,375.07 s, peak allocation 23.554 GB; \xD71 peaks at epoch 7 and falls\
+    \ at epoch 8 while loss decreases."
+  - '[Candidate adapter](/home/claudio/src/knee-abnormality/outputs/autoresearch/backbone-families/experiments/wtconvnext-tiny-9ep-20261016T030355Z-43b90fbd/source/src/knee_abnormality/modeling/backbone_stages.py:137)
+    uses norm_pre, which the inherited default ConvNeXt constructor makes Identity,
+    and returns the raw middle map.'
+  - '[Official dense backbone](https://github.com/BGU-CS-VIL/WTConv/blob/main/semantic_segmentation/mmseg/models/backbones/wtconvnext.py)
+    registers a normalization for each exported stage; its dense forward applies those
+    normalizations to spatial maps.'
+  - '[Official tiny segmentation configuration](https://github.com/BGU-CS-VIL/WTConv/blob/main/semantic_segmentation/configs/wtconvnext/wtconvnext-tiny_upernet_8xb2-amp-160k_ade20k-512x512.py)
+    selects all four stage outputs with gap_before_final_norm=False. This supports
+    the adapter design, not transfer of its other settings.'
+  novelty: "Tests normalization at the backbone-map boundary using the family\u2019\
+    s published dense-export convention. It changes neither routing nor readout structure\
+    \ and is distinct from increasing epochs or weakening augmentation."
+  coverage: Both existing map interfaces, every real image and all labels. Spatial
+    resolution, channels, geometry and downstream projections stay fixed.
+  exploitation: Builds on a fully activated, completed family with measured blend
+    complementarity. The weak soft-tissue signal and raw exports identify a bounded
+    conditioning hypothesis; neither proves normalization caused the rejection.
+  budget: "Measured parent: 3,375.07 s and 23.554 GB. Expected candidate: 3,450\u2013\
+    3,800 s and approximately 23.7\u201324.1 GB, estimates allowing for normalization\
+    \ activations and backward storage. Memory is the main feasibility risk: the parent\
+    \ preflight reported only 0.027 GiB projected headroom. Keep nine epochs and let\
+    \ preflight reject an overrun without compensating recipe changes."
+  implementation: Restore the completed 030355Z WTConv implementation onto the live
+    incumbent. In wtconv.py, perform strict loading of the same official checkpoint
+    before registering the new stride-16 norm and relocating the existing head norm
+    to the exported final-map path. Remove its unused head registration to avoid duplicate
+    parameter ownership. In backbone_stages.py, normalize only the returned reads;
+    retain raw stride-16 input to stage 3. Ensure optimizer grouping covers the new
+    affine parameters and retain their existing one-dimensional anchor/decay exclusions.
+    Add bounded device-side diagnostics in training/lightning.py. Preserve padding,
+    kernels, geometry, stride-8 augmentation and all downstream behavior. This replaces
+    the selected backbone and its family settings, including focalnet-tiny-srf when
+    applicable; preserve unrelated newly accepted improvements.
+  open_choices: "Read conditioning, pretraining transfer and the shorter horizon remain\
+    \ competing explanations. The exact runtime repair\u2019s backward parity remains\
+    \ unmeasured. This proposal does not settle that concern or justify downstream\
+    \ changes."
+  dependencies: []
+  priority_rationale: 'Second: fulfils the new WTConvNeXt retry with direct source
+    evidence and a published adapter precedent. Potential is tempered by the negative
+    interval and tight memory projection.'
+  source_change: true
+  targeted_curve: "WTConvNeXt epochs 4\u20138: improve the late \xD71 macro plateau\
+    \ at 0.9240\u20130.9292 and the weak stride-16 soft-tissue signal, while retaining\
+    \ the existing loss reduction and active wavelet path."
+  status: retired
+  created_revision: 504
+  ranking_rationale: 'Admit FocalNet export normalization first after the reserved
+    head: it extends the accepted family through a specific, independently verified
+    adapter difference supported by its official dense-backbone implementation. Admit
+    EfficientViT''s eleven-epoch retry next: original metrics confirm four rising
+    terminal validation values with falling loss, and prior-work documents eleven-epoch
+    feasibility for its ordinary-BatchNorm implementation. Its smaller incumbent deficit
+    makes this retry more promising than the queued WTConvNeXt conditioning retry.
+    Both admissions have satisfied proposal_admission dependencies. Keep cosine proposed:
+    its ten-epoch base is still improving, so the claimed late-generalization diagnosis
+    is weaker. Keep the other surplus proposals proposed. Ledger, prior-work precedent-table
+    checks and targeted searches of docs/validation/results and docs/history found
+    no measured duplicate of these three new mechanisms.'
+  retired_reason: 'User decision 2026-10-16 09:20 CEST: only EfficientViT-B2 ideas
+    from now on'
+- id: focalnet-native-drop-path-ten-epochs
+  mechanism_id: family-focalnet-stochastic-depth
+  parent_idea_id: focalnet-tiny-srf-10ep
+  title: "Use FocalNet-T SRF\u2019s published stochastic-depth rate on the measured\
+    \ ten-epoch base"
+  opportunity: "Measured: twelve-epoch FocalNet\u2019s \xD71 macro AUC falls from\
+    \ 0.933241 at epoch 9 to 0.931271/0.931536, while total training loss falls from\
+    \ 0.5021 to 0.4954/0.4869. Hypothesis: stochastic depth can regularize the modulation\
+    \ and MLP residual branches. The official tiny SRF configuration supplies a rate\
+    \ of 0.2, avoiding a validation-selected strength. Ten-epoch FocalNet supplies\
+    \ a completed cost-feasible base, although its still-rising final curve makes\
+    \ additional regularization uncertain."
+  mechanism: "Starting from focalnet-tiny-srf-10ep\u2019s measured configuration,\
+    \ change only model.stochastic_depth from 0 to the official maximum rate 0.2.\
+    \ Retain timm\u2019s native depth-dependent rates and independent residual-branch\
+    \ masks. Keep ten epochs, both anchors and their current schedules. Add observational\
+    \ instrumentation without replacing DropPath: sample eligible real image rows\
+    \ at a fixed bounded cadence, count nonzero input branches whose outputs are entirely\
+    \ zero, and aggregate on device. Prove activation with focalnet_drop_path_dropped_real_rows\
+    \ > 0 at epoch 0; also log focalnet_drop_path_eligible_real_rows and focalnet_drop_path_empirical_rate."
+  precedents:
+  - '[Official FocalNet-T SRF configuration](https://github.com/microsoft/FocalNet/blob/main/configs/focalnet_tiny_srf.yaml)
+    specifies DROP_PATH_RATE: 0.2 and depths [2,2,6,2].'
+  - "Installed timm focalnet.py:174\u2013203 applies separate DropPath modules to\
+    \ focal-modulation and MLP residual branches. The incumbent builder already passes\
+    \ model.stochastic_depth to drop_path_rate."
+  - "focalnet-tiny-srf-10ep-20261015T214711Z-bd7affe1: 3,313.47 s, 23.042 GB; \xD7\
+    1 0.932380 and \xD74 0.938154. Its horizon remains a measured base, not an adopted\
+    \ improvement."
+  - "Prior-work and the external MambaVision ledger record rejected stochastic-depth\
+    \ attempts in other families. Those negatives lower confidence; they do not measure\
+    \ FocalNet\u2019s response."
+  novelty: A family-specific regularization mechanism distinct from anchor scheduling
+    and read normalization. The strength comes from the original tiny SRF configuration,
+    with one candidate and no sweep.
+  coverage: Native residual branches throughout FocalNet, across all images and labels.
+    Evaluation remains deterministic with DropPath disabled normally.
+  exploitation: "Uses the accepted family\u2019s observed late training/validation\
+    \ divergence. It leaves the separately proposed early-anchor combination unstacked,\
+    \ so either result remains interpretable against its named base."
+  budget: "Measured ten-epoch base: 3,313.47 s and 23.042 GB. Expected candidate:\
+    \ 3,350\u20133,650 s and approximately 23.1\u201323.5 GB; these are guesses allowing\
+    \ for masks and bounded instrumentation. Native DropPath still computes residual\
+    \ branches, so no substantial speed saving is assumed."
+  implementation: "Use the completed ten-epoch FocalNet recipe and set model.stochastic_depth\
+    \ to 0.2 in configs/campaign.yaml. Retain the incumbent\u2019s eager pointwise\
+    \ execution and existing native DropPath implementation. Add only observational\
+    \ counters through backbone_stages.py and training/lightning.py, excluding padded\
+    \ rows and avoiding host synchronization or additional random draws. Retain constant\
+    \ early anchoring; do not combine the pending anchor mechanism. Preserve focalnet-tiny-srf\
+    \ and unrelated accepted behavior. If a compatible FocalNet incumbent changes\
+    \ during development, retain its unrelated improvements and declare any overlap\
+    \ before applying this setting; reassess the dependency if FocalNet ceases to\
+    \ be active."
+  open_choices: The late decline may reflect another mechanism, and the shorter base
+    may benefit less from regularization. Published pretraining settings do not establish
+    optimal fine-tuning settings. Judge only the shared macro rule; no label-specific
+    objective or additional strength follows automatically.
+  dependencies:
+  - focalnet-tiny-srf
+  priority_rationale: 'Third: inexpensive, distinct and supported by an exact primary-source
+    setting, but less directly diagnosed than the two open-line follow-ups.'
+  source_change: true
+  targeted_curve: "FocalNet incumbent epochs 9\u201311: address falling \xD71 macro\
+    \ AUC despite decreasing training loss. On the ten-epoch base, seek better late\
+    \ macro generalization; a lower training loss is not the objective."
+  status: proposed
+  created_revision: 504
+- id: efficientvit-eleven-epoch-fit-from-batchnorm
+  mechanism_id: family-efficientvit
+  parent_idea_id: efficientvit-b2-checkpointed
+  title: "Extend EfficientViT\u2019s stronger ordinary-BatchNorm run to eleven epochs"
+  opportunity: "Measured: ordinary-BatchNorm EfficientViT finishes with four rising\
+    \ \xD71 macro AUCs, 0.9277, 0.9285, 0.9295 and 0.9311, while loss falls from 0.5184\
+    \ to 0.4954. Renormalization also finishes rising but does not improve the completed\
+    \ family result. Hypothesis: incomplete fitting remains a more credible next target\
+    \ than changing renormalization strength. Prior-work identifies eleven epochs\
+    \ as feasible for the original checkpointed implementation."
+  mechanism: "Change the completed efficientvit-b2-checkpointed configuration\u2019\
+    s horizon from ten to eleven epochs. Preserve its ordinary real-row BatchNorm,\
+    \ rate 2e-4, anchors 0.001/0.00003, linear decay and checkpoint boundaries. Stretch\
+    \ the existing schedule through the new horizon without adding a restart or terminal\
+    \ phase. Prove execution with efficientvit_extended_epoch_optimizer_steps > 0\
+    \ at zero-based epoch 10, counting completed optimizer steps beyond the original\
+    \ horizon; report existing backbone_drift_stage4 and final optimizer_steps alongside\
+    \ it. With unchanged cohort accounting, eleven epochs imply 4,862 optimizer steps."
+  precedents:
+  - "efficientvit-b2-checkpointed-20261016T011621Z-3b868528: \xD71 0.931092, \xD7\
+    4 0.937280, training 3,406.44 s, peak allocation 12.204 GB. Its final four validation\
+    \ epochs rise while training loss decreases."
+  - 'efficientvit-real-row-batch-renorm-20261016T043256Z-366d9ffe: corrections activated
+    without sustained clipping, but the completed result did not improve ordinary
+    BatchNorm. This motivates returning to the stronger family base; it does not establish
+    a causal explanation.'
+  - '[Measured family horizons](/home/claudio/src/knee-abnormality-backbone-families/autoresearch/campaigns/backbone-families/prior-work.md#epochs-that-fit-the-time-bound-per-family)
+    reports approximately 322 unscaled seconds per epoch and a preflight-feasible
+    maximum of eleven epochs for checkpointed EfficientViT.'
+  - '[Original adapter](/home/claudio/src/knee-abnormality/outputs/autoresearch/backbone-families/experiments/efficientvit-b2-checkpointed-20261016T011621Z-3b868528/source/src/knee_abnormality/modeling/backbone_stages.py:130)
+    uses native BatchNorm on real rows and protects running statistics during checkpoint
+    recomputation.'
+  novelty: Tests the unfinished fitting trajectory of the stronger EfficientViT setting.
+    It changes the horizon rather than correction strength, normalization type or
+    model capacity.
+  coverage: The complete EfficientViT backbone, all training studies and all twelve
+    labels. Image counts, resolutions, batch size, targets and both evaluation multipliers
+    remain fixed.
+  exploitation: Takes the newly open EfficientViT follow-up slot. Its stronger completed
+    base has measured blend complementarity and an improving terminal curve, although
+    neither guarantees adoption after another epoch.
+  budget: "Measured base: 3,406.44 s and 12.204 GB peak allocation. Linear extrapolation\
+    \ gives 3,747.08 s for eleven epochs. Expected training is approximately 3,750\u2013\
+    3,950 s and peak allocation approximately 12.3 GB; these are estimates. The existing\
+    \ preflight remains authoritative within the 1,684.32\u20134,090.50 s window."
+  implementation: Restore the completed 011621Z EfficientViT adapter and its builder,
+    geometry checks and diagnostics onto the live incumbent, then set trainer.max_epochs
+    to 11. Python changes are required because the supplied incumbent source lacks
+    this family adapter; add only the extended-epoch counter beyond that restoration.
+    Retain its padding, real-row BatchNorm and stage-0/1 checkpointing. Exclude rejected
+    renormalization, its custom backward and cached-correction replay. Replace the
+    active backbone selection and family settings, superseding focalnet-tiny-srf if
+    still active; preserve unrelated newly accepted behavior. If another EfficientViT
+    incumbent arrives, reconcile its accepted changes before development and omit
+    an already-equivalent horizon.
+  open_choices: The extra epoch also stretches decay, so the result cannot isolate
+    additional updates from schedule timing. The final rising curve supports unfinished
+    fitting only as a hypothesis. Do not add a confirmation run or use blend gains
+    to override the macro adoption rule.
+  dependencies: []
+  priority_rationale: "First: fills the new open family line with a specific curve\
+    \ diagnosis, a stronger completed base and documented cost feasibility. Confidence\
+    \ is limited by the family\u2019s two rejected comparisons."
+  source_change: true
+  targeted_curve: "Ordinary-BatchNorm EfficientViT epochs 6\u20139: \xD71 macro rises\
+    \ 0.9277\u21920.9311 while loss falls 0.5184\u21920.4954. Extend that fitting\
+    \ trajectory through epoch 10 and seek strict macro gains at both multipliers."
+  status: retired
+  created_revision: 540
+  ranking_rationale: 'Admit FocalNet export normalization first after the reserved
+    head: it extends the accepted family through a specific, independently verified
+    adapter difference supported by its official dense-backbone implementation. Admit
+    EfficientViT''s eleven-epoch retry next: original metrics confirm four rising
+    terminal validation values with falling loss, and prior-work documents eleven-epoch
+    feasibility for its ordinary-BatchNorm implementation. Its smaller incumbent deficit
+    makes this retry more promising than the queued WTConvNeXt conditioning retry.
+    Both admissions have satisfied proposal_admission dependencies. Keep cosine proposed:
+    its ten-epoch base is still improving, so the claimed late-generalization diagnosis
+    is weaker. Keep the other surplus proposals proposed. Ledger, prior-work precedent-table
+    checks and targeted searches of docs/validation/results and docs/history found
+    no measured duplicate of these three new mechanisms.'
+  retired_reason: 'User decision 2026-10-16 09:33 CEST: no eleven-epoch run'
+- id: focalnet-stride-sixteen-export-layer-norm
+  mechanism_id: family-focalnet-dense-export
+  parent_idea_id: focalnet-tiny-srf-10ep
+  title: "Normalize FocalNet\u2019s stride-16 export using its published dense-backbone\
+    \ convention"
+  opportunity: "Measured: the incumbent\u2019s \xD71 macro peaks at epoch 9, then\
+    \ falls to 0.9313/0.9315 while loss decreases. Source inspection identifies a\
+    \ concrete adapter difference: FocalNetStages returns the raw stride-16 residual\
+    \ map but normalizes stride 32; the official dense backbone normalizes every exported\
+    \ stage. Hypothesis: conditioning the intermediate export could improve its downstream\
+    \ use. Existing logit magnitudes do not prove a scale defect."
+  mechanism: Starting from the completed ten-epoch FocalNet setting, add channel LayerNorm
+    only to the exported 384-channel stride-16 map. Initialize affine scale to one
+    and bias to zero, using epsilon 1e-5. Feed the original unnormalized map into
+    stage 3 and retain the existing pretrained final normalization. Prove activity
+    with focalnet_read16_active_batches > 0 at epoch 0, counting sampled training
+    batches where normalization changes real-row outputs and those outputs receive
+    nonzero downstream gradients. Also report focalnet_read16_relative_change, focalnet_read16_output_rms
+    and focalnet_read16_grad_rms. Collect detached diagnostics at a bounded fixed
+    cadence without additional random draws.
+  precedents:
+  - '[Incumbent adapter](/home/claudio/src/knee-abnormality/outputs/autoresearch/backbone-families/experiments/focalnet-tiny-srf-20261015T172800Z-0542173d/source/src/knee_abnormality/modeling/backbone_stages.py:123)
+    exports raw middle features and applies backbone.norm only to the final map.'
+  - '[Official FocalNet dense backbone](https://github.com/microsoft/FocalNet/blob/main/segmentation/mmseg/models/backbones/focalnet.py)
+    registers a normalization for each selected stage and applies it to x_out before
+    spatial export. Retrieved directly from the official repository during this refill.'
+  - "focalnet-tiny-srf-10ep-20261015T214711Z-bd7affe1 supplies the measured feasible\
+    \ horizon: \xD71 0.932380, \xD74 0.938154, training 3,313.47 s, peak allocation\
+    \ 23.042 GB."
+  - Queued wtconvnext-normalized-dense-exports and proposed hiera-final-map-layer-norm
+    are analogous adapter hypotheses in other families, with no predictive results
+    yet. They are precedents, not dependencies or evidence of benefit.
+  novelty: "Changes the conditioning of FocalNet\u2019s existing intermediate map\
+    \ interface. It is distinct from the pending anchor and stochastic-depth mechanisms,\
+    \ and leaves internal modulation blocks and downstream readout structure intact."
+  coverage: The existing stride-16 export on every real image, including the anatomy
+    and soft-tissue consumers. Channels, spatial geometry, stride-8 augmentation and
+    the stride-32 interface remain fixed.
+  exploitation: "Builds on the accepted family using a directly observed source difference\
+    \ and its own published dense-export convention. It does not assume that another\
+    \ family\u2019s pending normalization proposal will succeed."
+  budget: "Measured ten-epoch base: 3,313.47 s and 23.042 GB. Expected candidate:\
+    \ approximately 3,350\u20133,650 s and 23.3\u201323.8 GB peak allocation, estimates\
+    \ allowing for the additional normalized map and backward storage. Memory feasibility\
+    \ is uncertain; retain ten epochs and let preflight decide without compensating\
+    \ recipe changes."
+  implementation: Add the normalization after strict pretrained loading as an owned
+    submodule of backbone.layers[2], so existing stage grouping includes its affine
+    parameters. In FocalNetStages.deep, normalize only the returned middle branch;
+    retain raw middle input to layer 3 and retain backbone.norm. Preserve eager pointwise
+    execution, padding, checkpoint identity and all downstream components. Add bounded
+    diagnostics in training/lightning.py without a behavior flag. Use the named ten-epoch
+    setting and retain focalnet-tiny-srf. If a compatible FocalNet incumbent is accepted
+    during development, preserve unrelated accepted improvements and disclose the
+    resulting combination; reassess the declared prerequisite if FocalNet ceases to
+    be active.
+  open_choices: The published dense model differs in other settings; import only its
+    export-normalization convention. There is no measured raw-feature conditioning
+    fault yet. Do not target individual labels, maximize logit magnitude or stack
+    another pending mechanism.
+  dependencies:
+  - focalnet-tiny-srf
+  priority_rationale: 'Second: a small adapter change supported by direct source evidence
+    in the accepted family. Potential is tempered by uncertain conditioning benefit
+    and limited memory headroom.'
+  source_change: true
+  targeted_curve: "FocalNet incumbent epochs 9\u201311: address the \xD71 macro retreat\
+    \ from 0.933241 despite loss falling 0.5021\u21920.4869. On the ten-epoch base,\
+    \ seek better late macro generalization from the existing stride-16 export."
+  status: retired
+  created_revision: 540
+  ranking_rationale: 'Admit FocalNet export normalization first after the reserved
+    head: it extends the accepted family through a specific, independently verified
+    adapter difference supported by its official dense-backbone implementation. Admit
+    EfficientViT''s eleven-epoch retry next: original metrics confirm four rising
+    terminal validation values with falling loss, and prior-work documents eleven-epoch
+    feasibility for its ordinary-BatchNorm implementation. Its smaller incumbent deficit
+    makes this retry more promising than the queued WTConvNeXt conditioning retry.
+    Both admissions have satisfied proposal_admission dependencies. Keep cosine proposed:
+    its ten-epoch base is still improving, so the claimed late-generalization diagnosis
+    is weaker. Keep the other surplus proposals proposed. Ledger, prior-work precedent-table
+    checks and targeted searches of docs/validation/results and docs/history found
+    no measured duplicate of these three new mechanisms.'
+  experiments:
+  - focalnet-stride-sixteen-export-layer-norm-20261016T064047Z-89c26bf7
+- id: focalnet-cosine-decay-ten-epoch-base
+  mechanism_id: family-focalnet-cosine-decay
+  parent_idea_id: focalnet-tiny-srf-10ep
+  title: "Redistribute FocalNet\u2019s learning-rate budget with cosine decay"
+  opportunity: "Measured: twelve-epoch FocalNet\u2019s late validation decline accompanies\
+    \ continued loss reduction; ten-epoch FocalNet finishes with rising macro AUC.\
+    \ Hypothesis: retaining more learning rate earlier and reducing it faster near\
+    \ the end could improve the balance between fitting and late generalization. FocalNet\u2019\
+    s official classification configuration supplies cosine decay as a family precedent;\
+    \ its suitability for this short fine-tuning run remains unknown."
+  mechanism: On the completed ten-epoch FocalNet base, change optimizer.lr_decay from
+    linear to cosine. Keep the one-epoch warmup, peak rates, 0.01 floor, anchor strengths
+    and existing late-anchor coupling. At post-warmup progress u, use the already
+    implemented ratio 0.01 + 0.99(1 + cos(pi*u))/2. Relative to linear decay this
+    allocates more rate before the midpoint and less afterward, with the same continuous
+    integrated ratio. Add observational focalnet_cosine_active_updates and focalnet_backbone_lr_ratio
+    metrics, retaining lr_schedule_progress. Count activation only after warmup when
+    the applied ratio matches the cosine formula and differs from linear; require
+    a positive count at epoch 1.
+  precedents:
+  - '[Official FocalNet configuration](https://github.com/microsoft/FocalNet/blob/main/config.py)
+    sets TRAIN.LR_SCHEDULER.NAME to cosine. This supports the schedule family, not
+    transfer of its 300-epoch horizon or other pretraining settings.'
+  - '[Official tiny SRF configuration](https://github.com/microsoft/FocalNet/blob/main/configs/focalnet_tiny_srf.yaml)
+    selects the same [2,2,6,2] family depths and inherits the classification scheduler
+    default.'
+  - "Incumbent curves: epoch-9 \xD71 macro 0.933241 falls to 0.931271/0.931536 while\
+    \ training loss falls 0.5021\u21920.4954\u21920.4869."
+  - "focalnet-tiny-srf-10ep-20261015T214711Z-bd7affe1 supplies the feasible base:\
+    \ final \xD71 0.932380, training 3,313.47 s and peak allocation 23.042 GB."
+  - training/lightning.py already implements both decay functions and schedules the
+    late anchor from the actual optimizer learning-rate ratio. The external MambaVision
+    ledger records adoption of linear decay in that different family, which lowers
+    confidence in assuming cosine is generally better.
+  novelty: Changes the temporal allocation of optimization without changing peak rate,
+    integrated continuous decay budget, capacity or augmentation. It is separate from
+    scheduling the early anchor and from native stochastic depth.
+  coverage: "All existing optimizer groups use the same scheduler multiplier; the\
+    \ backbone\u2019s normalization and modulation parameters retain their existing\
+    \ grouping. All labels retain the unchanged macro objective."
+  exploitation: Uses an observed FocalNet trajectory and an exact family-specific
+    published schedule, with one candidate and no parameter sweep. The ten-epoch base
+    keeps the proposal executable within measured costs.
+  budget: "Measured base: 3,313.47 s and 23.042 GB. Expected training: approximately\
+    \ 3,300\u20133,550 s; peak allocation approximately 23.1 GB. These are estimates\
+    \ because only scalar schedule arithmetic and bounded observations change."
+  implementation: Set optimizer.lr_decay to cosine and use the named ten-epoch base
+    in configs/campaign.yaml. Retain the existing LR_DECAYS implementation; add only
+    observational applied-rate counters in training/lightning.py, which makes source_change
+    true. Preserve eager FocalNet execution, padding, normalizations, anchor membership,
+    warmup and floor. Do not stack pending anchor, export-normalization or stochastic-depth
+    ideas. Retain focalnet-tiny-srf and unrelated accepted improvements. If another
+    compatible FocalNet incumbent arrives, preserve its unrelated changes and state
+    the resulting combination; do not overwrite an equivalent accepted scheduler or
+    silently drop a lost prerequisite.
+  open_choices: Cosine may worsen fitting or the early-anchor retreat, and the shorter
+    base has no observed terminal macro decline. Existing late-anchor coupling changes
+    its time profile automatically; that is part of the scheduler intervention. No
+    extra floor, restart, control or confirmation run is proposed.
+  dependencies:
+  - focalnet-tiny-srf
+  priority_rationale: 'Third: inexpensive and distinct, with a primary-source schedule
+    precedent. Its causal diagnosis is weaker than the adapter proposal because the
+    ten-epoch base is still improving.'
+  source_change: true
+  targeted_curve: "FocalNet\u2019s late loss/validation divergence at epochs 9\u2013\
+    11, interpreted alongside the ten-epoch base\u2019s rising epochs 7\u20139. Seek\
+    \ better late \xD71 macro AUC through rate allocation, followed by strict improvement\
+    \ at \xD74."
+  status: proposed
+  created_revision: 540
+- id: efficientvit-read-layernorm
+  mechanism_id: efficientvit-read-normalisation
+  parent_idea_id: efficientvit-b2-checkpointed
+  title: EfficientViT-B2 with a LayerNorm on its stride-16 and stride-32 reads, the
+    efficientvit-b2-checkpointed run otherwise unchanged
+  opportunity: "Evidence (run-notes.md, run 19; prior-work.md, Four families): EfficientViT-B2\
+    \ has no final norm, so its stride-16 and stride-32 maps reach the reads unnormalised,\
+    \ while FocalNet-T, DaViT-T, EdgeNeXt-B and ConvNeXt-T end in a LayerNorm. Its\
+    \ \xD71 led FocalNet-T by up to +0.0125 through epoch 7 and fell behind in the\
+    \ last epochs (0.931092 at epoch 10 against 0.933241); \xD74 0.937280, \u2212\
+    0.0015 against the incumbent. Guess: normalised reads stabilise the heads late\
+    \ in training, level to +0.002 at \xD74. Chosen by the user on 2026-10-16."
+  mechanism: 'The efficientvit-b2-checkpointed candidate (stages 0 and 1 checkpointed,
+    real-row BatchNorm padding with the recompute pass leaving the running statistics
+    alone, rate 2e-4, anchors 0.001 and 0.00003, ten epochs) with two new LayerNorm2d
+    modules over the channels: one on the stride-32 final map (384 channels, as the
+    final_norm of the stage adapter) and one on the stride-16 middle map (192 channels).
+    Weights 1 and biases 0 at the start, created under torch.random.fork_rng; they
+    are new parameters, so they train with the head parameters at the head rate and
+    carry no anchor. Nothing else changes. Start from the files of that run''s candidate,
+    /home/claudio/src/knee-abnormality/outputs/autoresearch/backbone-families/experiments/efficientvit-b2-checkpointed-20261016T011621Z-3b868528/workspace
+    (its changed files: configs/campaign.yaml, modeling/backbone_stages.py, modeling/spatial_tokens.py
+    and the others its changes.diff lists), rebased on the current incumbent.'
+  precedents:
+  - "efficientvit-b2-checkpointed: \xD74 0.937280, \xD71 0.931092, 3,406 s, 11.4 GiB."
+  - FocalNet-T and ConvNeXt-T in this code read their final map through the backbone's
+    own LayerNorm (StemStages final_norm).
+  novelty: First read normalisation on EfficientViT-B2.
+  coverage: Every study and every label.
+  exploitation: "Read \xD74 and \xD71 against the incumbent and against efficientvit-b2-checkpointed,\
+    \ the per-epoch \xD71 curve of epochs 7 to 10 against that run, the per-label\
+    \ changes and the blends. Activation: the two new LayerNorm weights move from\
+    \ 1 (their drift is logged at epoch end)."
+  budget: "Two LayerNorms on maps of 14\xD714 and 7\xD77: training time and memory\
+    \ as efficientvit-b2-checkpointed (3,406 s, 11.4 GiB)."
+  implementation: 'Files: modeling/backbone_stages.py (the norms in the EfficientViT
+    stage adapter), training/lightning.py only if the new parameters need placing
+    in the head group, configs/campaign.yaml unchanged except as the parent. Check
+    on CPU the shapes, the parameter groups and that eval mode applies the norms.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's choice; the missing final norm is the one structural
+    difference from every other family here.
+  status: completed
+  created_revision: 561
+  seeded: /home/claudio/src/knee-abnormality-backbone-families/autoresearch/campaigns/backbone-families/seed-efficientvit-user.yaml
+  experiments:
+  - efficientvit-read-layernorm-20261016T073337Z-261205bf
+  decision: reject
+- id: efficientvit-bf16-attention
+  mechanism_id: efficientvit-attention-precision
+  parent_idea_id: efficientvit-b2-checkpointed
+  title: EfficientViT-B2 with its linear-attention products in bfloat16 and only the
+    normalising division in float32, the efficientvit-b2-checkpointed run otherwise
+    unchanged
+  opportunity: "Evidence (prior-work.md, Four families): timm's LiteMLA turns autocast\
+    \ off and casts q, k and v to float32 for both attention matrix products, the\
+    \ only float32 compute in the backbone; the rest runs in bfloat16. Running the\
+    \ products in bfloat16 (accumulated in float32 by cuBLAS) cuts the attention time\
+    \ and memory at strides 16 and 32. Guess on accuracy: level (\xB10.001 at \xD7\
+    4), at lower cost; it isolates whether the float32 attention matters. Chosen by\
+    \ the user on 2026-10-16."
+  mechanism: 'The efficientvit-b2-checkpointed candidate with LiteMLA''s attention
+    replaced, in the stage adapter, by: k transposed times v and q times that product
+    in the autocast dtype (bfloat16), then the last column (the normaliser from the
+    padded ones) and the division out[..., :-1] / (out[..., -1:] + eps) in float32,
+    cast back to the input dtype. Same eps as timm. Outside training under autocast
+    the computation is identical in float32. Nothing else changes (stages 0 and 1
+    stay checkpointed, ten epochs). Start from the files of that run''s candidate,
+    /home/claudio/src/knee-abnormality/outputs/autoresearch/backbone-families/experiments/efficientvit-b2-checkpointed-20261016T011621Z-3b868528/workspace
+    (its changed files: configs/campaign.yaml, modeling/backbone_stages.py, modeling/spatial_tokens.py
+    and the others its changes.diff lists), rebased on the current incumbent.'
+  precedents:
+  - "efficientvit-b2-checkpointed: \xD74 0.937280, 3,406 s, 11.4 GiB, 0.73 s per step."
+  novelty: First reduced-precision attention here.
+  coverage: Every study and every label.
+  exploitation: "Read \xD74 and \xD71 against the incumbent and efficientvit-b2-checkpointed,\
+    \ the training seconds and peak memory against that run, the per-label changes\
+    \ and the blends. Activation: the preflight and timing show a faster step than\
+    \ 0.73 s, and a CPU check shows the attention products in bfloat16 under autocast."
+  budget: At most efficientvit-b2-checkpointed's 3,406 s and 11.4 GiB.
+  implementation: 'Files: modeling/backbone_stages.py (the replaced attention for
+    the EfficientViT blocks), configs/campaign.yaml unchanged except as the parent.
+    Check on CPU in float32 that the replaced attention equals timm''s to 1e-6 relative,
+    and that under bfloat16 autocast the products run in bfloat16 and the division
+    in float32.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's choice; the cheapest change and a speed headroom
+    for later EfficientViT runs.
+  status: completed
+  created_revision: 561
+  seeded: /home/claudio/src/knee-abnormality-backbone-families/autoresearch/campaigns/backbone-families/seed-efficientvit-user.yaml
+  experiments:
+  - efficientvit-bf16-attention-20261016T074147Z-ac2934c1
+  decision: reject
+- id: efficientvit-stochastic-depth
+  mechanism_id: efficientvit-stochastic-depth
+  parent_idea_id: efficientvit-b2-checkpointed
+  title: EfficientViT-B2 with stochastic depth 0.1 on its identity residual blocks,
+    the efficientvit-b2-checkpointed run otherwise unchanged
+  opportunity: "Evidence (run-notes.md, runs 19, 25, 28): EfficientViT-B2's \xD71\
+    \ led FocalNet-T by up to +0.0125 through epoch 7 and flattened after it (0.931092\
+    \ at epoch 10 against FocalNet-T's 0.933241); its weights shrink from RMS 0.057\
+    \ to 0.044 in the attention stages, so the recipe's rate 2e-4 is a relative step\
+    \ up to 4.5e-3 there. Guess: stochastic depth regularises the late epochs; level\
+    \ to +0.002 at \xD74. Chosen by the user on 2026-10-16."
+  mechanism: 'Start from the files of the efficientvit-b2-checkpointed candidate,
+    /home/claudio/src/knee-abnormality/outputs/autoresearch/backbone-families/experiments/efficientvit-b2-checkpointed-20261016T011621Z-3b868528/workspace
+    (its changed files as its changes.diff lists), rebased on the current incumbent.
+    timm''s EfficientViT has no drop path and rejects drop_path_rate, so: (1) model.stochastic_depth
+    0.1 in configs/campaign.yaml, and the backbone builder must not pass drop_path_rate
+    to timm for EfficientViT (it raises); (2) in the EfficientViT stage adapter, every
+    timm ResidualBlock of stages 0 to 3 whose shortcut is not None (the identity residuals:
+    the inverted-residual blocks after each stage''s first and the context and local
+    modules of the attention blocks; not the stem''s and not the stride-2 first block
+    of a stage, whose shortcut is None) applies timm.layers.DropPath to its main branch:
+    out = drop_path(main(pre_norm(x))) + shortcut(x). Rates rise linearly over those
+    blocks in network order from 0 to 0.1, as timm''s other families do. DropPath
+    acts only in training; eval is unchanged. torch.utils.checkpoint keeps preserve_rng_state=True
+    so the recomputed stages 0 and 1 draw the same masks. Draws come from the training
+    RNG; model construction stays under fork_rng. Everything else as the parent (real-row
+    BatchNorm, checkpointing, rate 2e-4, anchors 0.001 and 0.00003, ten epochs).'
+  precedents:
+  - "efficientvit-b2-checkpointed: \xD74 0.937280, \xD71 0.931092, 3,406 s, 11.4 GiB."
+  - MambaVision-T and RadioDINO-S/16 with stochastic depth 0.1 were not adopted in
+    their campaigns (other families, flat weights).
+  novelty: First stochastic depth on EfficientViT here.
+  coverage: Every study and every label.
+  exploitation: "Read \xD74 and \xD71 against the incumbent and efficientvit-b2-checkpointed,\
+    \ the \xD71 curve of epochs 7 to 10 against that run, the training loss, the per-label\
+    \ changes and the blends. Activation: the count of residual blocks with a nonzero\
+    \ drop rate and the fraction of dropped residual samples in training, logged per\
+    \ epoch."
+  budget: 'As efficientvit-b2-checkpointed: about 3,400 s and 11.4 GiB.'
+  implementation: 'Files: modeling/backbone_stages.py (the DropPath on the identity
+    residual blocks), modeling/model.py (no drop_path_rate passed to timm for EfficientViT),
+    training/lightning.py (the activation metric), configs/campaign.yaml (model.stochastic_depth
+    0.1). Check on CPU: with rate 0 the outputs equal the parent''s; in eval the outputs
+    equal the parent''s at rate 0.1; the rates rise from 0 to 0.1 over the identity
+    residual blocks; a training-mode forward and backward with checkpointing runs.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's choice; the one regulariser not yet tried on EfficientViT-B2.
+  status: completed
+  created_revision: 598
+  seeded: /home/claudio/src/knee-abnormality-backbone-families/autoresearch/campaigns/backbone-families/seed-efficientvit-user-2.yaml
+  experiments:
+  - efficientvit-stochastic-depth-20261016T094329Z-1300506e
+  decision: reject
+- id: efficientvit-checkpoint-stage0
+  mechanism_id: efficientvit-checkpointing-depth
+  parent_idea_id: efficientvit-b2-checkpointed
+  title: EfficientViT-B2 with only stage 0 under activation checkpointing instead
+    of stages 0 and 1, the efficientvit-b2-checkpointed run otherwise unchanged
+  opportunity: 'Evidence (run-notes.md, run 19; keeper measurement 2026-10-16): the
+    efficientvit-b2-checkpointed run peaked at 11.4 GiB, half the 22.5 GiB cap, while
+    checkpointing stages 0 and 1 costs about 15% of the backbone step (0.306 against
+    0.353 s per 256 images, backbone alone). Checkpointing stage 0 only keeps more
+    memory and recomputes less: identical outputs and gradients, a shorter step. It
+    buys time for later EfficientViT-B2 runs. Chosen by the user on 2026-10-16.'
+  mechanism: Start from the files of the efficientvit-b2-checkpointed candidate, /home/claudio/src/knee-abnormality/outputs/autoresearch/backbone-families/experiments/efficientvit-b2-checkpointed-20261016T011621Z-3b868528/workspace
+    (its changed files as its changes.diff lists), rebased on the current incumbent.
+    In the EfficientViT stage adapter, run only stage 0 under torch.utils.checkpoint.checkpoint(use_reentrant=False)
+    in training, with the same recompute context that keeps the real-row BatchNorm
+    from updating its running statistics a second time; stage 1 runs directly. Nothing
+    else changes (real-row BatchNorm padding, rate 2e-4, anchors 0.001 and 0.00003,
+    ten epochs).
+  precedents:
+  - 'efficientvit-b2-checkpointed: 3,406 s, 11.4 GiB peak, preflight 0.73 s per step.'
+  - efficientvit-b2 without checkpointing ran out of memory in its preflight at 22.29
+    GiB allocated.
+  novelty: First change of EfficientViT-B2's checkpointing depth.
+  coverage: Every study and every label.
+  exploitation: "Read the preflight and the training seconds and peak memory against\
+    \ efficientvit-b2-checkpointed; \xD74 and \xD71 should be level with it. Activation:\
+    \ the checkpointed-image count covers stage 0 and stage 1 runs without checkpointing,\
+    \ logged per epoch."
+  budget: Faster than efficientvit-b2-checkpointed's 3,406 s; peak memory between
+    its 11.4 GiB and the cap; the preflight decides.
+  implementation: 'Files: modeling/backbone_stages.py (stage 1 out of the checkpoint),
+    training/lightning.py only for the activation metric. Check on CPU at two image
+    counts that outputs, gradients, running means and variances and num_batches_tracked
+    equal the parent''s.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's choice; time headroom for later EfficientViT-B2 runs
+    at no change in results.
+  status: completed
+  created_revision: 598
+  seeded: /home/claudio/src/knee-abnormality-backbone-families/autoresearch/campaigns/backbone-families/seed-efficientvit-user-2.yaml
+  experiments:
+  - efficientvit-checkpoint-stage0-20261016T095225Z-2c3f2ad2
+  - efficientvit-checkpoint-stage0-20261016T095631Z-cd917f65
+  decision: invalid
+- id: efficientvit-stochastic-depth-stage0
+  mechanism_id: efficientvit-stochastic-depth
+  parent_idea_id: efficientvit-stochastic-depth
+  title: EfficientViT-B2 with stochastic depth 0.1, only stage 0 under activation
+    checkpointing and bfloat16 attention products, combining the runs efficientvit-stochastic-depth,
+    efficientvit-checkpoint-stage0 and efficientvit-bf16-attention
+  opportunity: "Evidence (run-notes.md, run 30): stochastic depth 0.1 lifted EfficientViT-B2\
+    \ to \xD74 0.938641, level with the FocalNet-T incumbent (0.938816, 80% interval\
+    \ \u22120.0019 to +0.0016) and +0.0014 above plain EfficientViT-B2, at 3,633 s\
+    \ and 11.4 GiB with stages 0 and 1 checkpointed. The stage-0-only candidate's\
+    \ preflight measured 0.662 s per step and 17.0 GiB predicted, against 0.704 s\
+    \ with both stages checkpointed: checkpointing stage 0 only changes neither outputs\
+    \ nor gradients, so the combination is the stochastic-depth run, faster. Requested\
+    \ by the user on 2026-10-16; the stage-0-only run without stochastic depth was\
+    \ aborted in favour of this one. efficientvit-bf16-attention was level with plain\
+    \ EfficientViT-B2 at \xD74 (0.937130 against 0.937280) at 3,319 s and 10.4 GiB\
+    \ against 3,406 s and 11.4 GiB; the user asked to combine it on 2026-10-16."
+  mechanism: 'Start from the files of the efficientvit-stochastic-depth candidate,
+    /home/claudio/src/knee-abnormality/outputs/autoresearch/backbone-families/experiments/efficientvit-stochastic-depth-20261016T094329Z-1300506e/workspace
+    (its changed files as its changes.diff lists: model.stochastic_depth 0.1, DropPath
+    on the identity residual blocks with rates rising from 0 to 0.1, no drop_path_rate
+    passed to timm), rebased on the current incumbent, and apply the checkpointing
+    change of the efficientvit-checkpoint-stage0 candidate, /home/claudio/src/knee-abnormality/outputs/autoresearch/backbone-families/experiments/efficientvit-checkpoint-stage0-20261016T095631Z-cd917f65/workspace:
+    only stage 0 runs under torch.utils.checkpoint.checkpoint(use_reentrant=False)
+    in training, with the recompute context that keeps the real-row BatchNorm from
+    updating its running statistics twice and preserve_rng_state=True so stage 0''s
+    drop masks repeat in the recompute; stage 1 runs directly. Nothing else changes
+    (rate 2e-4, anchors 0.001 and 0.00003, ten epochs). Also apply the attention change
+    of the efficientvit-bf16-attention candidate, /home/claudio/src/knee-abnormality/outputs/autoresearch/backbone-families/experiments/efficientvit-bf16-attention-20261016T074147Z-ac2934c1/workspace:
+    the EfficientVitLiteMLA subclass that reuses timm''s LiteMLA weights, runs k transposed
+    times v and q times that product in the autocast dtype and only the normalising
+    division in float32, swapped in for every LiteMLA in the stage adapter, with its
+    activity check.'
+  precedents:
+  - "efficientvit-stochastic-depth: \xD74 0.938641, \xD71 0.929984, 3,633 s, 11.4\
+    \ GiB."
+  - 'efficientvit-checkpoint-stage0 preflight: 0.662 s per step, 3,690 s projected,
+    17.0 GiB predicted.'
+  novelty: Combines the two named runs.
+  coverage: Every study and every label.
+  exploitation: "Read \xD74 and \xD71 against the incumbent and efficientvit-stochastic-depth,\
+    \ the training seconds and peak memory against it, the per-label changes and the\
+    \ blends. Activation: the stochastic-depth metrics of the parent and the checkpointed-image\
+    \ count covering stage 0 only."
+  budget: Faster than efficientvit-stochastic-depth's 3,633 s; peak memory near 17
+    GiB; the preflight decides.
+  implementation: 'Files: as the two named candidates (modeling/backbone_stages.py,
+    modeling/model.py, training/lightning.py, configs/campaign.yaml). Check on CPU
+    that with the drop rate at 0 outputs, gradients and the BatchNorm running statistics
+    equal the efficientvit-checkpoint-stage0 candidate''s, and that stage 0''s drop
+    masks match between the forward and the recompute.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's request; the best EfficientViT-B2 run at a lower
+    cost.
+  status: completed
+  created_revision: 636
+  seeded: /home/claudio/src/knee-abnormality-backbone-families/autoresearch/campaigns/backbone-families/seed-efficientvit-sd-stage0.yaml
+  experiments:
+  - efficientvit-stochastic-depth-stage0-20261016T110207Z-bd72ef0a
+  - efficientvit-stochastic-depth-stage0-20261016T110514Z-b5279e0f
+  - efficientvit-stochastic-depth-stage0-20261016T110912Z-bcd14c63
+  decision: reject
+- id: efficientvit-stochastic-depth-02
+  mechanism_id: efficientvit-stochastic-depth
+  parent_idea_id: efficientvit-stochastic-depth-stage0
+  title: EfficientViT-B2 with stochastic depth 0.2 instead of 0.1, and only stage
+    0's first block under activation checkpointing, the efficientvit-stochastic-depth-stage0
+    run otherwise unchanged
+  opportunity: "Evidence (run-notes.md, run 30): stochastic depth 0.1 lifted EfficientViT-B2\
+    \ from \xD74 0.937280 to 0.938641 (+0.0014), level with the FocalNet-T incumbent\
+    \ (0.938816), while \xD71 fell 0.0011 (0.929984 against 0.931092). Guess: a higher\
+    \ rate lifts \xD74 further or starts to cost; this run finds which side 0.2 is\
+    \ on. Requested by the user on 2026-10-16. The checkpointing change is results-neutral\
+    \ and only saves time: keeper measurement 2026-10-16 (saved activations per image,\
+    \ bf16, timm efficientvit_b2): stage 0 block 0 9.5 MiB, blocks 1 and 2 7.5 MiB\
+    \ each; with only block 0 checkpointed the predicted peak is about 20.2 GiB against\
+    \ the 22.5 GiB cap (the parent predicted 15.9 GiB with all of stage 0 checkpointed)."
+  mechanism: 'Start from the files of the efficientvit-stochastic-depth-stage0 candidate,
+    /home/claudio/src/knee-abnormality/outputs/autoresearch/backbone-families/experiments/efficientvit-stochastic-depth-stage0-20261016T110912Z-bcd14c63/workspace
+    (stochastic depth on the identity residual blocks with rates rising linearly,
+    bfloat16 attention products with the division in float32, real-row BatchNorm padding),
+    rebased on the current incumbent. Two changes: (1) model.stochastic_depth 0.2,
+    so the drop rates rise linearly from 0 to 0.2 over the same blocks; (2) in training
+    only stage 0''s first block (stages.0.blocks.0, the stride-4 downsample) runs
+    under torch.utils.checkpoint.checkpoint (use_reentrant=False, preserve_rng_state=True,
+    the same recompute context that leaves the BatchNorm running statistics alone);
+    stage 0''s other blocks and stage 1 run directly. Nothing else changes (rate 2e-4,
+    anchors 0.001 and 0.00003, ten epochs).'
+  precedents:
+  - "efficientvit-stochastic-depth (0.1, stages 0 and 1 checkpointed, float32 attention):\
+    \ \xD74 0.938641, \xD71 0.929984, 3,633 s, 11.4 GiB."
+  - 'efficientvit-stochastic-depth-stage0 preflight: 0.638 s per step, 3,573 s projected,
+    14.8 GiB measured, 15.9 GiB predicted.'
+  novelty: First stochastic depth above 0.1 here.
+  coverage: Every study and every label.
+  exploitation: "Read \xD74 and \xD71 against the incumbent, efficientvit-stochastic-depth\
+    \ and efficientvit-stochastic-depth-stage0, the \xD71 curve, the per-label changes\
+    \ and the blends; the preflight and the training seconds against the parent. Activation:\
+    \ the stochastic-depth metrics report a largest drop rate of 0.2, and the checkpointed-image\
+    \ count covers stage 0's first block only."
+  budget: At most the parent's time (about 3,570 s); peak memory about 20 GiB; the
+    preflight decides.
+  implementation: 'Files: modeling/backbone_stages.py (the checkpoint around stages.0.blocks.0
+    only), configs/campaign.yaml (model.stochastic_depth 0.2), training/lightning.py
+    only for the activation metric. Check on CPU that the drop rates rise to 0.2,
+    that with checkpointing of block 0 only the outputs, gradients and BatchNorm running
+    statistics equal running without checkpointing at the same random state, and that
+    block 0''s drop masks repeat in the recompute.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's choice; the next step of the one setting that helped
+    EfficientViT-B2.
+  status: completed
+  created_revision: 661
+  seeded: /home/claudio/src/knee-abnormality-backbone-families/autoresearch/campaigns/backbone-families/seed-efficientvit-sd02.yaml
+  experiments:
+  - efficientvit-stochastic-depth-02-20261016T113529Z-0460b2f1
+  - efficientvit-stochastic-depth-02-20261016T113953Z-5571e626
+  decision: reject

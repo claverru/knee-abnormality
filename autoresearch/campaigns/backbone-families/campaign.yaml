@@ -1,0 +1,86 @@
+id: backbone-families
+recipe: configs/mambavision.yaml
+reference_run: outputs/training/mamba-silver-fold-2
+reference_equivalences: {}
+reference_config_exceptions:
+- paths.anatomy_targets
+- paths.data_root
+- paths.label_manifest
+- paths.meniscus_targets
+- validation.train_on_validation
+reference_identity_exceptions:
+- preprocessing_identity.sources_sha256
+additional_evidence_runs: []
+backlog:
+  refill_below: 3
+  refill_to: 5
+  seed_order: forced
+  rotate_after: 1000000
+budget:
+  mode: range
+  min_fraction: 0.35
+  max_fraction: 0.85
+policy:
+  editable_files:
+  - configs/campaign.yaml
+  - src/knee_abnormality/config.py
+  - src/knee_abnormality/training/lightning.py
+  - src/knee_abnormality/modeling/model.py
+  - src/knee_abnormality/modeling/staged_backbones.py
+  - src/knee_abnormality/modeling/backbone_stages.py
+  - src/knee_abnormality/modeling/spatial_tokens.py
+  - src/knee_abnormality/modeling/wtconv.py
+  editable_directories: []
+  config_keys:
+  - model.backbone
+  - trainer.max_epochs
+  - model.stochastic_depth
+  - data.mean
+  - data.std
+  - trainer.gradient_clip_val
+  config_prefixes:
+  - optimizer
+  - model.feature_statistics_augmentation
+  list_item_fields: {}
+  input_identity_keys:
+  - preprocessing_identity
+  require_source_change: false
+  configuration_only_ideas: true
+  developer_instructions: 'You have no GPU and must not use one. Allowed checks are static checks, loading configs/campaign.yaml
+    through the config model, building the model and the optimizer on the CPU, and tiny no-gradient forward passes of
+    the backbone on two synthetic 224 px images; never return blocked for lack of a GPU. Make every change inside the
+    candidate workspace you were assigned and nowhere else; do not stage the candidate under /tmp, and do not write
+    source/ or changes.diff in the experiment directory. Read contract.md before writing code. The recipe is the MambaVision-T
+    recipe (configs/mambavision.yaml); each forced seed adds one backbone family as a backbone the model can build and
+    switches model.backbone to it with the settings the seed names. A new backbone is built from timm with its pretrained weights (pretrained_weights timm), except WTConvNeXt-T, built as its seed states from the wavelet layer vendored in modeling/wtconv.py and the official checkpoint, and exposed to the model the way the existing families are: a stride-8 point
+    (to_stride_8, where the feature-statistics augmentation acts), a stride-16 middle map and a stride-32 final map
+    through modeling/backbone_stages.py, a group_matcher with the stem and four stage groups, parameter names that
+    put the stem and the first stage under the early anchor (training/lightning.py EARLY_ANCHOR_PREFIXES), and verified
+    feature-cell anchors in modeling/spatial_tokens.py (BACKBONE_MAPPINGS plus a mapping function that derives origin
+    and stride from the layers and raises if they differ). Families with depthwise convolutions and no BatchNorm pad
+    the image count to a multiple of 16 as ConvNeXt does (backbone_stages.py), because cuDNN plans depthwise convolutions
+    once per unseen image count; families with BatchNorm are zero-padded only when every BatchNorm takes its batch statistics from the real images alone (EfficientViT-B2''s seed). Triton kernels may be checked on the CPU with TRITON_INTERPRET=1 on tiny tensors. The existing backbones (ResNet-50,
+    ConvNeXt-T, MambaVision-T) must build and behave exactly as before. A new option exists only for a value the campaign
+    intends to vary. New parameters or buffers initialise under torch.random.fork_rng so the reference''s random stream
+    is unchanged where it applies. Keep the speed rules of the recipe: model.channels_last stays true, epoch metrics
+    go through _log_epoch_metric, and code that runs every training step gets no .item(), .cpu(), bool() or int() of
+    a tensor and no Python loop over studies. At most six new metrics per seed. Ten epochs (trainer.max_epochs 10) unless the idea names another count; twelve was MambaVision-T''s own recipe, not the default. Training time must stay
+    within 0.35 to 0.85 of the reference''s 4,812 s (measured on a slower machine: about 0.54 to 1.32 of a local MambaVision-T
+    run). No weight averaging. No tests.'
+  researcher_instructions: 'The campaign has no end: it runs until the user stops it. Never return an empty report
+    and never declare the directions exhausted. Research starts after the forced seeds. The epoch count is a family setting: ten by default (the ResNet-50 and ConvNeXt recipes), twelve was MambaVision-T''s; an idea may change one family''s epochs as its one setting, citing that family''s loss curves. Your first product after every
+    completed run is its analysis: both multipliers against the incumbent and against the MambaVision-T reference (×4
+    0.935160, ×1 0.930081), the training loss per epoch, the per-label AUC changes sorted from largest gain to largest
+    loss, the training seconds and the peak GPU memory, and the equal logit blend of the run with the ResNet-50 (targets-and-inputs
+    run 27, ×4 0.939634) and with the reference against each alone: the purpose is a backbone family that adds to the
+    blend. Adoption is by the runtime under the shared rule; say which side of it the run falls on. One run is a starting
+    point, never a verdict on a family: for a run that was not adopted list what it shares with the other runs and name
+    candidate causes; do not write that a reference was lucky or that a difference is noise. The scope is EfficientViT-B2 only, by the user''s decision on 2026-10-16 (the other families of this campaign are closed; every idea changes the EfficientViT-B2 run efficientvit-b2-checkpointed or combines EfficientViT-B2 runs): its adapter (stage
+    split, read depths, padding, normalisation of the reads) and their training settings set from their own properties
+    (weight scale, normalisation layers, depthwise convolutions, pretraining). Each idea is one training run that changes
+    one setting of one family, or combines settings of named earlier runs; it marks every claim as evidence-backed or
+    a guess, cites its numbers from prior-work.md or a run, and states its expected training time and GPU memory. Name
+    the metrics that prove the idea active. Out of bounds: everything in the contract''s out-of-bounds list, among it
+    other backbone families, model sizes or pretrained weights than the ten, image sizes other than 224 px, more slices or images per study, the labels, new routing, attention or readout structure downstream of
+    the backbone''s maps, ensembling, weight averaging, test-time augmentation, reflection probabilities, gold-study
+    weighting, trained models in the loader, per-run controls and confirmation or multi-seed runs.'

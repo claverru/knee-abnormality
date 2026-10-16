@@ -1,0 +1,32 @@
+ideas:
+- id: pvt-v2-b2-retry
+  mechanism_id: family-pvtv2
+  parent_idea_id: null
+  title: PVTv2-b2 (pvt_v2_b2.in1k), global spatial-reduction attention from stride 4 with overlapping patch embeddings, on
+    the MambaVision recipe unchanged (relaunch of pvt-v2-b2, whose first batch hit a transient CUDA driver error right after
+    the HRNet abort; its code needed no repair)
+  opportunity: 'Evidence (prior-work.md, The families): global attention at every stage (with spatially reduced keys and values),
+    not windowed like Swin-T, plus overlapping patch embeddings and a depthwise convolution in each MLP, the encoder of many
+    medical segmentation models (Polyp-PVT). Apache-2.0. Its weights are flat over depth (RMS 0.045 to 0.056), between RadioDINO''s
+    0.05 to 0.06, where the MambaVision rate and anchors held, and MambaVision''s 0.08. Guess on size: level to +0.003, blend
+    value from global attention.'
+  mechanism: 'A pvt_v2 backbone from timm''s pvt_v2_b2.in1k: 64, 128, 320 and 512 channels at strides 4, 8, 16 and 32. to_stride_8
+    runs the patch embedding and the first two stages; the middle map is the third stage''s output, the final map the fourth''s.
+    Image counts padded to a multiple of 16 (depthwise convolutions, no BatchNorm). Settings: model.backbone the new name;
+    rate and anchors the recipe''s (2e-4, 0.001, 0.00001).'
+  precedents:
+  - 'RadioDINO-S/16 (weights 0.05 to 0.06): rates 1.4e-4 to 4e-4 and the MambaVision anchors all within ±0.0006 at ×4; doubled
+    anchors −0.0024 (autoresearch/campaigns/radiodino-settings).'
+  novelty: First global-attention pyramid here.
+  coverage: Every study and every label.
+  exploitation: 'Read ×4 and ×1 against the reference, the per-label changes and the blends. Activation: the effective config
+    and the padded image count logged or checked once.'
+  budget: '4.0 GMAC per image (measured): expected near a local MambaVision-T run; memory near 12 GB.'
+  implementation: 'Files: modeling/backbone_stages.py (the stage adapter with the multiple-of-16 padding ConvNeXt uses), modeling/staged_backbones.py
+    if a wrapper is needed, modeling/spatial_tokens.py (mappings derived from the overlapping patch embeddings: kernel 7 stride
+    4 padding 3, then kernel 3 stride 2 padding 1), configs/campaign.yaml. Check on CPU the stage shapes and that padded and
+    unpadded image counts give the same outputs for the real images.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The easiest drop-in of the attention families, with global attention from the start.
+exhausted_directions: ''

@@ -1,0 +1,75 @@
+ideas:
+- id: efficientvit-stochastic-depth
+  mechanism_id: efficientvit-stochastic-depth
+  parent_idea_id: efficientvit-b2-checkpointed
+  title: EfficientViT-B2 with stochastic depth 0.1 on its identity residual blocks, the efficientvit-b2-checkpointed run
+    otherwise unchanged
+  opportunity: 'Evidence (run-notes.md, runs 19, 25, 28): EfficientViT-B2''s ×1 led FocalNet-T by up to +0.0125 through
+    epoch 7 and flattened after it (0.931092 at epoch 10 against FocalNet-T''s 0.933241); its weights shrink from RMS
+    0.057 to 0.044 in the attention stages, so the recipe''s rate 2e-4 is a relative step up to 4.5e-3 there. Guess:
+    stochastic depth regularises the late epochs; level to +0.002 at ×4. Chosen by the user on 2026-10-16.'
+  mechanism: 'Start from the files of the efficientvit-b2-checkpointed candidate,
+    /home/claudio/src/knee-abnormality/outputs/autoresearch/backbone-families/experiments/efficientvit-b2-checkpointed-20261016T011621Z-3b868528/workspace
+    (its changed files as its changes.diff lists), rebased on the current incumbent. timm''s EfficientViT has no drop
+    path and rejects drop_path_rate, so: (1) model.stochastic_depth 0.1 in configs/campaign.yaml, and the backbone
+    builder must not pass drop_path_rate to timm for EfficientViT (it raises); (2) in the EfficientViT stage adapter,
+    every timm ResidualBlock of stages 0 to 3 whose shortcut is not None (the identity residuals: the inverted-residual
+    blocks after each stage''s first and the context and local modules of the attention blocks; not the stem''s and not
+    the stride-2 first block of a stage, whose shortcut is None) applies timm.layers.DropPath to its main branch:
+    out = drop_path(main(pre_norm(x))) + shortcut(x). Rates rise linearly over those blocks in network order from 0 to
+    0.1, as timm''s other families do. DropPath acts only in training; eval is unchanged. torch.utils.checkpoint keeps
+    preserve_rng_state=True so the recomputed stages 0 and 1 draw the same masks. Draws come from the training RNG;
+    model construction stays under fork_rng. Everything else as the parent (real-row BatchNorm, checkpointing,
+    rate 2e-4, anchors 0.001 and 0.00003, ten epochs).'
+  precedents:
+  - 'efficientvit-b2-checkpointed: ×4 0.937280, ×1 0.931092, 3,406 s, 11.4 GiB.'
+  - 'MambaVision-T and RadioDINO-S/16 with stochastic depth 0.1 were not adopted in their campaigns (other families,
+    flat weights).'
+  novelty: First stochastic depth on EfficientViT here.
+  coverage: Every study and every label.
+  exploitation: 'Read ×4 and ×1 against the incumbent and efficientvit-b2-checkpointed, the ×1 curve of epochs 7 to 10
+    against that run, the training loss, the per-label changes and the blends. Activation: the count of residual blocks
+    with a nonzero drop rate and the fraction of dropped residual samples in training, logged per epoch.'
+  budget: 'As efficientvit-b2-checkpointed: about 3,400 s and 11.4 GiB.'
+  implementation: 'Files: modeling/backbone_stages.py (the DropPath on the identity residual blocks), modeling/model.py
+    (no drop_path_rate passed to timm for EfficientViT), training/lightning.py (the activation metric), configs/campaign.yaml
+    (model.stochastic_depth 0.1). Check on CPU: with rate 0 the outputs equal the parent''s; in eval the outputs equal
+    the parent''s at rate 0.1; the rates rise from 0 to 0.1 over the identity residual blocks; a training-mode forward
+    and backward with checkpointing runs.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's choice; the one regulariser not yet tried on EfficientViT-B2.
+- id: efficientvit-checkpoint-stage0
+  mechanism_id: efficientvit-checkpointing-depth
+  parent_idea_id: efficientvit-b2-checkpointed
+  title: EfficientViT-B2 with only stage 0 under activation checkpointing instead of stages 0 and 1, the
+    efficientvit-b2-checkpointed run otherwise unchanged
+  opportunity: 'Evidence (run-notes.md, run 19; keeper measurement 2026-10-16): the efficientvit-b2-checkpointed run
+    peaked at 11.4 GiB, half the 22.5 GiB cap, while checkpointing stages 0 and 1 costs about 15% of the backbone step
+    (0.306 against 0.353 s per 256 images, backbone alone). Checkpointing stage 0 only keeps more memory and recomputes
+    less: identical outputs and gradients, a shorter step. It buys time for later EfficientViT-B2 runs. Chosen by the
+    user on 2026-10-16.'
+  mechanism: 'Start from the files of the efficientvit-b2-checkpointed candidate,
+    /home/claudio/src/knee-abnormality/outputs/autoresearch/backbone-families/experiments/efficientvit-b2-checkpointed-20261016T011621Z-3b868528/workspace
+    (its changed files as its changes.diff lists), rebased on the current incumbent. In the EfficientViT stage adapter,
+    run only stage 0 under torch.utils.checkpoint.checkpoint(use_reentrant=False) in training, with the same
+    recompute context that keeps the real-row BatchNorm from updating its running statistics a second time; stage 1
+    runs directly. Nothing else changes (real-row BatchNorm padding, rate 2e-4, anchors 0.001 and 0.00003, ten
+    epochs).'
+  precedents:
+  - 'efficientvit-b2-checkpointed: 3,406 s, 11.4 GiB peak, preflight 0.73 s per step.'
+  - 'efficientvit-b2 without checkpointing ran out of memory in its preflight at 22.29 GiB allocated.'
+  novelty: First change of EfficientViT-B2's checkpointing depth.
+  coverage: Every study and every label.
+  exploitation: 'Read the preflight and the training seconds and peak memory against efficientvit-b2-checkpointed;
+    ×4 and ×1 should be level with it. Activation: the checkpointed-image count covers stage 0 and stage 1 runs
+    without checkpointing, logged per epoch.'
+  budget: 'Faster than efficientvit-b2-checkpointed''s 3,406 s; peak memory between its 11.4 GiB and the cap; the
+    preflight decides.'
+  implementation: 'Files: modeling/backbone_stages.py (stage 1 out of the checkpoint), training/lightning.py only for
+    the activation metric. Check on CPU at two image counts that outputs, gradients, running means and variances and
+    num_batches_tracked equal the parent''s.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's choice; time headroom for later EfficientViT-B2 runs at no change in results.
+exhausted_directions: ''

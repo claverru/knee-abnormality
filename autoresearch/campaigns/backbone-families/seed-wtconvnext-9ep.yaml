@@ -1,0 +1,36 @@
+ideas:
+- id: wtconvnext-tiny-9ep
+  mechanism_id: family-wtconvnext
+  parent_idea_id: wtconvnext-tiny
+  title: WTConvNeXt-T, the repaired candidate unchanged, at nine epochs to fit the time bound
+  opportunity: 'Evidence (run-notes.md, runs 18 and 20): the repaired WTConvNeXt-T candidate (experiment wtconvnext-tiny-relaunch-20261016T023531Z-328fea54)
+    runs 0.726 s per step; its preflight projected 4,183 s for ten epochs, 2.3% over the 4,090 s bound, and stopped it before
+    training. Epochs are a family setting in this campaign; nine epochs project about 3,770 s. Evidence (prior-work.md, Four
+    families added on 2026-10-15): each block''s depthwise convolution becomes a wavelet convolution, a 5×5 depthwise base
+    plus 5, 4, 3 and 2 Haar levels in stages 0 to 3, each level a 5×5 depthwise convolution on the four Haar subbands: a large
+    low-frequency receptive field while the edge subbands keep thin detail. Against ConvNeXt-T in its paper: ADE20K 46.6 against
+    46.0 mIoU, COCO 51.0/44.4 against 50.4/43.7 AP, shape bias 29.2% against 21.7%, ImageNet-C mCE 52.0 against 53.2. MIT.
+    Weights flat at RMS about 0.10. Added at the user''s request. Guess on size: level to +0.004 against the reference.'
+  mechanism: Copy unchanged the changed files of the repaired candidate from /home/claudio/src/knee-abnormality/outputs/autoresearch/backbone-families/experiments/wtconvnext-tiny-relaunch-20261016T023531Z-328fea54/workspace
+    (configs/campaign.yaml, src/knee_abnormality/modeling/wtconv.py, backbone_stages.py, model.py, spatial_tokens.py and training/lightning.py),
+    rebased on the current incumbent, and set trainer.max_epochs 9. No other change.
+  precedents:
+  - 'Fast WTConv (arXiv 2608.10805): the Triton backend runs the layer about 3.0× faster than the original on an RTX A6000;
+    the original WTConvNeXt-T trains at 0.67× ConvNeXt-T''s throughput on a 3090.'
+  - 'ConvNeXt-T in12k: the stem and downsample geometry and the padding.'
+  - 'wtconvnext-tiny-relaunch-20261016T023531Z-328fea54 preflight: 0.726 s median step, 40 s validation per epoch, 22.5 GiB
+    predicted peak, 4,183 s projected for ten epochs.'
+  - 'Keeper GPU parity of the vendored WTConv layer against the official one (prior-work.md): every gradient below 6.4e-7
+    relative.'
+  novelty: First frequency-domain operator here.
+  coverage: Every study and every label.
+  exploitation: 'Read ×4 and ×1 against the incumbent and the reference, the per-label changes (menisci, cartilage-borne OA
+    labels and ACL first), the token-map metrics and the blends. Activation: the effective config names the backbone; backbone_drift_stage4
+    above zero after epoch 1.'
+  budget: About 3,770 s projected for nine epochs (preflight rule); memory as measured, at the 22.5 GiB cap.
+  implementation: Copy the repaired candidate's files and set trainer.max_epochs 9; no new code. Check on CPU the strict checkpoint
+    load and that the files equal the repaired candidate's except for rebasing and the epoch count.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's pick with the most adapter work, so last.
+exhausted_directions: ''
