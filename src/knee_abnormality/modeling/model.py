@@ -207,9 +207,14 @@ class KneeAbnormalityModel(nn.Module):
         if model.backbone == "resnet50.a1_in1k":
             backbone_kwargs["avg_down"] = True
         focalnet = model.backbone == "focalnet_tiny_srf.ms_in1k"
-        if model.stochastic_depth > 0 or focalnet:
+        efficientvit = model.backbone == "efficientvit_b2.r224_in1k"
+        if (model.stochastic_depth > 0 or focalnet) and not efficientvit:
             backbone_kwargs["drop_path_rate"] = model.stochastic_depth
-        with torch.random.fork_rng(devices=[]) if focalnet else nullcontext():
+        with (
+            torch.random.fork_rng(devices=[])
+            if focalnet or efficientvit
+            else nullcontext()
+        ):
             self.backbone = (
                 create_staged_backbone(
                     model.backbone,
@@ -222,7 +227,7 @@ class KneeAbnormalityModel(nn.Module):
                     pretrained=pretrained and model.pretrained_weights == "timm",
                     in_chans=SLICES_PER_INPUT,
                     num_classes=0,
-                    global_pool="",
+                    global_pool="avg" if efficientvit else "",
                     **backbone_kwargs,
                 )
             )
@@ -232,7 +237,7 @@ class KneeAbnormalityModel(nn.Module):
                 state = resnet_avg_down_state_dict(state)
             self.backbone.load_state_dict(state, strict=True)
         self.feature_mapping = backbone_mapping(model.backbone, self.backbone)
-        self.backbone_stages = backbone_stages(self.backbone)
+        self.backbone_stages = backbone_stages(self.backbone, model.stochastic_depth)
         self.projection = nn.Linear(self.backbone.num_features, PROJECTION_WIDTH)
         if self.channels_last:
             self.backbone.to(memory_format=torch.channels_last)

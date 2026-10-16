@@ -7,6 +7,7 @@ from knee_abnormality.modeling.staged_backbones import STAGED_BACKBONES
 
 CONVNEXT_BACKBONES = ("convnext_tiny.in12k_ft_in1k",)
 FOCALNET_BACKBONES = ("focalnet_tiny_srf.ms_in1k",)
+EFFICIENTVIT_BACKBONES = ("efficientvit_b2.r224_in1k",)
 
 BACKBONE_MAPPINGS = {
     **{
@@ -43,7 +44,7 @@ BACKBONE_MAPPINGS = {
             "stride": [stride, stride],
             "anchors": "convolution_centers",
         }
-        for name in STAGED_BACKBONES
+        for name in (*STAGED_BACKBONES, *EFFICIENTVIT_BACKBONES)
         for suffix, stride in (("", 32.0), (".layer3", 16.0))
     },
     "resnet50.a1_in1k": {
@@ -167,6 +168,32 @@ def _focalnet_mapping(
     return mapping
 
 
+def _efficientvit_mapping(
+    backbone: nn.Module, stages: int = 4
+) -> tuple[float, float, float, float]:
+    mapping = _spatial_mapping([backbone.stem.in_conv.conv])
+    for module in tuple(backbone.stem.children())[1:]:
+        convolutions = [
+            layer for layer in module.modules() if isinstance(layer, nn.Conv2d)
+        ]
+        if _spatial_mapping(convolutions, mapping) != mapping:
+            raise ValueError("EfficientViT stem residual geometry changed")
+    for stage in backbone.stages[:stages]:
+        downsample, *blocks = stage.blocks
+        mapping = _spatial_mapping(
+            [layer for layer in downsample.modules() if isinstance(layer, nn.Conv2d)],
+            mapping,
+        )
+        for block in blocks:
+            if any(
+                _spatial_mapping([layer], mapping) != mapping
+                for layer in block.modules()
+                if isinstance(layer, nn.Conv2d)
+            ):
+                raise ValueError("EfficientViT residual geometry changed")
+    return mapping
+
+
 def _resnet_mapping(
     backbone: nn.Module, stages: int = 4
 ) -> tuple[float, float, float, float]:
@@ -232,6 +259,11 @@ _BACKBONE_MAPPING_FUNCTIONS = {
     **{
         f"{name}.layer3": lambda backbone: _convnext_mapping(backbone, 3)
         for name in CONVNEXT_BACKBONES
+    },
+    **{name: _efficientvit_mapping for name in EFFICIENTVIT_BACKBONES},
+    **{
+        f"{name}.layer3": lambda backbone: _efficientvit_mapping(backbone, 3)
+        for name in EFFICIENTVIT_BACKBONES
     },
     **{name: _focalnet_mapping for name in FOCALNET_BACKBONES},
     **{
