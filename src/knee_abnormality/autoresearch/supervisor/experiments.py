@@ -1,5 +1,6 @@
 import ast
 import difflib
+import json
 import math
 import subprocess
 import sys
@@ -382,21 +383,34 @@ class ExperimentMixin:
         cache = Path.home() / ".cache"
         if cache.exists():
             writable.append(cache)
+        training = [
+            sys.executable,
+            "-m",
+            "scripts.pipeline.train",
+            str(config_path),
+            "--validation.folds",
+            f"[{campaign_fold(self.state)}]",
+            "--paths.output-root",
+            str(directory),
+            "--run-id",
+            "training",
+        ]
         self.submit(
             kind,
             source,
             sandbox(
                 [
                     sys.executable,
-                    "-m",
-                    "scripts.pipeline.train",
+                    "-P",
+                    str(self.root / "scripts/tools/preflight_training.py"),
+                    "--config",
                     str(config_path),
-                    "--validation.folds",
-                    f"[{campaign_fold(self.state)}]",
-                    "--paths.output-root",
-                    str(directory),
-                    "--run-id",
-                    "training",
+                    "--fold",
+                    str(campaign_fold(self.state)),
+                    "--output",
+                    str(directory / "preflight"),
+                    "--command",
+                    json.dumps(training),
                 ],
                 source,
                 writable,
@@ -406,7 +420,10 @@ class ExperimentMixin:
             payload=payload,
             timeout=timeout,
             gpu=self.state["gpu"],
-            extra_env={"KNEE_AUTORESEARCH_LIMITS": str(limits_path)},
+            extra_env={
+                "KNEE_AUTORESEARCH_LIMITS": str(limits_path),
+                "TRITON_CACHE_DIR": str(cache / "triton"),
+            },
         )
 
     def dequeue_launched(self, exp):
