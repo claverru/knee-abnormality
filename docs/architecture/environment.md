@@ -1,6 +1,6 @@
 # Environment and dependency versions
 
-The local `uv` environment is installed, using the Kaggle GPU v170 reference
+The local `uv` environment is installed, using the Kaggle GPU v171 reference
 and the explicitly documented additions below. It targets Linux x86-64
 (including WSL2) with an NVIDIA GPU. The visible Kaggle notebook run is recorded
 in the [inference notes](../inference/INDEX.md); hidden-run parity remains a
@@ -49,11 +49,24 @@ generic dependencies resolve from PyPI.
 - `uv` and `uvx` 0.12.12, installed in `/home/claudio/.local/bin` using the
   [official installer](https://docs.astral.sh/uv/getting-started/installation/).
   Both commands resolve on the host PATH; shell startup files were not modified.
-- System Python remains 3.14.4. The project uses uv-managed CPython 3.12.14,
-  matching the published image's Python minor version. This local patch
-  version has not been verified against Kaggle's interpreter.
+- System Python remains 3.14.4. The project uses uv-managed CPython 3.13.15,
+  the version of the v171 image's `libpython3.13` (3.13.15-1+noble1).
 
 ## Kaggle reference
+
+**Since 2026-10-17 the pins follow the v171 GPU image** (released 2026-10-01, on Kaggle notebooks
+since about 2026-10-03; Ubuntu 24.04, Python 3.13), from its
+[release diff](https://github.com/Kaggle/docker-python/releases/tag/v171-GPU-22be155a37fc52bc8254ebfd0bb894643d00a1283e2446e212597ae12aec45f9)
+against v170: torch 2.11.0+cu128, torchvision 0.26.0+cu128, timm 1.0.29, numpy 2.1.3, pillow
+12.3.0, pytorch-lightning 2.6.6 and kornia-rs 0.2.0 changed; the diff lists only changed packages, so
+every other pin below kept its v170 version. pydantic-settings left the image (the submission bundles
+it). Submission notebooks set no `docker_image`, so they run Kaggle's current default image. With
+torch 2.11 the lock also moves to cuDNN 9.19.0.56, NCCL 2.28.9 and setuptools 81.0.0 (Kaggle pins
+setuptools below 82); triton stays 3.6.0. Checked on the CPU in float32: ResNet-50, ConvNeXt-T,
+FocalNet-T and EfficientViT-B2 checkpoints load strictly and their backbone outputs are bit-identical
+to torch 2.10 with timm 1.0.26; MambaVision-T loads strictly.
+
+The v170 inspection below is kept as the method and the earlier reference.
 
 The inspected public image is `gcr.io/kaggle-gpu-images/python:v170`, also
 tagged `latest` when checked. Its immutable reference is:
@@ -94,26 +107,25 @@ and DICOM preparation workflow. Use Polars for tabular data processing.
 The following pins match the inspected image; other transitive versions were resolved
 by uv and are not claimed to match Kaggle's full environment.
 
-| Package | Kaggle GPU v170 version | Purpose |
+| Package | Kaggle GPU v171 version | Purpose |
 |---|---|---|
-| `torch` | `2.10.0+cu128` | Training, GPU tensors, and inference |
-| `torchvision` | `0.25.0+cu128` | Vision operations and timm dependency |
-| `timm` | `1.0.26` | Pretrained vision backbones, including ReXNet candidates |
-| `numpy` | `2.0.2` | Pixel arrays, preprocessing, and prediction arrays |
+| `torch` | `2.11.0+cu128` | Training, GPU tensors, and inference |
+| `torchvision` | `0.26.0+cu128` | Vision operations and timm dependency |
+| `timm` | `1.0.29` | Pretrained vision backbones, including ReXNet candidates |
+| `numpy` | `2.1.3` | Pixel arrays, preprocessing, and prediction arrays |
 | `polars` | `1.35.2` | Labels, study manifests, and submission tables |
 | `pydicom` | `3.0.2` | DICOM metadata and pixel access |
 | `scikit-learn` | `1.6.1` | Validation splits and ROC-AUC calculations |
 | `scipy` | `1.16.3` | Numerical support, including scikit-learn's dependency |
-| `pillow` | `11.3.0` | Image support required by the vision stack |
+| `pillow` | `12.3.0` | Image support required by the vision stack |
 | `tqdm` | `4.67.3` | Progress reporting for preprocessing and training |
 
-Kornia 0.8.3 and kornia-rs 0.1.14 are additional local dependencies used by
-the implemented affine, intensity and noise augmentations. They are pinned in
-`pyproject.toml`; matching Kaggle-image versions have not been established.
+Kornia 0.8.3 and kornia-rs 0.2.0 are used by the implemented affine, intensity and noise
+augmentations. kornia-rs 0.2.0 is the v171 image's version; Kornia is not in the v171 diff.
 
-MambaVision-T adds `einops` 0.8.1, `mambavision` 1.2.0 and `mamba-ssm` 2.3.2.post1 from the
-prebuilt release wheel for CUDA 12 and torch 2.10, with trimmed dependency metadata so that neither
-pulls in `transformers` or its own pins. Kaggle installs a T4 build instead; both are described in
+MambaVision-T adds `einops` 0.8.1, `mambavision` 1.2.0 and `mamba-ssm` 2.3.2.post1 from Astral's GPU
+index (CUDA 12.8, torch 2.11, cp313; T4 and 3090 code), with trimmed dependency metadata so that
+neither pulls in `transformers` or its own pins; described in
 [MambaVision-T dependencies](../modeling/mambavision-backbone.md#dependencies).
 
 ## Lightning training framework
@@ -123,12 +135,12 @@ Kaggle GPU image on 2026-09-11:
 
 | Package | Version | Purpose |
 |---|---|---|
-| `pytorch-lightning` | `2.6.5` | Provides the project's `pytorch_lightning` namespace |
+| `pytorch-lightning` | `2.6.6` | Provides the project's `pytorch_lightning` namespace |
 | `torchmetrics` | `1.9.0` | Lightning's metrics dependency |
 | `lightning-utilities` | `0.15.3` | Shared Lightning utilities |
 
 Kaggle's [v170 GPU release](https://github.com/Kaggle/docker-python/releases/tag/v170-GPU-bdf9e0538555f90453619adefb49ba40cfa136db44a9c9be7a42ea715c0aa068)
-lists `pytorch-lightning==2.6.5`. The
+lists `pytorch-lightning==2.6.5`; v171 moved it to 2.6.6. The
 [v167 GPU release](https://github.com/Kaggle/docker-python/releases/tag/v167-GPU-8777803d62f21da3e88e1062b5cc6973d9612768ca7bc59613d418958084e3cc)
 lists TorchMetrics 1.9.0 and Lightning Utilities 0.15.3; the v168–v170 GPU diffs
 record no subsequent changes to those two packages. These pins use published
