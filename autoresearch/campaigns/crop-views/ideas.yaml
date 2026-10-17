@@ -1,0 +1,1009 @@
+revision: 342
+ideas:
+- id: two-views-wide-and-posed
+  mechanism_id: wide-unposed-views
+  parent_idea_id: null
+  title: Coronal T1/PD, coronal fluid and sagittal T1/PD each read as their posed
+    view on 3 slices plus an unposed, image-centred 120 mm view on 2 slices of their
+    own; sagittal fluid and axial unchanged
+  opportunity: 'Evidence (prior-work.md, Whole-framing changes): on fold 0 the ResNet-18
+    runs whose framing differed in every view from the hand views added +7 to +16.5
+    x1e-4 in an equal blend with the hand-view run, against +1.6 to +4.8 for runs
+    one setting away; two learned views on every type (a 120 mm centre crop and the
+    hand width) +13.3, solo -0.0009. Single-type widenings of the posed views added
+    nothing (+1.9 to -2.0). Coverage (prior-work.md): the coronal fluid view holds
+    the collateral region in 35% of knees, the sagittal views the whole kneecap in
+    8 to 26%; a wide view holds them in 89 to 94%. Guess: complement gain +0.0010
+    to +0.0015 with MCL, Lateral Meniscus, PF OA and Baker''s up and Synovitis and
+    Fracture down, solo -0.001 to -0.002.'
+  mechanism: 'A view option posed (ViewConfig, default true). An unposed view is cut
+    at its static canvas placement: pose angle 0, shift 0 and scale 1 in first_look_pose
+    and no training jitter, so its window is the image-centred field the anchors give.
+    View table: Axial T1/PD and Axial fluid unchanged (120 mm, 6 slices, image anchors);
+    Coronal T1/PD 84 mm, 3 slices, horizontal knee 0, vertical image 10, posed, then
+    120 mm, 2 slices, image 0 and image 0, unposed; Coronal fluid 93.333333 mm, 3
+    slices, as the recipe''s, posed, then 120 mm, 2 slices, unposed; Sagittal T1/PD
+    93.333333 mm, 3 slices, horizontal knee 7, vertical image 10, posed, then 120
+    mm, 2 slices, unposed; Sagittal fluid unchanged (84 mm, 5 slices, posed, and the
+    64 mm detail view on the same slices). model.view_knee_scale true. Images per
+    study as the recipe''s.'
+  precedents:
+  - 'two-views-every-type (learnable-views, fold 0, ResNet-18): blend with the hand-view
+    run +13.3 x1e-4, solo -9.3, correlation 0.977.'
+  - 'Runs on a 120 mm base plus a crop (smart-crops, fold 0): blend +7 to +9 against
+    the hand-view run, solo about -20.'
+  - 'rn18-sagittal-fluid-72-and-112mm (fold 1): two posed views splitting sagittal
+    fluid slices, blend -4.5, solo -27.4.'
+  novelty: First wide, unposed view beside the posed views on the current recipe.
+  coverage: Every study with coronal or sagittal T1/PD or coronal fluid series; every
+    label.
+  exploitation: 'Read the complement gain and its per-label gains, the solo x4 and
+    x1, and the sixth-member blend. Activation: validation metrics of the mean absolute
+    applied turn and shift per view, zero on the three unposed views and above zero
+    on the posed ones, and the count of tokens per view.'
+  budget: Same images per study as the recipe; expected about the reference's 2,617
+    s (1.0) and 16.4 GB.
+  implementation: 'Written and verified by the keeper: apply /home/claudio/src/knee-abnormality-crop-views/autoresearch/campaigns/crop-views/two-views-wide-and-posed.patch
+    exactly (git apply in the workspace; base is the control''s source; files src/knee_abnormality/config.py,
+    modeling/model.py, modeling/spatial_tokens.py, modeling/view_windows.py, training/lightning.py),
+    then set the view table of configs/campaign.yaml as the mechanism states (the
+    three changed types: first view slices 3, then a view field_mm 120.0, slices 2,
+    horizontal and vertical anchor image offset 0.0, posed false) and change nothing
+    else. Keeper''s CPU checks on three fold-2 training studies: views axial_t1pd_120mm,
+    axial_fluid_120mm, coronal_t1pd_84mm, coronal_t1pd_120mm, coronal_fluid_93mm,
+    coronal_fluid_120mm, sagittal_t1pd_93mm, sagittal_t1pd_120mm, sagittal_fluid_84mm,
+    sagittal_fluid_64mm; the three 120 mm views get turn 0, shift 0 and scale 1 from
+    the first look and after the training jitter while the posed views move; images
+    per study as the recipe''s; logits finite; val_unposed_crop_turn_abs_deg, val_unposed_crop_shift_abs_mm
+    and val_unposed_crop_scale_offset 0, val_unposed_image_fraction 0.18. With every
+    view posed (the control''s table) the code is the control''s: the scale selection
+    keeps the per-knee scale exactly. If the incumbent changed, port the same change
+    onto it.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The strongest complement evidence of the ranking, and the same
+    images per study.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-crop-views/autoresearch/campaigns/crop-views/seed-ideas.yaml
+  experiments:
+  - two-views-wide-and-posed-20261016T202135Z-623b6d7c
+  decision: provisional_accept
+- id: unposed-120-mm-everywhere
+  mechanism_id: wide-unposed-views
+  parent_idea_id: null
+  title: Every series type read as one unposed, image-centred 120 mm view, slices
+    6, 6, 5, 5, 5, 5, no detail view
+  opportunity: 'Evidence (prior-work.md, Whole-framing changes): rn18-field-120-control
+    (fold 0) in an equal blend with the hand-view run +5.5 and +6.7 x1e-4 against
+    two hand-view runs +4.8; solo -0.0019. Per label MCL +62, Lateral Meniscus +31,
+    Baker''s +18, PF OA +16, Medial Meniscus +6, Contusion +3, Effusion 0, Medial
+    OA -4, Lateral OA -7, Fracture -10, ACL -11, Synovitis -39. Guess: complement
+    gain +0.0006 to +0.0012, solo -0.002 to -0.003.'
+  mechanism: 'The posed option of two-views-wide-and-posed (built by that seed if
+    it has not run). View table: every one of the six types a single view, 120 mm,
+    image anchors with offset 0, unposed; slices Axial T1/PD 6, Axial fluid 6, Coronal
+    T1/PD 5, Coronal fluid 5, Sagittal T1/PD 5, Sagittal fluid 5. The 64 mm sagittal
+    fluid detail view is removed with its slices. model.view_knee_scale true (inactive
+    with no posed view). When no view is posed the first look may be skipped if every
+    output is unchanged.'
+  precedents:
+  - 'rn18-field-120-control against view-frozen-control and rn18-view-label-bias (fold
+    0): blend +5.5 and +6.7 x1e-4.'
+  - 'field-120-single (mixed-field, fold 0): blend with the contrast-split run +10.9,
+    solo -3.7.'
+  novelty: The pre-view framing on the ResNet-50 recipe, as an ensemble member.
+  coverage: Every study and every label.
+  exploitation: 'Read the complement gain, per label, solo and sixth-member blend.
+    Activation: the same per-view pose metrics, zero on every view, and the view count
+    in the logged view names.'
+  budget: 32 images per study against 37; expected 0.8 to 0.9 of the reference's time,
+    under 16 GB.
+  implementation: 'Files: configs/campaign.yaml, and the posed option and metrics
+    if two-views-wide-and-posed has not built them. Check on CPU that the config loads
+    and one batch gives zero pose on every view.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The cheapest whole-framing change, the old recipe's framing.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-crop-views/autoresearch/campaigns/crop-views/seed-ideas.yaml
+  experiments:
+  - unposed-120-mm-everywhere-20261016T202726Z-efd5c1ff
+  - unposed-120-mm-everywhere-20261016T211539Z-95ffff54
+  decision: reject
+- id: per-knee-scale-off
+  mechanism_id: per-knee-scale
+  parent_idea_id: null
+  title: Per-knee view scale off (model.view_knee_scale false); every view posed at
+    scale 1, everything else the recipe's
+  opportunity: 'Evidence (prior-work.md, Pose settings): the per-knee crop size run
+    (anatomy-recipe, fold 1) in an equal blend with the recipe of its time, which
+    had no per-knee scale, +6.7 x1e-4 against a retraining''s +2.0; solo +3.2. The
+    recipe adopted the scale on 2026-10-10, so the run without it is now the different
+    member. Per label in that blend MCL +49, Synovitis +21, Medial OA +14, Medial
+    Meniscus +10, PF OA +10, Baker''s +9, Effusion +7, ACL -4, Contusion -4, Lateral
+    Meniscus -7, Lateral OA -10, Fracture -15. Guess: complement gain +0.0006 to +0.0010.'
+  mechanism: A model option view_knee_scale (default true, the recipe). When false,
+    first_look_pose appends scale 1 for every view in place of the per-knee size over
+    17.087 clamped to 0.87 to 1.13. View table as the recipe's.
+  precedents:
+  - 'crop-size-per-knee-from-the-first-look (anatomy-recipe, fold 1): blend +6.7,
+    solo +3.2, correlation 0.993.'
+  novelty: First run of the posed recipe without the per-knee scale.
+  coverage: Every study with a trusted pose; every label.
+  exploitation: 'Read the complement gain, per label, solo and sixth-member blend.
+    Activation: a validation metric of the mean applied scale and the share of studies
+    at 1, which must be 1 and 1.0 here and spread for the control''s code.'
+  budget: Same images as the recipe; about 1.0 of the reference's time and 16.4 GB.
+  implementation: 'Files: config.py (model.view_knee_scale), modeling/model.py, training/lightning.py
+    (the scale metrics), configs/campaign.yaml. Check on CPU that one batch gives
+    scale 1 everywhere with the option off and the recipe''s scales with it on.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A one-line option whose earlier run gave the third-largest complement
+    on fold 1.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-crop-views/autoresearch/campaigns/crop-views/seed-ideas.yaml
+  experiments:
+  - per-knee-scale-off-20261016T212038Z-5ce859d4
+  decision: provisional_accept
+- id: coronal-crops-a-ninth-wider
+  mechanism_id: posed-field-sizes
+  parent_idea_id: null
+  title: Coronal T1/PD at 93.333333 mm and coronal fluid at 103.703704 mm (both a
+    ninth wider), posed as the recipe; nothing else changes
+  opportunity: 'Evidence (prior-work.md, Single-type widenings): coronal crops a ninth
+    wider (anatomy-masks, fold 1) in an equal blend with its incumbent +4.1 x1e-4
+    against a retraining''s +2.0, solo -0.3; the only single-type widening above the
+    yardstick. Per label Medial Meniscus +14, Lateral Meniscus +11, MCL +10, Synovitis
+    +10, PF OA +9, Effusion +5, Fracture +5, Lateral OA +2, Contusion 0, ACL -1, Medial
+    OA -1, Baker''s -15. The 93 mm coronal fluid view holds the collateral region
+    in 35% of knees. Guess: complement gain +0.0004 to +0.0007, solo level.'
+  mechanism: Configuration only. Coronal T1/PD field_mm 93.333333 and Coronal fluid
+    field_mm 103.703704, slices and anchors as the recipe's; every other view and
+    model.view_knee_scale true as the recipe's.
+  precedents:
+  - 'coronal-crops-a-ninth-wider (anatomy-masks, fold 1): blend +4.1, solo -0.3, correlation
+    0.994.'
+  - 'sagittal-crops-a-ninth-wider (anatomy-masks, fold 1): blend -0.9, solo -8.0.'
+  novelty: The coronal widening on the ResNet-50 recipe.
+  coverage: Every study with coronal series; every label.
+  exploitation: 'Read the complement gain, per label, solo and sixth-member blend.
+    Activation: the recorded effective view table and the logged canvas pixel size
+    of the two coronal views (0.4167 and 0.4630 mm).'
+  budget: Same images; about 1.0 of the reference's time and 16.4 GB.
+  implementation: 'Files: configs/campaign.yaml only. Check that the config loads.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Configuration only and level on its own.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-crop-views/autoresearch/campaigns/crop-views/seed-ideas.yaml
+  ranking_rationale: Block and park the duplicate reservation. Direct recursive comparison
+    against the bound parent confirms that only validation diagnostic logging differs;
+    paired framing, scale-off and joint-depth selection are identical. Training would
+    be a forbidden unchanged confirmation run. A bounded repair cannot introduce a
+    distinct mechanism while preserving the reserved idea and accepted behavior. To
+    address the previous ranking rejection, explicitly list every remaining live queue
+    entry once, preserving their relative order.
+  experiments:
+  - coronal-crops-a-ninth-wider-20261017T022911Z-633ab764
+  decision: provisional_accept
+- id: soft-bone-shares-for-the-joint-plane
+  mechanism_id: pose-estimation
+  parent_idea_id: null
+  title: Fit the joint plane with each token weighted by its continuous femur plus
+    tibia share instead of keeping only tokens above one half; everything else the
+    recipe's
+  opportunity: 'Evidence (prior-work.md, Pose estimation): the same change (anatomy-masks,
+    fold 1) in an equal blend with its incumbent +4.2 x1e-4 against a retraining''s
+    +2.0, solo -0.4. Per label Fracture +21, MCL +19, PF OA +12, Medial Meniscus +11,
+    ACL +6, Effusion +4, Synovitis +3, Lateral Meniscus -2, Medial OA -3, Contusion
+    -6, Lateral OA -7, Baker''s -7. A different plane moves every posed crop and the
+    routing frame. Guess: complement gain +0.0004 to +0.0008, solo level.'
+  mechanism: In the joint-plane fit of model.py (the bone weight before the refits,
+    about line 829), weight each token by valid times (femur + tibia) and its target
+    by valid times (femur - tibia), and keep the Gaussian refit as a separate factor
+    that multiplies that weight at each refit, as in the frozen candidate outputs/autoresearch/anatomy-masks/experiments/soft-bone-shares-fit-the-joint-plane-20261008T033130Z-816591b0/changes.diff;
+    port its fit lines, not its diagnostics. View table and settings as the recipe's.
+  precedents:
+  - 'soft-bone-shares-fit-the-joint-plane (anatomy-masks, fold 1): blend +4.2, solo
+    -0.4, correlation 0.994.'
+  - 'sparse-first-look-at-interior-depth-quantiles (anatomy-masks, fold 1): blend
+    +4.2, solo 0.0.'
+  novelty: A different pose estimate on the ResNet-50 recipe.
+  coverage: Every study with an anatomy plane fit; every label.
+  exploitation: 'Read the complement gain, per label, solo and sixth-member blend.
+    Activation: a validation metric of the share of plane-fit weight carried by tokens
+    at or below one half bone share, above zero here and zero for the recipe''s fit,
+    and the mean angle between the two planes on the same batch.'
+  budget: Same images; about 1.0 of the reference's time and 16.4 GB.
+  implementation: 'Files: modeling/model.py (the fit), modeling/spatial_tokens.py
+    (identity strings), training/lightning.py (the metrics). Check on CPU that one
+    batch fits a plane and that the weights match the description.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A pose-source change with a flat solo cost and a fold-1 complement
+    above the yardstick.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-crop-views/autoresearch/campaigns/crop-views/seed-ideas.yaml
+  ranking_rationale: Block and park the duplicate reservation. Direct recursive comparison
+    against the bound parent confirms that only validation diagnostic logging differs;
+    paired framing, scale-off and joint-depth selection are identical. Training would
+    be a forbidden unchanged confirmation run. A bounded repair cannot introduce a
+    distinct mechanism while preserving the reserved idea and accepted behavior. To
+    address the previous ranking rejection, explicitly list every remaining live queue
+    entry once, preserving their relative order.
+  experiments:
+  - soft-bone-shares-for-the-joint-plane-20261017T031833Z-5c16041b
+  - soft-bone-shares-for-the-joint-plane-20261017T040458Z-881bebb2
+  decision: reject
+- id: canvas-locator-resnet10t
+  mechanism_id: auxiliary-locator
+  parent_idea_id: null
+  title: A Refined-RadImageNet ResNet-10t reads each primary series' whole 368 px
+    canvas resized to 224 px, learns the anatomy map from the mask targets, and its
+    map replaces the ResNet-50 first look for the crop pose from epoch 3
+  opportunity: 'Today the pose comes from a no-gradient pass of the ResNet-50 over
+    the central 224 px of each canvas, the view''s own field, so a knee off centre
+    is seen in part, and the shift is capped at 18 mm. A locator that sees the whole
+    canvas (138 to 197 mm) estimates the pose from the whole knee and frees the ResNet-50
+    from the first look (about 32 of the 143 ResNet-50 forward passes per study).
+    Evidence (prior-work.md, Pose estimation): other pose estimates gave +4.2 to +5.3
+    x1e-4 in a blend against a retraining''s +2.0 (fold 1). Guess: complement gain
+    +0.0004 to +0.0010, solo level to -0.001.'
+  mechanism: 'Under model.auxiliary: a resnet10t.c3_in1k backbone with Refined-RadImageNet
+    weights (restore its entry in modeling/radimagenet.py: file refined_radimagenet_resnet10t.pth,
+    sha256 f5219dff128ca752d47e8acd07817564c10bacbbc4241b3a31845e1a67a079ab, source
+    REFINED_RADIMAGENET_URL resnet10t.pth; the file is in the torch hub cache), its
+    own linear projection to 256 and its own seven-class anatomy head, trained with
+    the recipe''s anatomy loss and weight on targets looked up at its token positions.
+    Input: the slices first_look_batch selects, each whole canvas resized from 368
+    to 224 px, with patient maps and valid rectangles transformed by that resize.
+    Its tokens go through the model''s first-look frame computation (positions, anatomy
+    shares, joint plane and centre, study frame, side) in place of the ResNet-50''s,
+    and frame_pose and the per-knee scale read that result. Epochs 1 and 2 pose from
+    the ResNet-50 first look as today; from epoch 3 from the locator alone, and validation
+    and prediction use the locator. Rate and anchors as the ResNet-50''s (backbone_lr
+    5e-5, anchors 0.01 early and 0.001 late toward its pretrained weights). Shift
+    and turn limits as the recipe''s. View table and every other setting as the recipe''s.'
+  precedents:
+  - 'soft-bone-shares-fit-the-joint-plane (anatomy-masks, fold 1): blend +4.2, solo
+    -0.4.'
+  - 'spot-shift-locator-keeps-spatial-maps (routing-and-shifts, fold 1): a learned
+    crop point, blend +5.3, solo +1.4.'
+  - 'joint-centre-taught-from-the-masks (view-poses, fold 1): a centre regressed from
+    the masks, blend +2.8, solo -30.7.'
+  - 'Refined-RadImageNet ResNet-10t: 1.10 GMAC at 224 px against the ResNet-50''s
+    4.09 (measured).'
+  novelty: First pose read by a second network from the whole canvas.
+  coverage: Every study with a trusted pose; every label through the crops.
+  exploitation: 'Read the complement gain, per label, solo and sixth-member blend.
+    Activation: validation metrics of the locator''s anatomy-map accuracy on its targets,
+    the mean absolute difference between its pose and the ResNet-50 first look''s
+    on the same batch (shift in mm, turn in degrees, scale), and the share of studies
+    whose pose came from the locator (1.0 from epoch 3).'
+  budget: 'The locator costs about 32 x 3 x 0.27 = 26 ResNet-50 forward passes per
+    study against the first look''s 32 it replaces from epoch 3: -5% to +10% of the
+    reference''s time; about +1 GB.'
+  implementation: 'Files: config.py (model.auxiliary), modeling/radimagenet.py, modeling/model.py
+    (the locator module, its use in first_look_pose and the epoch switch), modeling/view_windows.py
+    (the resized canvas batch), modeling/spatial_tokens.py (the resnet10t feature
+    mapping and identity strings), training/lightning.py (the locator''s parameter
+    group, anchors, anatomy loss and metrics), configs/campaign.yaml. Check on CPU
+    that the weights load strictly, the config loads, and one batch gives a locator
+    pose of the right shape.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's idea, and the base of canvas-locator-with-context-tokens.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-crop-views/autoresearch/campaigns/crop-views/seed-ideas-2.yaml
+  ranking_rationale: Block and park the duplicate reservation. Direct recursive comparison
+    against the bound parent confirms that only validation diagnostic logging differs;
+    paired framing, scale-off and joint-depth selection are identical. Training would
+    be a forbidden unchanged confirmation run. A bounded repair cannot introduce a
+    distinct mechanism while preserving the reserved idea and accepted behavior. To
+    address the previous ranking rejection, explicitly list every remaining live queue
+    entry once, preserving their relative order.
+  experiments:
+  - canvas-locator-resnet10t-20261017T045753Z-ba721b67
+  - canvas-locator-resnet10t-20261017T054709Z-d73aa942
+  decision: reject
+- id: wide-fluid-stream-resnet10t
+  mechanism_id: auxiliary-context-stream
+  parent_idea_id: null
+  title: A Refined-RadImageNet ResNet-10t reads an unposed, image-centred 120 mm view
+    of the slices each fluid series' first view selects; its tokens join the same
+    pools from the first step, with no gate
+  opportunity: 'Evidence (prior-work.md, Whole-framing changes): framings different
+    in every view added +7 to +16.5 x1e-4 in a blend on fold 0. Two-stream precedents:
+    the mixed-field ResNet-10t stream behind a zero-started scalar gate never trained
+    (its readout 0.506) and the run was 120 mm alone; the smart-crops ResNet-10t 140
+    mm fluid stream feeding the pool from the first step trained, blend +7.7, solo
+    -21.2 (fold 0). Here the stream adds context beside the posed views instead of
+    replacing them. Guess: complement gain +0.0008 to +0.0015, solo -0.001 to +0.001.'
+  mechanism: 'Under model.auxiliary: the ResNet-10t with Refined-RadImageNet weights
+    (as canvas-locator-resnet10t restores them), its own linear projection to 256
+    and a learned stream embedding added to its tokens. For the three fluid types
+    (axial, coronal, sagittal fluid) it reads the slices the type''s first view selects,
+    cut at 120 mm with image anchors and offset 0, unposed (no shift, turn, scale
+    or jitter). Its tokens carry their positions and enter the same pools and readouts
+    as the ResNet-50''s, the anatomy head included, with no gate. Rate and anchors
+    as the ResNet-50''s. The first look, the view table and every other setting as
+    the recipe''s.'
+  precedents:
+  - 'two-views-fluid-140 (smart-crops, fold 0): ResNet-10t 140 mm fluid stream, no
+    gate, blend +7.7, solo -21.2.'
+  - 'two-stream-paired (mixed-field, fold 0): gated ResNet-10t stream that never trained.'
+  novelty: First wide context stream from a second network beside posed views.
+  coverage: Every study with fluid series; every label.
+  exploitation: 'Read the complement gain, per label, solo and sixth-member blend.
+    Activation: the share of attention mass on stream tokens per label at validation,
+    the stream projection''s weight drift after epoch 1, and the stream token count
+    per study.'
+  budget: '16 images per study through the ResNet-10t, about 16 x 3 x 0.27 = 13 ResNet-50
+    forward passes on 143: +10% to +15% of the reference''s time; +1 to 2 GB.'
+  implementation: 'Files: config.py (model.auxiliary), modeling/radimagenet.py, modeling/model.py,
+    modeling/view_windows.py (the unposed 120 mm cut for the stream), modeling/spatial_tokens.py
+    (mapping, embeddings, identity strings), data/dataset.py or data/preprocessing
+    if the stream needs its own canvas, training/lightning.py (parameter group, anchors,
+    metrics), configs/campaign.yaml. Check on CPU that the stream tokens reach every
+    pool and that one batch runs.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The cheapest two-backbone context stream with a trained precedent.
+  status: blocked
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-crop-views/autoresearch/campaigns/crop-views/seed-ideas-2.yaml
+  ranking_rationale: Block and park the duplicate reservation. Direct recursive comparison
+    against the bound parent confirms that only validation diagnostic logging differs;
+    paired framing, scale-off and joint-depth selection are identical. Training would
+    be a forbidden unchanged confirmation run. A bounded repair cannot introduce a
+    distinct mechanism while preserving the reserved idea and accepted behavior. To
+    address the previous ranking rejection, explicitly list every remaining live queue
+    entry once, preserving their relative order.
+  experiments:
+  - wide-fluid-stream-resnet10t-20261017T055439Z-3f16fa3f
+  - wide-fluid-stream-resnet10t-20261017T064431Z-1f7248d5
+  blocked_reason: 'Withdraw approval and block wide-fluid-stream-resnet10t: its one
+    bounded repair also failed runtime preflight, projecting 3,218.63 s against the
+    fixed 3,140.82 s ceiling. repair_count=1 leaves no further repair. Park the seed
+    at its own implementation review. Supply the full remaining queue, excluding the
+    parked idea, to resolve the rejected ranking; preserve the remaining user-ordered
+    seeds without changing their relative priority.'
+- id: canvas-locator-with-context-tokens
+  mechanism_id: auxiliary-locator
+  parent_idea_id: canvas-locator-resnet10t
+  title: canvas-locator-resnet10t with the locator's full-canvas tokens also entering
+    the pools, so one ResNet-10t pass places the crops and adds wide context
+  opportunity: 'Guess: the locator already encodes every primary canvas; its tokens
+    add 138 to 197 mm context at 0.62 to 0.88 mm per pixel at little cost. Comparing
+    with canvas-locator-resnet10t separates the context from the pose, and with canvas-context-tokens-resnet10t
+    the pose from the context. Guess: complement gain +0.0008 to +0.0015.'
+  mechanism: 'canvas-locator-resnet10t unchanged, plus: the locator''s tokens, with
+    a learned stream embedding, enter the same pools and readouts as the ResNet-50''s
+    from the first step, with no gate, and the target losses train the locator through
+    them as well as the anatomy loss. In epochs 1 and 2, while the pose comes from
+    the ResNet-50 first look, the locator tokens still enter the pools.'
+  precedents:
+  - canvas-locator-resnet10t (this campaign).
+  - 'mixed-field-120-160 (fold 0): 160 mm slices beside 120 mm ones, blend +3.6, solo
+    -9.2.'
+  novelty: One auxiliary pass with two uses.
+  coverage: Every study; every label.
+  exploitation: Read as canvas-locator-resnet10t plus the share of attention mass
+    on locator tokens per label.
+  budget: 'As canvas-locator-resnet10t plus the extra tokens in the pools: 0% to +10%
+    of the reference''s time; +1 to 2 GB.'
+  implementation: 'Files: modeling/model.py and training/lightning.py on top of canvas-locator-resnet10t;
+    configs/campaign.yaml.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Runs after canvas-locator-resnet10t, whose code it extends.
+  status: blocked
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-crop-views/autoresearch/campaigns/crop-views/seed-ideas-2.yaml
+  ranking_rationale: 'Withdraw approval and block wide-fluid-stream-resnet10t: its
+    one bounded repair also failed runtime preflight, projecting 3,218.63 s against
+    the fixed 3,140.82 s ceiling. repair_count=1 leaves no further repair. Park the
+    seed at its own implementation review. Supply the full remaining queue, excluding
+    the parked idea, to resolve the rejected ranking; preserve the remaining user-ordered
+    seeds without changing their relative priority.'
+  experiments:
+  - canvas-locator-with-context-tokens-20261017T065429Z-a88fd2f6
+  - canvas-locator-with-context-tokens-20261017T070018Z-3def6f88
+  blocked_reason: 'Block and park canvas-locator-with-context-tokens: the repaired
+    candidate failed runtime preflight, projecting 3,308.56 s against the fixed 3,140.82
+    s ceiling. Its one bounded repair is exhausted. Inspection of changes.diff and
+    critical source confirms auxiliary checkpointing preserves the declared locator/context
+    mechanism, warm-up and training schedule, but a failed gate prevents approval.
+    The explicit ranking contains every remaining eligible queue entry once, preserving
+    their order after removing the blocked head; this addresses the previous report''s
+    ranking rejection.'
+- id: wide-fluid-stream-own-loss
+  mechanism_id: auxiliary-context-stream
+  parent_idea_id: wide-fluid-stream-resnet10t
+  title: wide-fluid-stream-resnet10t with the stream's tokens also pooled alone under
+    the target loss and its logits added to the main ones
+  opportunity: 'A stream that the pools can ignore may not learn; its own loss makes
+    it learn alone, and its logits add a second reading inside the model. Precedent
+    (prior-work.md, Auxiliary backbones): crop-own-loss, a crop pooled alone under
+    its own loss, blend +5.5, solo -24.7 (fold 0). Guess: complement gain +0.0006
+    to +0.0015.'
+  mechanism: 'wide-fluid-stream-resnet10t unchanged, plus: the stream''s tokens are
+    pooled alone by a copy of the target readout (own attention and classifiers, zero-started),
+    trained by the same target loss at weight 1, and its logits are added to the model''s
+    logits for the twelve labels; the joint pools still see the stream tokens.'
+  precedents:
+  - 'crop-own-loss (smart-crops, fold 0): blend +5.5, solo -24.7.'
+  - wide-fluid-stream-resnet10t (this campaign).
+  novelty: A deeply supervised second backbone.
+  coverage: Every study with fluid series; every label.
+  exploitation: Read as wide-fluid-stream-resnet10t plus the stream's own macro AUC
+    at x1 and the size of its logits against the main ones.
+  budget: +12% to +18% of the reference's time; +1 to 2 GB.
+  implementation: 'Files: modeling/model.py and training/lightning.py on top of wide-fluid-stream-resnet10t;
+    configs/campaign.yaml.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Runs after wide-fluid-stream-resnet10t, whose code it extends.
+  status: retired
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-crop-views/autoresearch/campaigns/crop-views/seed-ideas-2.yaml
+  ranking_rationale: 'Withdraw approval and block wide-fluid-stream-resnet10t: its
+    one bounded repair also failed runtime preflight, projecting 3,218.63 s against
+    the fixed 3,140.82 s ceiling. repair_count=1 leaves no further repair. Park the
+    seed at its own implementation review. Supply the full remaining queue, excluding
+    the parked idea, to resolve the rejected ranking; preserve the remaining user-ordered
+    seeds without changing their relative priority.'
+  retired_reason: 'Keeper, 2026-10-17: builds on wide-fluid-stream-resnet10t, blocked
+    at the preflight time gate (3,219 s against 3,141 s), and would cost more than
+    it; replaced by wide-fluid-stream-3-slices-own-loss on the 3-slice stream.'
+- id: canvas-context-tokens-resnet10t
+  mechanism_id: auxiliary-context-stream
+  parent_idea_id: null
+  title: A Refined-RadImageNet ResNet-10t reads each primary series' whole 368 px
+    canvas resized to 224 px and its tokens join the same pools; crops stay posed
+    by the ResNet-50 first look
+  opportunity: 'The canvas extends past the crop: 138 mm for coronal T1/PD and sagittal
+    fluid, 153 mm for coronal fluid and sagittal T1/PD, 197 mm for axial, at 0.62
+    to 0.88 mm per pixel. Evidence (prior-work.md): fields wider than 140 mm helped
+    only beside narrower ones (mixed-field-120-160 blend +3.6, 160 mm alone solo -34).
+    This is the context-only comparison for canvas-locator-with-context-tokens. Guess:
+    complement gain +0.0005 to +0.0012, below wide-fluid-stream-resnet10t for the
+    coarser pixels.'
+  mechanism: 'Under model.auxiliary: the ResNet-10t with Refined-RadImageNet weights,
+    its own projection to 256 and a learned stream embedding. It reads the slices
+    first_look_batch selects, each whole canvas resized from 368 to 224 px with patient
+    maps and valid rectangles transformed by the resize, and its tokens enter the
+    same pools and readouts as the ResNet-50''s, the anatomy head included, from the
+    first step with no gate. The ResNet-50 first look, the pose, the view table and
+    every other setting as the recipe''s. If the run is stopped for time, the repair
+    restricts the stream to the three fluid series.'
+  precedents:
+  - 'mixed-field-120-160 (mixed-field, fold 0): blend +3.6, solo -9.2.'
+  - 'field-160-single-logged (mixed-field, fold 0): 160 mm alone, solo -49.5 against
+    its incumbent.'
+  novelty: Whole-canvas context beside the posed views.
+  coverage: Every study; every label.
+  exploitation: 'Read the complement gain, per label, solo and sixth-member blend.
+    Activation: the share of attention mass on stream tokens per label and the stream
+    token count per study.'
+  budget: '32 images per study through the ResNet-10t, about 26 ResNet-50 forward
+    passes on 143 with the first look kept: +15% to +25% of the reference''s time,
+    the upper end at the 1.2 limit; +1 to 2 GB.'
+  implementation: 'Files: config.py (model.auxiliary), modeling/radimagenet.py, modeling/model.py,
+    modeling/view_windows.py (the resized canvas batch), modeling/spatial_tokens.py,
+    training/lightning.py, configs/campaign.yaml. Reuse the resized canvas batch of
+    canvas-locator-resnet10t when it exists.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's request, and the context-only comparison for the
+    locator with tokens.
+  status: retired
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-crop-views/autoresearch/campaigns/crop-views/seed-ideas-2.yaml
+  ranking_rationale: Block and park the duplicate reservation. Direct recursive comparison
+    against the bound parent confirms that only validation diagnostic logging differs;
+    paired framing, scale-off and joint-depth selection are identical. Training would
+    be a forbidden unchanged confirmation run. A bounded repair cannot introduce a
+    distinct mechanism while preserving the reserved idea and accepted behavior. To
+    address the previous ranking rejection, explicitly list every remaining live queue
+    entry once, preserving their relative order.
+  retired_reason: 'Keeper, 2026-10-17: canvas-locator-resnet10t ended with its pose
+    equal to the ResNet-50 first look (shift 0.9 mm, turn 3.2 deg, scale 0.03 apart;
+    map agreement 0.945), so the pose part of canvas-locator-with-context-tokens adds
+    nothing and that seed already measures the full-canvas context tokens, at lower
+    cost (no ResNet-50 first look after warm-up) and inside the time limit this seed
+    reaches at its upper estimate.'
+- id: wide-view-on-distinct-depths
+  mechanism_id: wide-unposed-views
+  parent_idea_id: two-views-wide-and-posed
+  title: two-views-wide-and-posed with each type's posed and wide views drawn as one
+    selection of their combined budget and split by depth, so the two views never
+    read the same depth
+  opportunity: 'Evidence (keeper count on 12 fold-2 validation studies with the two-views-wide-and-posed
+    source): each view of a type selects its slices independently from the same pool,
+    so at x1 the wide view''s depths are 0 to 4% also read by the posed view, but
+    at x4 (posed 12, wide 8 of a 20 to 30 slice series) 53 to 56% of them are. At
+    x4 each changed type then covers about 16 distinct depths, 12 of them fine, against
+    the control''s 20 fine ones. two-views-wide-and-posed gained +0.0014 at x1 and
+    lost -0.0006 at x4 against the control; its x4 minus x1 was 0.0073 against a median
+    of 0.0082 for 28 fold-2 ResNet-50 runs (10th to 90th percentile 0.0075 to 0.0090)
+    and the control''s 0.0093. Adoption reads x4. Guess: complement gain above two-views-wide-and-posed''s
+    +7.6 x1e-4, x4 solo level with the control.'
+  mechanism: 'Configuration of two-views-wide-and-posed (the incumbent''s view table:
+    coronal T1/PD, coronal fluid and sagittal T1/PD each a posed view on 3 slices
+    and an unposed image-centred 120 mm view on 2). Change in the loader: when a series
+    type has more than one view that selects its own slices (DataConfig.view_sources),
+    select_triplets runs once for the type with the sum of those views'' budgets and
+    the first view''s kind key and seed, so the type reads exactly the triplets one
+    view of that budget would read, at training and evaluation alike. The selected
+    triplets, ordered by depth, are dealt to the views in proportion to their budgets,
+    evenly interleaved along the depth order (largest remainder over the ranks), deterministically,
+    so each view spans the type''s depth range and no depth is read twice. The shared
+    sagittal fluid detail view and single-view types are unchanged; with the control''s
+    table the loader''s output is the control''s. Sampling metadata records the combined
+    selection per view.'
+  precedents:
+  - 'two-views-wide-and-posed (this campaign): blend +7.6 x1e-4, x4 0.937262, x1 0.929920.'
+  - 'rn18-sagittal-fluid-72-and-112mm (fold 1): two views taking slices from one budget,
+    blend -4.5, solo -27.4.'
+  novelty: First joint slice selection for two views of one series type.
+  coverage: Every study with coronal or sagittal T1/PD or coronal fluid series; every
+    label.
+  exploitation: 'Read the complement gain against two-views-wide-and-posed''s, per
+    label, the x4 minus x1 gap and the sixth-member blend. Activation: a validation
+    metric of the share of a type''s depths read by more than one of its own-selection
+    views (0 here, about 0.03 at x1 for two-views-wide-and-posed), and the distinct
+    depths per changed type.'
+  budget: Same images per study as two-views-wide-and-posed; about its 2,741 s (1.05
+    of the reference) and 16.4 GB.
+  implementation: 'Files: data/dataset.py (_prepare_slot: the joint selection and
+    the split), data/preprocessing/sampling.py only if a helper belongs there, the
+    sampling identity string in the preprocessing identity, training/lightning.py
+    (the activation metric), configs/campaign.yaml as the incumbent''s. Check on CPU
+    with KneeStudyDataset at image multipliers 1 and 4 on a few fold-2 validation
+    studies that the changed types read 5 and 20 distinct depths with no repeat, that
+    the posed and wide views get 3 and 2 (12 and 8) of them spread over the range,
+    and that the control''s table gives the control''s selection.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Repairs the measured x4 overlap of the adopted incumbent; the
+    user asked for it on 2026-10-16.
+  status: completed
+  created_revision: 43
+  seeded: /home/claudio/src/knee-abnormality-crop-views/autoresearch/campaigns/crop-views/seed-ideas-3.yaml
+  experiments:
+  - wide-view-on-distinct-depths-20261016T220605Z-e69d4440
+  - wide-view-on-distinct-depths-20261016T225244Z-44c369f0
+  decision: provisional_accept
+- id: axial-views-unposed
+  mechanism_id: axial-pose
+  parent_idea_id: null
+  title: The recipe with both axial views unposed (image-centred 120 mm, no shift,
+    turn, scale or jitter); every coronal and sagittal view posed as the recipe's
+  opportunity: 'Evidence (this campaign and view-poses run notes): unposed-120-mm-everywhere,
+    which removes every pose, gained alone Lateral OA +30, Baker''s +27, Effusion
+    +22 x1e-4 and lost Synovitis -31, Contusion -42, Fracture -100; in a blend with
+    the control Lateral OA +40, Baker''s +26, Effusion +25, PF OA +20, beyond half
+    its solo change +17.7 against about +5 for one-setting runs. The step that posed
+    all six views (view-poses run 3, axial pose and per-knee scale added) moved the
+    same labels the other way: Lateral OA -33, Effusion -30, MCL -25, Fracture -21,
+    Synovitis +63, Contusion +38. Guess, moderate confidence: the axial pose centres
+    the crop between the kneecap front and 30 mm in front of the femur back, which
+    cuts the popliteal fossa (Baker''s cysts) and the posterior recesses that axial
+    fluid reads for effusion; Lateral OA is read best alone on axial fluid (0.842).
+    per-knee-scale-off separates the scale. Guess: complement gain +0.0006 to +0.0010
+    with Baker''s, Effusion and Lateral OA up, solo level to -0.001.'
+  mechanism: 'Configuration only, on the posed option of two-views-wide-and-posed:
+    the control''s view table with posed false on the two axial views (120 mm, image
+    anchors, offset 0, 6 slices each); coronal and sagittal views, the detail view
+    and model.view_knee_scale true as the recipe''s.'
+  precedents:
+  - 'unposed-120-mm-everywhere (this campaign): blend +7.6, solo -20.3, beyond half
+    solo +17.7.'
+  - 'canvases-for-the-pose-in-all-six-views (view-poses run 3, fold 1): Lateral OA
+    -0.0033, Effusion -0.0030, MCL -0.0025, Fracture -0.0021, Synovitis +0.0063, Contusion
+    +0.0038.'
+  novelty: First test of the axial pose alone.
+  coverage: Every study with axial series; every label.
+  exploitation: 'Read the complement gain and per label, Baker''s, Effusion and Lateral
+    OA first, the solo change and the sixth-member blend. Activation: val_unposed_image_fraction
+    about 0.33 and the unposed turn, shift and scale metrics at 0, 1 and 0.'
+  budget: Same images as the recipe; about 1.0 of the reference's time and 16.4 GB.
+  implementation: 'Files: configs/campaign.yaml only (the posed option is in the incumbent''s
+    source). Check that the config loads and val_unposed metrics are logged.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Separates the cheapest candidate cause of unposed-120-mm-everywhere's
+    Baker's, Effusion and Lateral OA gains, configuration only.
+  status: completed
+  created_revision: 55
+  seeded: /home/claudio/src/knee-abnormality-crop-views/autoresearch/campaigns/crop-views/seed-ideas-4.yaml
+  ranking_rationale: Block and park the duplicate reservation. Direct recursive comparison
+    against the bound parent confirms that only validation diagnostic logging differs;
+    paired framing, scale-off and joint-depth selection are identical. Training would
+    be a forbidden unchanged confirmation run. A bounded repair cannot introduce a
+    distinct mechanism while preserving the reserved idea and accepted behavior. To
+    address the previous ranking rejection, explicitly list every remaining live queue
+    entry once, preserving their relative order.
+  experiments:
+  - axial-views-unposed-20261017T005623Z-e0e06691
+  decision: reject
+- id: two-views-wide-with-unposed-axial
+  mechanism_id: wide-unposed-views
+  parent_idea_id: two-views-wide-and-posed
+  title: The incumbent at its turn (two-views-wide-and-posed, or wide-view-on-distinct-depths
+    if adopted) with both axial views unposed
+  opportunity: 'Evidence (this campaign): the two runs complement each other. Adding
+    unposed-120-mm-everywhere to the control plus two-views-wide-and-posed adds +3.4
+    x1e-4 (Lateral OA +22, Effusion +20, Baker''s +13, PF OA +11, Fracture -18); the
+    reverse adds +3.4 (Fracture +41, Synovitis +22). two-views-wide-and-posed keeps
+    the posed fine views that Fracture needs (+36 alone, against -100 when every view
+    is unposed) but keeps the axial pose. Guess: this combination takes Fracture and
+    Synovitis from the first run and Baker''s, Effusion and Lateral OA from the axial
+    views; complement gain +0.0009 to +0.0014.'
+  mechanism: 'Combines two named runs: the incumbent''s code and view table when this
+    seed starts (two-views-wide-and-posed, or wide-view-on-distinct-depths if adopted,
+    with its joint slice selection) and axial-views-unposed''s change: posed false
+    on the two axial views. Nothing else changes.'
+  precedents:
+  - 'two-views-wide-and-posed (this campaign): blend +7.6, solo -5.6.'
+  - 'unposed-120-mm-everywhere (this campaign): blend +7.6, solo -20.3.'
+  novelty: The combination the per-label complementarity points to.
+  coverage: Every study; every label.
+  exploitation: 'Read the complement gain against the incumbent''s, per label, the
+    solo change and the sixth-member blend. Activation: val_unposed_image_fraction
+    about 0.45 and the unposed metrics at 0, 1 and 0.'
+  budget: Same images as the incumbent; about 1.05 of the reference's time and 16.4
+    GB.
+  implementation: 'Files: configs/campaign.yaml only. Check that the config loads.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Runs after axial-views-unposed and wide-view-on-distinct-depths
+    so it starts from the better incumbent.
+  status: retired
+  created_revision: 55
+  seeded: /home/claudio/src/knee-abnormality-crop-views/autoresearch/campaigns/crop-views/seed-ideas-4.yaml
+  retired_reason: 'Superseded by keeper seeds on the per-knee-scale-off incumbent
+    (adopted 2026-10-17 00:54, blend +9.8, x4 +0.0008): the same combination plus
+    scale off'
+- id: wide-views-scale-off
+  mechanism_id: wide-unposed-views
+  parent_idea_id: per-knee-scale-off
+  title: two-views-wide-and-posed's view table on the per-knee-scale-off incumbent
+    (scale off), with wide-view-on-distinct-depths's joint selection if that run's
+    complement gain beat two-views-wide-and-posed's
+  opportunity: 'Evidence (this campaign, fold 2, x1e-4): per-knee-scale-off is better
+    alone (x4 +7.7, x1 +13) with a blend of +9.8 led by Medial OA +22, Fracture +18,
+    Synovitis +14, Lateral Meniscus +14, MCL +12. two-views-wide-and-posed adds +3.5
+    on top of control plus per-knee-scale-off (Fracture +30, Synovitis +20, Baker''s
+    +12, PF OA +8), and the reverse adds +5.6 (Medial OA +16, Lateral Meniscus +13,
+    MCL +12): the two act on different labels. Guess: one model with both keeps most
+    of each, complement gain +0.0011 to +0.0014.'
+  mechanism: 'Combines two named runs: model.view_knee_scale false (per-knee-scale-off)
+    and the view table of two-views-wide-and-posed (coronal T1/PD, coronal fluid and
+    sagittal T1/PD each a posed view on 3 slices and an unposed image-centred 120
+    mm view on 2; axial and sagittal fluid as the recipe''s). If wide-view-on-distinct-depths
+    has completed with a complement gain above +0.00076, also its joint slice selection
+    (its source change); otherwise the independent selection of two-views-wide-and-posed.
+    Nothing else changes.'
+  precedents:
+  - 'per-knee-scale-off (this campaign): blend +9.8, x4 0.938595, sixth member +3.1.'
+  - 'two-views-wide-and-posed (this campaign): blend +7.6, x4 0.937262, sixth member
+    +1.6.'
+  novelty: The first combination of a better base with a different framing.
+  coverage: Every study; every label.
+  exploitation: 'Read the complement gain against the incumbent''s, per label (Fracture,
+    Synovitis and Baker''s from the wide views, Medial OA and Lateral Meniscus from
+    the scale), the solo change and the sixth-member blend. Activation: the unposed
+    metrics at 0, 1 and 0 with val_unposed_image_fraction about 0.18, and val_knee_crop_scale_mean
+    1.'
+  budget: Same images as the recipe; about 1.05 of the reference's time and 16.4 GB.
+  implementation: 'Files: configs/campaign.yaml, and wide-view-on-distinct-depths''s
+    source change when it applies. Check that the config loads.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The largest measured pairwise complement in the campaign, on
+    the better base.
+  status: blocked
+  created_revision: 79
+  seeded: /home/claudio/src/knee-abnormality-crop-views/autoresearch/campaigns/crop-views/seed-ideas-5.yaml
+  experiments:
+  - wide-views-scale-off-20261016T225730Z-5d78fd32
+  - wide-views-scale-off-20261016T234548Z-d9c4bfec
+  blocked_reason: Block and park the duplicate reservation. Direct recursive comparison
+    against the bound parent confirms that only validation diagnostic logging differs;
+    paired framing, scale-off and joint-depth selection are identical. Training would
+    be a forbidden unchanged confirmation run. A bounded repair cannot introduce a
+    distinct mechanism while preserving the reserved idea and accepted behavior. To
+    address the previous ranking rejection, explicitly list every remaining live queue
+    entry once, preserving their relative order.
+- id: wide-views-unposed-axial-scale-off
+  mechanism_id: wide-unposed-views
+  parent_idea_id: wide-views-scale-off
+  title: wide-views-scale-off with both axial views unposed
+  opportunity: 'Evidence (this campaign, x1e-4): unposed-120-mm-everywhere adds +3.2
+    on top of control plus per-knee-scale-off, from Lateral OA +24, Effusion +14,
+    Baker''s +14 and PF OA +10, labels the posed recipe reads on axial fluid; the
+    view-poses step that posed all six views cost Lateral OA -33 and Effusion -30.
+    axial-views-unposed tests the axial pose alone on the control. Guess: the axial
+    views carry those labels; complement gain above wide-views-scale-off''s by +0.0002
+    to +0.0004.'
+  mechanism: wide-views-scale-off unchanged, plus posed false on the two axial views
+    (120 mm, image anchors, offset 0, 6 slices each). Nothing else changes.
+  precedents:
+  - 'unposed-120-mm-everywhere (this campaign): blend +7.6, beyond half solo +17.7.'
+  - 'canvases-for-the-pose-in-all-six-views (view-poses run 3, fold 1): Lateral OA
+    -0.0033, Effusion -0.0030.'
+  novelty: All three per-label sources in one model.
+  coverage: Every study; every label.
+  exploitation: 'Read as wide-views-scale-off, Lateral OA, Effusion and Baker''s first.
+    Activation: val_unposed_image_fraction about 0.45.'
+  budget: Same images as the recipe; about 1.05 of the reference's time and 16.4 GB.
+  implementation: 'Files: configs/campaign.yaml only. Check that the config loads.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Runs after axial-views-unposed, whose result tells whether the
+    axial pose is the cause.
+  status: completed
+  created_revision: 79
+  seeded: /home/claudio/src/knee-abnormality-crop-views/autoresearch/campaigns/crop-views/seed-ideas-5.yaml
+  ranking_rationale: Block and park the duplicate reservation. Direct recursive comparison
+    against the bound parent confirms that only validation diagnostic logging differs;
+    paired framing, scale-off and joint-depth selection are identical. Training would
+    be a forbidden unchanged confirmation run. A bounded repair cannot introduce a
+    distinct mechanism while preserving the reserved idea and accepted behavior. To
+    address the previous ranking rejection, explicitly list every remaining live queue
+    entry once, preserving their relative order.
+  experiments:
+  - wide-views-unposed-axial-scale-off-20261017T014022Z-0a6269c4
+  decision: reject
+- id: imagenet-resnet50
+  mechanism_id: pretraining-domain
+  parent_idea_id: null
+  title: The recipe with the ImageNet resnet50.a1_in1k weights in place of Refined-RadImageNet,
+    ImageNet input statistics, anchors toward the ImageNet weights; everything else
+    the control's
+  opportunity: 'Evidence (keeper, saved fold 0 to 2 predictions, per label against
+    the ResNet-50 of the same fold, x1e-4): every ImageNet-pretrained family loses
+    to the Refined-RadImageNet ResNet-50 on Fracture (ConvNeXt -144, MambaVision -91,
+    FocalNet -77, EfficientViT -44), Lateral OA (-39 to -138), PF OA (-48 to -68)
+    and Lateral Meniscus (-9 to -66), and FocalNet and EfficientViT gain Contusion
+    (+47, +44), MCL (+34, +58) and Synovitis (EfficientViT +42). ConvNeXt is a convolutional
+    network and has the same pattern, so the split follows the pretraining, not convolution
+    against attention. Guess, moderate confidence: RadImageNet pretraining carries
+    the bone and compartment labels. This run holds the architecture fixed and changes
+    only the pretraining. Proof: its per-label solo changes against the control correlate
+    positively with the families'' mean pattern (Fracture, Lateral OA, PF OA, Lateral
+    Meniscus down; Contusion, MCL, Synovitis up), and its complement beyond half its
+    solo change is far above the +5 of one-setting runs.'
+  mechanism: 'model.pretrained_weights timm for resnet50.a1_in1k, loaded through the
+    same average-pool shortcut rename the RadImageNet weights use (create the backbone
+    without pretrained weights, take the timm resnet50.a1_in1k pretrained state dict
+    of the plain model, apply resnet_avg_down_state_dict, load strictly), since timm
+    cannot load them into the avg_down model directly (measured: size mismatch at
+    layer1.0.downsample.1). data.mean (0.485, 0.456, 0.406) and data.std (0.229, 0.224,
+    0.225), the ImageNet statistics the checkpoint was trained with. L2-SP anchors
+    at the recipe''s strengths toward these weights. View table and every other setting
+    as the control''s, model.view_knee_scale true.'
+  precedents:
+  - 'radimagenet-input-statistics (refined-radimagenet campaign, ResNet-18, fold 0):
+    the checkpoint''s own statistics +0.0006.'
+  - Family table above (keeper, folds 0 to 2).
+  novelty: First ImageNet-pretrained ResNet-50 on the current recipe; isolates pretraining
+    from architecture.
+  coverage: Every study and every label.
+  exploitation: 'Read the per-label solo changes against the control and their correlation
+    with the families'' mean per-label pattern, the complement gain and beyond half
+    solo, and the sixth-member blend. Activation: the logged early and late anchor
+    distances at epoch 1 measured toward the ImageNet weights, and the recorded effective
+    config.'
+  budget: Same images and backbone as the recipe; about 1.0 of the reference's time
+    and 16.4 GB.
+  implementation: 'Files: modeling/model.py (the timm weight load through the rename),
+    configs/campaign.yaml. Check on CPU with HF_HUB_OFFLINE=1 that the weights load
+    strictly and equal the timm checkpoint after the rename.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user asked for seeds that prove whether different backbones
+    favour different setups; this is the first cell of a pretraining by framing 2x2
+    with the architecture fixed.
+  status: completed
+  created_revision: 97
+  seeded: /home/claudio/src/knee-abnormality-crop-views/autoresearch/campaigns/crop-views/seed-ideas-6.yaml
+  ranking_rationale: Block and park the duplicate reservation. Direct recursive comparison
+    against the bound parent confirms that only validation diagnostic logging differs;
+    paired framing, scale-off and joint-depth selection are identical. Training would
+    be a forbidden unchanged confirmation run. A bounded repair cannot introduce a
+    distinct mechanism while preserving the reserved idea and accepted behavior. To
+    address the previous ranking rejection, explicitly list every remaining live queue
+    entry once, preserving their relative order.
+  experiments:
+  - imagenet-resnet50-20261016T234730Z-428cfd0f
+  - imagenet-resnet50-20261017T000235Z-aba98504
+  decision: reject
+- id: imagenet-resnet50-unposed-120
+  mechanism_id: pretraining-domain
+  parent_idea_id: imagenet-resnet50
+  title: imagenet-resnet50 with unposed-120-mm-everywhere's framing (one unposed image-centred
+    120 mm view per type, no detail view)
+  opportunity: 'Completes the 2x2: control (RadImageNet, posed), unposed-120-mm-everywhere
+    (RadImageNet, unposed 120 mm: solo Lateral OA +30, Baker''s +27, Effusion +22,
+    Fracture -100, Contusion -42), imagenet-resnet50 (ImageNet, posed) and this run
+    (ImageNet, unposed 120 mm). The per-label interaction, (this run minus imagenet-resnet50)
+    minus (unposed-120-mm-everywhere minus control), shows whether a framing''s effect
+    depends on the backbone''s pretraining. Proof: interactions beyond the spread
+    of the per-label differences between one-setting runs (about +-0.002 per label)
+    on several labels, for example the Fracture loss of the wide framing being smaller
+    for the ImageNet model that never had the bone niche.'
+  mechanism: 'imagenet-resnet50''s weights, statistics and anchors with unposed-120-mm-everywhere''s
+    view table: every type a single view, 120 mm, image anchors offset 0, posed false;
+    slices 6, 6, 5, 5, 5, 5; no detail view. model.view_knee_scale true (inactive).
+    Nothing else changes.'
+  precedents:
+  - 'unposed-120-mm-everywhere (this campaign): x4 0.935790, blend +7.6, beyond half
+    solo +17.7.'
+  - imagenet-resnet50 (this campaign).
+  novelty: The interaction cell of the 2x2.
+  coverage: Every study and every label.
+  exploitation: 'Read the per-label interaction against the other three cells, the
+    complement gain and the sixth-member blend. Activation: val_unposed_image_fraction
+    1.0.'
+  budget: 32 images per study against 37; about 0.9 of the reference's time.
+  implementation: 'Files: configs/campaign.yaml on imagenet-resnet50''s source. Check
+    that the config loads.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Runs right after imagenet-resnet50 to complete the 2x2.
+  status: completed
+  created_revision: 97
+  seeded: /home/claudio/src/knee-abnormality-crop-views/autoresearch/campaigns/crop-views/seed-ideas-6.yaml
+  ranking_rationale: Block and park the duplicate reservation. Direct recursive comparison
+    against the bound parent confirms that only validation diagnostic logging differs;
+    paired framing, scale-off and joint-depth selection are identical. Training would
+    be a forbidden unchanged confirmation run. A bounded repair cannot introduce a
+    distinct mechanism while preserving the reserved idea and accepted behavior. To
+    address the previous ranking rejection, explicitly list every remaining live queue
+    entry once, preserving their relative order.
+  experiments:
+  - imagenet-resnet50-unposed-120-20261016T235259Z-a13e6c16
+  - imagenet-resnet50-unposed-120-20261017T000745Z-a9bc7681
+  decision: reject
+- id: coronal-wider-scale-off
+  mechanism_id: posed-field-sizes
+  parent_idea_id: coronal-crops-a-ninth-wider
+  title: Combine coronal-crops-a-ninth-wider (coronal T1/PD 93.33 mm, coronal fluid
+    103.70 mm) with per-knee-scale-off (model.view_knee_scale false); everything else
+    the control's
+  opportunity: 'Evidence (this campaign, fold 2, x1e-4 against the control): both
+    runs are better alone at both multipliers, coronal-crops-a-ninth-wider x4 +16.5
+    and x1 +28 (Fracture +39, Lateral OA +34, PF OA +29, Synovitis +28, MCL +27),
+    per-knee-scale-off x4 +7.7 and x1 +13 (Medial OA +36, Synovitis +23, Lateral Meniscus
+    +17). They act on different labels and each adds to the other in a blend (+5.8
+    and +2.0). The wider coronal Fracture gain repeats an earlier ResNet-18 result
+    (coronal T1/PD 93 mm, fold 1, Fracture +0.0053). Guess: the two gains are mostly
+    additive, x4 +0.0018 to +0.0024 against the control, complement gain above +13.6.'
+  mechanism: 'Combines two named runs: coronal-crops-a-ninth-wider''s view table (Coronal
+    T1/PD field_mm 93.333333, Coronal fluid field_mm 103.703704, every other view
+    as the control''s, all posed) and per-knee-scale-off''s model.view_knee_scale
+    false. Nothing else changes.'
+  precedents:
+  - 'coronal-crops-a-ninth-wider (this campaign): x4 0.939467, blend +13.6, sixth
+    member +3.9.'
+  - 'per-knee-scale-off (this campaign): x4 0.938595, blend +9.8, sixth member +3.1.'
+  novelty: The two solo gains of the campaign in one recipe.
+  coverage: Every study and every label.
+  exploitation: 'Read the solo x4 and x1 against the control and both parents, per
+    label (Fracture, Lateral OA, PF OA, MCL from the coronal fields; Medial OA, Synovitis,
+    Lateral Meniscus from the scale), the complement gain and the sixth-member blend.
+    Activation: val_knee_crop_scale_mean 1 and the logged coronal canvas pixel sizes
+    0.4167 and 0.4630 mm.'
+  budget: Same images as the recipe; about 1.0 of the reference's time and 16.4 GB.
+  implementation: 'Files: configs/campaign.yaml only. Check that the config loads.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Both parents are solo improvements on different labels; the
+    combination is the candidate recipe change for main.
+  status: completed
+  created_revision: 222
+  seeded: /home/claudio/src/knee-abnormality-crop-views/autoresearch/campaigns/crop-views/seed-ideas-7.yaml
+  experiments:
+  - coronal-wider-scale-off-20261017T040918Z-c38ac8a9
+  decision: reject
+- id: wide-fluid-stream-3-slices
+  mechanism_id: auxiliary-context-stream
+  parent_idea_id: wide-fluid-stream-resnet10t
+  title: wide-fluid-stream-resnet10t with the stream reading 3 evenly spaced slices
+    of each fluid type's first-view selection instead of all of them, so the run fits
+    the time limit
+  opportunity: 'wide-fluid-stream-resnet10t was blocked by the runtime''s time gate,
+    not by a result: its preflight projected 3,237 s and, after its one bounded repair,
+    3,219 s against the 3,141 s ceiling (median step 0.569 s, 16 stream images per
+    study, peak 16.9 GB). Reading 3 slices per fluid type (9 stream images instead
+    of 16) removes about 44% of the stream''s cost; keeper estimate about 2,750 s.
+    The hypothesis is unchanged (prior-work.md, Whole-framing changes and Auxiliary
+    backbones): wide unposed context from a second network beside the posed views.
+    Guess: complement gain +0.0006 to +0.0012.'
+  mechanism: Port the reviewed source of wide-fluid-stream-resnet10t's last attempt
+    (outputs/autoresearch/crop-views/experiments/wide-fluid-stream-resnet10t-20261017T064431Z-1f7248d5,
+    its changes.diff) unchanged, except that the stream reads, for each fluid type,
+    3 slices evenly spaced over the slices that type's first view selected (first,
+    middle and last when there are 5 or 6; all when fewer than 3), with their positions
+    and valid rectangles. The main views, the first look, the view table, model.view_knee_scale
+    and every other setting as the control's.
+  precedents:
+  - 'wide-fluid-stream-resnet10t (this campaign): blocked at preflight, 3,219 s projected.'
+  - 'two-views-fluid-140 (smart-crops, fold 0): ResNet-10t fluid stream with no gate,
+    blend +7.7, solo -21.2.'
+  novelty: The context stream at a cost that fits.
+  coverage: Every study with fluid series; every label.
+  exploitation: 'Read the complement gain, per label, the solo change and the sixth-member
+    blend. Activation: the share of attention mass on stream tokens per label, and
+    the stream image count per study (about 9).'
+  budget: 9 stream images per study; keeper estimate about 2,750 s (1.05 of the reference);
+    about 16.5 GB.
+  implementation: 'Files: as wide-fluid-stream-resnet10t''s change (config.py, modeling/,
+    training/lightning.py, configs/campaign.yaml), plus the 3-slice selection for
+    the stream. Check on CPU that the stream reads 3 slices per fluid type and that
+    the tokens reach every pool.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Requeues a seed blocked by the harness cost gate, not by a result.
+  status: launched
+  created_revision: 300
+  seeded: /home/claudio/src/knee-abnormality-crop-views/autoresearch/campaigns/crop-views/seed-ideas-8.yaml
+  ranking_rationale: 'Block and park canvas-locator-with-context-tokens: the repaired
+    candidate failed runtime preflight, projecting 3,308.56 s against the fixed 3,140.82
+    s ceiling. Its one bounded repair is exhausted. Inspection of changes.diff and
+    critical source confirms auxiliary checkpointing preserves the declared locator/context
+    mechanism, warm-up and training schedule, but a failed gate prevents approval.
+    The explicit ranking contains every remaining eligible queue entry once, preserving
+    their order after removing the blocked head; this addresses the previous report''s
+    ranking rejection.'
+  experiments:
+  - wide-fluid-stream-3-slices-20261017T070725Z-9f3bbb3c
+- id: wide-fluid-stream-3-slices-own-loss
+  mechanism_id: auxiliary-context-stream
+  parent_idea_id: wide-fluid-stream-3-slices
+  title: wide-fluid-stream-3-slices with the stream's tokens also pooled alone under
+    the target loss and its logits added to the main ones
+  opportunity: 'Replaces wide-fluid-stream-own-loss, which builds on the blocked full
+    stream and would cost more than it. A stream the pools can ignore may not learn;
+    its own loss makes it learn alone. Precedent (prior-work.md, Auxiliary backbones):
+    crop-own-loss blend +5.5, solo -24.7 (fold 0). Guess: complement gain +0.0006
+    to +0.0012.'
+  mechanism: 'wide-fluid-stream-3-slices unchanged, plus: the stream''s tokens pooled
+    alone by a copy of the target readout (own attention and classifiers, zero-started),
+    trained by the same target loss at weight 1, its logits added to the model''s
+    logits for the twelve labels; the joint pools still see the stream tokens.'
+  precedents:
+  - 'crop-own-loss (smart-crops, fold 0): blend +5.5, solo -24.7.'
+  novelty: A deeply supervised second backbone.
+  coverage: Every study with fluid series; every label.
+  exploitation: Read as wide-fluid-stream-3-slices plus the stream's own x1 macro
+    AUC and the size of its logits against the main ones.
+  budget: Keeper estimate about 2,850 s (1.09 of the reference); about 16.7 GB.
+  implementation: 'Files: modeling/model.py and training/lightning.py on top of wide-fluid-stream-3-slices;
+    configs/campaign.yaml.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Runs after wide-fluid-stream-3-slices, whose code it extends.
+  status: prepared
+  created_revision: 300
+  seeded: /home/claudio/src/knee-abnormality-crop-views/autoresearch/campaigns/crop-views/seed-ideas-8.yaml
+  ranking_rationale: 'Block and park canvas-locator-with-context-tokens: the repaired
+    candidate failed runtime preflight, projecting 3,308.56 s against the fixed 3,140.82
+    s ceiling. Its one bounded repair is exhausted. Inspection of changes.diff and
+    critical source confirms auxiliary checkpointing preserves the declared locator/context
+    mechanism, warm-up and training schedule, but a failed gate prevents approval.
+    The explicit ranking contains every remaining eligible queue entry once, preserving
+    their order after removing the blocked head; this addresses the previous report''s
+    ranking rejection.'
+  experiments:
+  - wide-fluid-stream-3-slices-own-loss-20261017T071420Z-453f58c1

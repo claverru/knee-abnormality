@@ -1,0 +1,54 @@
+ideas:
+- id: wide-views-scale-off
+  mechanism_id: wide-unposed-views
+  parent_idea_id: per-knee-scale-off
+  title: two-views-wide-and-posed's view table on the per-knee-scale-off incumbent (scale off), with wide-view-on-distinct-depths's
+    joint selection if that run's complement gain beat two-views-wide-and-posed's
+  opportunity: 'Evidence (this campaign, fold 2, x1e-4): per-knee-scale-off is better alone (x4 +7.7, x1 +13) with a blend
+    of +9.8 led by Medial OA +22, Fracture +18, Synovitis +14, Lateral Meniscus +14, MCL +12. two-views-wide-and-posed
+    adds +3.5 on top of control plus per-knee-scale-off (Fracture +30, Synovitis +20, Baker''s +12, PF OA +8), and the
+    reverse adds +5.6 (Medial OA +16, Lateral Meniscus +13, MCL +12): the two act on different labels. Guess: one model
+    with both keeps most of each, complement gain +0.0011 to +0.0014.'
+  mechanism: 'Combines two named runs: model.view_knee_scale false (per-knee-scale-off) and the view table of two-views-wide-and-posed
+    (coronal T1/PD, coronal fluid and sagittal T1/PD each a posed view on 3 slices and an unposed image-centred 120 mm
+    view on 2; axial and sagittal fluid as the recipe''s). If wide-view-on-distinct-depths has completed with a complement
+    gain above +0.00076, also its joint slice selection (its source change); otherwise the independent selection of two-views-wide-and-posed.
+    Nothing else changes.'
+  precedents:
+  - 'per-knee-scale-off (this campaign): blend +9.8, x4 0.938595, sixth member +3.1.'
+  - 'two-views-wide-and-posed (this campaign): blend +7.6, x4 0.937262, sixth member +1.6.'
+  novelty: The first combination of a better base with a different framing.
+  coverage: Every study; every label.
+  exploitation: 'Read the complement gain against the incumbent''s, per label (Fracture, Synovitis and Baker''s from the
+    wide views, Medial OA and Lateral Meniscus from the scale), the solo change and the sixth-member blend. Activation:
+    the unposed metrics at 0, 1 and 0 with val_unposed_image_fraction about 0.18, and val_knee_crop_scale_mean 1.'
+  budget: 'Same images as the recipe; about 1.05 of the reference''s time and 16.4 GB.'
+  implementation: 'Files: configs/campaign.yaml, and wide-view-on-distinct-depths''s source change when it applies. Check
+    that the config loads.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The largest measured pairwise complement in the campaign, on the better base.
+- id: wide-views-unposed-axial-scale-off
+  mechanism_id: wide-unposed-views
+  parent_idea_id: wide-views-scale-off
+  title: wide-views-scale-off with both axial views unposed
+  opportunity: 'Evidence (this campaign, x1e-4): unposed-120-mm-everywhere adds +3.2 on top of control plus per-knee-scale-off,
+    from Lateral OA +24, Effusion +14, Baker''s +14 and PF OA +10, labels the posed recipe reads on axial fluid; the view-poses
+    step that posed all six views cost Lateral OA -33 and Effusion -30. axial-views-unposed tests the axial pose alone
+    on the control. Guess: the axial views carry those labels; complement gain above wide-views-scale-off''s by +0.0002
+    to +0.0004.'
+  mechanism: 'wide-views-scale-off unchanged, plus posed false on the two axial views (120 mm, image anchors, offset 0,
+    6 slices each). Nothing else changes.'
+  precedents:
+  - 'unposed-120-mm-everywhere (this campaign): blend +7.6, beyond half solo +17.7.'
+  - 'canvases-for-the-pose-in-all-six-views (view-poses run 3, fold 1): Lateral OA -0.0033, Effusion -0.0030.'
+  novelty: All three per-label sources in one model.
+  coverage: Every study; every label.
+  exploitation: 'Read as wide-views-scale-off, Lateral OA, Effusion and Baker''s first. Activation: val_unposed_image_fraction
+    about 0.45.'
+  budget: 'Same images as the recipe; about 1.05 of the reference''s time and 16.4 GB.'
+  implementation: 'Files: configs/campaign.yaml only. Check that the config loads.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Runs after axial-views-unposed, whose result tells whether the axial pose is the cause.
+exhausted_directions: 'Not exhausted.'

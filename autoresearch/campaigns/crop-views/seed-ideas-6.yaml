@@ -1,0 +1,63 @@
+ideas:
+- id: imagenet-resnet50
+  mechanism_id: pretraining-domain
+  parent_idea_id: null
+  title: The recipe with the ImageNet resnet50.a1_in1k weights in place of Refined-RadImageNet, ImageNet input statistics,
+    anchors toward the ImageNet weights; everything else the control's
+  opportunity: 'Evidence (keeper, saved fold 0 to 2 predictions, per label against the ResNet-50 of the same fold, x1e-4):
+    every ImageNet-pretrained family loses to the Refined-RadImageNet ResNet-50 on Fracture (ConvNeXt -144, MambaVision
+    -91, FocalNet -77, EfficientViT -44), Lateral OA (-39 to -138), PF OA (-48 to -68) and Lateral Meniscus (-9 to -66),
+    and FocalNet and EfficientViT gain Contusion (+47, +44), MCL (+34, +58) and Synovitis (EfficientViT +42). ConvNeXt
+    is a convolutional network and has the same pattern, so the split follows the pretraining, not convolution against
+    attention. Guess, moderate confidence: RadImageNet pretraining carries the bone and compartment labels. This run
+    holds the architecture fixed and changes only the pretraining. Proof: its per-label solo changes against the control
+    correlate positively with the families'' mean pattern (Fracture, Lateral OA, PF OA, Lateral Meniscus down; Contusion,
+    MCL, Synovitis up), and its complement beyond half its solo change is far above the +5 of one-setting runs.'
+  mechanism: 'model.pretrained_weights timm for resnet50.a1_in1k, loaded through the same average-pool shortcut rename
+    the RadImageNet weights use (create the backbone without pretrained weights, take the timm resnet50.a1_in1k pretrained
+    state dict of the plain model, apply resnet_avg_down_state_dict, load strictly), since timm cannot load them into
+    the avg_down model directly (measured: size mismatch at layer1.0.downsample.1). data.mean (0.485, 0.456, 0.406) and
+    data.std (0.229, 0.224, 0.225), the ImageNet statistics the checkpoint was trained with. L2-SP anchors at the recipe''s
+    strengths toward these weights. View table and every other setting as the control''s, model.view_knee_scale true.'
+  precedents:
+  - 'radimagenet-input-statistics (refined-radimagenet campaign, ResNet-18, fold 0): the checkpoint''s own statistics +0.0006.'
+  - 'Family table above (keeper, folds 0 to 2).'
+  novelty: First ImageNet-pretrained ResNet-50 on the current recipe; isolates pretraining from architecture.
+  coverage: Every study and every label.
+  exploitation: 'Read the per-label solo changes against the control and their correlation with the families'' mean per-label
+    pattern, the complement gain and beyond half solo, and the sixth-member blend. Activation: the logged early and late
+    anchor distances at epoch 1 measured toward the ImageNet weights, and the recorded effective config.'
+  budget: 'Same images and backbone as the recipe; about 1.0 of the reference''s time and 16.4 GB.'
+  implementation: 'Files: modeling/model.py (the timm weight load through the rename), configs/campaign.yaml. Check on
+    CPU with HF_HUB_OFFLINE=1 that the weights load strictly and equal the timm checkpoint after the rename.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user asked for seeds that prove whether different backbones favour different setups; this is
+    the first cell of a pretraining by framing 2x2 with the architecture fixed.
+- id: imagenet-resnet50-unposed-120
+  mechanism_id: pretraining-domain
+  parent_idea_id: imagenet-resnet50
+  title: imagenet-resnet50 with unposed-120-mm-everywhere's framing (one unposed image-centred 120 mm view per type, no
+    detail view)
+  opportunity: 'Completes the 2x2: control (RadImageNet, posed), unposed-120-mm-everywhere (RadImageNet, unposed 120 mm:
+    solo Lateral OA +30, Baker''s +27, Effusion +22, Fracture -100, Contusion -42), imagenet-resnet50 (ImageNet, posed)
+    and this run (ImageNet, unposed 120 mm). The per-label interaction, (this run minus imagenet-resnet50) minus (unposed-120-mm-everywhere
+    minus control), shows whether a framing''s effect depends on the backbone''s pretraining. Proof: interactions beyond
+    the spread of the per-label differences between one-setting runs (about +-0.002 per label) on several labels, for
+    example the Fracture loss of the wide framing being smaller for the ImageNet model that never had the bone niche.'
+  mechanism: 'imagenet-resnet50''s weights, statistics and anchors with unposed-120-mm-everywhere''s view table: every type
+    a single view, 120 mm, image anchors offset 0, posed false; slices 6, 6, 5, 5, 5, 5; no detail view. model.view_knee_scale
+    true (inactive). Nothing else changes.'
+  precedents:
+  - 'unposed-120-mm-everywhere (this campaign): x4 0.935790, blend +7.6, beyond half solo +17.7.'
+  - 'imagenet-resnet50 (this campaign).'
+  novelty: The interaction cell of the 2x2.
+  coverage: Every study and every label.
+  exploitation: 'Read the per-label interaction against the other three cells, the complement gain and the sixth-member
+    blend. Activation: val_unposed_image_fraction 1.0.'
+  budget: '32 images per study against 37; about 0.9 of the reference''s time.'
+  implementation: 'Files: configs/campaign.yaml on imagenet-resnet50''s source. Check that the config loads.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Runs right after imagenet-resnet50 to complete the 2x2.
+exhausted_directions: 'Not exhausted.'

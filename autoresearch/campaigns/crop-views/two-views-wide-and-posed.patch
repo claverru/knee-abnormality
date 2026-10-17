@@ -1,0 +1,110 @@
+diff --git a/src/knee_abnormality/config.py b/src/knee_abnormality/config.py
+index 82729c3..3c3d70e 100644
+--- a/src/knee_abnormality/config.py
++++ b/src/knee_abnormality/config.py
+@@ -119,6 +119,7 @@ class ViewConfig(ConfigModel):
+     slices: Annotated[StrictInt, Field(gt=0)]
+     horizontal: ViewAxisConfig
+     vertical: ViewAxisConfig
++    posed: bool = True
+ 
+     @property
+     def shifted(self) -> bool:
+diff --git a/src/knee_abnormality/modeling/model.py b/src/knee_abnormality/modeling/model.py
+index e77c92e..8dc2931 100644
+--- a/src/knee_abnormality/modeling/model.py
++++ b/src/knee_abnormality/modeling/model.py
+@@ -1310,13 +1310,13 @@ class KneeAbnormalityModel(nn.Module):
+                 scale = torch.where(
+                     (mass > 0).all(-1), (size / 17.087).clamp(0.87, 1.13), 1.0
+                 )
++                scale = torch.where(
++                    self.view_windows.posed[batch["view_index"]],
++                    scale[batch["series_study_index"]],
++                    1.0,
++                )
+                 pose = torch.cat(
+-                    (
+-                        pose,
+-                        scale[batch["series_study_index"], None, None].expand(
+-                            -1, pose.shape[1], -1
+-                        ),
+-                    ),
++                    (pose, scale[:, None, None].expand(-1, pose.shape[1], -1)),
+                     -1,
+                 )
+         self.train(training)
+diff --git a/src/knee_abnormality/modeling/spatial_tokens.py b/src/knee_abnormality/modeling/spatial_tokens.py
+index dbb9d0a..3122b05 100644
+--- a/src/knee_abnormality/modeling/spatial_tokens.py
++++ b/src/knee_abnormality/modeling/spatial_tokens.py
+@@ -64,7 +64,7 @@ SPATIAL_TOKEN_IDENTITY = {
+     "meniscus_map": "independent_zero_initialized_linear_256_to_three_on_stride16_layer3_projection_plus_nearest_repeated_stride32_normalized_tokens_16px_target_footprint_four_by_four_target_samples_preserve_4px_quadrature_pitch_same_visual_validity_detached_probabilities_mean_of_four_per_stride32_token",
+     "token": "projection_plus_plane_contrast_and_detail_view_embeddings_layernorm_two_versions_own_channels_plus_fixed_sinusoid_of_detached_knee_frame_position_42_wavelengths_8_to_512_per_axis_zero_without_fitted_center_shared_channels_position_free",
+     "initialization_rng": "side_head_position_prior_up_width_and_knee_level_scale_parameters_forked_removed_position_draw_count_and_target_sized_scorer_and_readout_draws_preserve_training_stream_meniscus_stride16_projection_and_head_forked",
+-    "view_policy": "sagittal_fluid_second_64mm_view_reuses_first_view_exact_slice_selection_and_budget_excluded_from_first_look_shared_patient_shift_jitter_and_turn_configured_fixed_fields_and_slice_counts_all_six_views_shift_turn_scale_detached_single_eval_central224_first_look_multiplier_one_scale_sqrt_medial_bone_sd_times_front_femur_sd_over17.087_clamp0.87_to1.13_zero_mass_one_sagittal_coronal_incumbent_centres_and12deg_turn_axial_center_midpoint_femur_share5th_front_minus30mm_kneecap_share95th_front_frame_medial_zero_projected_medial_axis20deg_turn_shift18mm_sagittal_coronal8mm_axial_rounded_pixels_training_jitter3deg3mm_all_views_side_per_series_in_split_studies",
++    "view_policy": "sagittal_fluid_second_64mm_view_reuses_first_view_exact_slice_selection_and_budget_excluded_from_first_look_shared_patient_shift_jitter_and_turn_configured_fixed_fields_and_slice_counts_all_six_views_shift_turn_scale_detached_single_eval_central224_first_look_multiplier_one_scale_sqrt_medial_bone_sd_times_front_femur_sd_over17.087_clamp0.87_to1.13_zero_mass_one_sagittal_coronal_incumbent_centres_and12deg_turn_axial_center_midpoint_femur_share5th_front_minus30mm_kneecap_share95th_front_frame_medial_zero_projected_medial_axis20deg_turn_shift18mm_sagittal_coronal8mm_axial_rounded_pixels_training_jitter3deg3mm_all_views_side_per_series_in_split_studies_views_configured_unposed_take_zero_shift_and_turn_unit_scale_and_no_jitter",
+     "view_embedding": "zero_initialized_additive_detail_only",
+     "view_label_bias": "zero_initialized_additive_attention_score_per_view_and_channel",
+     "geometry_dtype": "float32_outside_autocast",
+diff --git a/src/knee_abnormality/modeling/view_windows.py b/src/knee_abnormality/modeling/view_windows.py
+index b3c0977..f4ebb01 100644
+--- a/src/knee_abnormality/modeling/view_windows.py
++++ b/src/knee_abnormality/modeling/view_windows.py
+@@ -127,6 +127,11 @@ class ViewWindows(nn.Module):
+                 torch.tensor(SAGITTAL_JOINT_TARGET_MM),
+                 persistent=False,
+             )
++            self.register_buffer(
++                "posed",
++                torch.tensor([view.posed for view in views]),
++                persistent=False,
++            )
+             self.register_buffer(
+                 "first_look_slices",
+                 torch.tensor([view.slices for view in views]),
+@@ -211,7 +216,9 @@ class ViewWindows(nn.Module):
+         series = batch["series_type_index"]
+         coronal = self.coronal[series][:, None]
+         sagittal = self.sagittal[series][:, None]
+-        movable = (self.margin[batch["view_index"]] > 0)[:, None]
++        movable = (
++            (self.margin[batch["view_index"]] > 0) & self.posed[batch["view_index"]]
++        )[:, None]
+         usable = usable & movable
+         half = (self.image_size - 1) / 2
+         offset = torch.where(
+diff --git a/src/knee_abnormality/training/lightning.py b/src/knee_abnormality/training/lightning.py
+index c98e7f5..b49057f 100644
+--- a/src/knee_abnormality/training/lightning.py
++++ b/src/knee_abnormality/training/lightning.py
+@@ -582,6 +582,29 @@ class KneeModule(L.LightningModule):
+                 torch.rad2deg(angle[axial]).abs().mean(),
+                 count,
+             )
++        unposed = ~windows.posed[view]
++        if unposed.any():
++            count = int(unposed.sum())
++            self._log_epoch_metric(
++                "val_unposed_crop_turn_abs_deg",
++                torch.rad2deg(angle[unposed]).abs().mean(),
++                count,
++            )
++            self._log_epoch_metric(
++                "val_unposed_crop_shift_abs_mm",
++                (
++                    shift[unposed].abs() * windows.pixel_spacing[view[unposed], None]
++                ).mean(),
++                count,
++            )
++            self._log_epoch_metric(
++                "val_unposed_crop_scale_offset",
++                (scale[unposed] - 1.0).abs().mean(),
++                count,
++            )
++            self._log_epoch_metric(
++                "val_unposed_image_fraction", unposed.float().mean(), unposed.numel()
++            )
+         counts = torch.zeros(encoded["batch_size"], device=scale.device).index_add(
+             0, encoded["study"], torch.ones_like(scale)
+         )

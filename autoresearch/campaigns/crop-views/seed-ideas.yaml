@@ -1,0 +1,152 @@
+ideas:
+- id: two-views-wide-and-posed
+  mechanism_id: wide-unposed-views
+  parent_idea_id: null
+  title: Coronal T1/PD, coronal fluid and sagittal T1/PD each read as their posed view on 3 slices plus an unposed,
+    image-centred 120 mm view on 2 slices of their own; sagittal fluid and axial unchanged
+  opportunity: 'Evidence (prior-work.md, Whole-framing changes): on fold 0 the ResNet-18 runs whose framing differed in
+    every view from the hand views added +7 to +16.5 x1e-4 in an equal blend with the hand-view run, against +1.6 to
+    +4.8 for runs one setting away; two learned views on every type (a 120 mm centre crop and the hand width) +13.3,
+    solo -0.0009. Single-type widenings of the posed views added nothing (+1.9 to -2.0). Coverage (prior-work.md):
+    the coronal fluid view holds the collateral region in 35% of knees, the sagittal views the whole kneecap in 8 to
+    26%; a wide view holds them in 89 to 94%. Guess: complement gain +0.0010 to +0.0015 with MCL, Lateral Meniscus,
+    PF OA and Baker''s up and Synovitis and Fracture down, solo -0.001 to -0.002.'
+  mechanism: 'A view option posed (ViewConfig, default true). An unposed view is cut at its static canvas placement:
+    pose angle 0, shift 0 and scale 1 in first_look_pose and no training jitter, so its window is the image-centred field
+    the anchors give. View table: Axial T1/PD and Axial fluid unchanged (120 mm, 6 slices, image anchors); Coronal T1/PD
+    84 mm, 3 slices, horizontal knee 0, vertical image 10, posed, then 120 mm, 2 slices, image 0 and image 0, unposed;
+    Coronal fluid 93.333333 mm, 3 slices, as the recipe''s, posed, then 120 mm, 2 slices, unposed; Sagittal T1/PD 93.333333
+    mm, 3 slices, horizontal knee 7, vertical image 10, posed, then 120 mm, 2 slices, unposed; Sagittal fluid unchanged
+    (84 mm, 5 slices, posed, and the 64 mm detail view on the same slices). model.view_knee_scale true. Images per study
+    as the recipe''s.'
+  precedents:
+  - 'two-views-every-type (learnable-views, fold 0, ResNet-18): blend with the hand-view run +13.3 x1e-4, solo -9.3,
+    correlation 0.977.'
+  - 'Runs on a 120 mm base plus a crop (smart-crops, fold 0): blend +7 to +9 against the hand-view run, solo about -20.'
+  - 'rn18-sagittal-fluid-72-and-112mm (fold 1): two posed views splitting sagittal fluid slices, blend -4.5, solo -27.4.'
+  novelty: First wide, unposed view beside the posed views on the current recipe.
+  coverage: Every study with coronal or sagittal T1/PD or coronal fluid series; every label.
+  exploitation: 'Read the complement gain and its per-label gains, the solo x4 and x1, and the sixth-member blend. Activation:
+    validation metrics of the mean absolute applied turn and shift per view, zero on the three unposed views and above
+    zero on the posed ones, and the count of tokens per view.'
+  budget: 'Same images per study as the recipe; expected about the reference''s 2,617 s (1.0) and 16.4 GB.'
+  implementation: 'Written and verified by the keeper: apply /home/claudio/src/knee-abnormality-crop-views/autoresearch/campaigns/crop-views/two-views-wide-and-posed.patch
+    exactly (git apply in the workspace; base is the control''s source; files src/knee_abnormality/config.py, modeling/model.py,
+    modeling/spatial_tokens.py, modeling/view_windows.py, training/lightning.py), then set the view table of configs/campaign.yaml
+    as the mechanism states (the three changed types: first view slices 3, then a view field_mm 120.0, slices 2, horizontal
+    and vertical anchor image offset 0.0, posed false) and change nothing else. Keeper''s CPU checks on three fold-2 training
+    studies: views axial_t1pd_120mm, axial_fluid_120mm, coronal_t1pd_84mm, coronal_t1pd_120mm, coronal_fluid_93mm, coronal_fluid_120mm,
+    sagittal_t1pd_93mm, sagittal_t1pd_120mm, sagittal_fluid_84mm, sagittal_fluid_64mm; the three 120 mm views get turn
+    0, shift 0 and scale 1 from the first look and after the training jitter while the posed views move; images per study
+    as the recipe''s; logits finite; val_unposed_crop_turn_abs_deg, val_unposed_crop_shift_abs_mm and val_unposed_crop_scale_offset
+    0, val_unposed_image_fraction 0.18. With every view posed (the control''s table) the code is the control''s: the scale
+    selection keeps the per-knee scale exactly. If the incumbent changed, port the same change onto it.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The strongest complement evidence of the ranking, and the same images per study.
+- id: unposed-120-mm-everywhere
+  mechanism_id: wide-unposed-views
+  parent_idea_id: null
+  title: Every series type read as one unposed, image-centred 120 mm view, slices 6, 6, 5, 5, 5, 5, no detail view
+  opportunity: 'Evidence (prior-work.md, Whole-framing changes): rn18-field-120-control (fold 0) in an equal blend with
+    the hand-view run +5.5 and +6.7 x1e-4 against two hand-view runs +4.8; solo -0.0019. Per label MCL +62, Lateral Meniscus
+    +31, Baker''s +18, PF OA +16, Medial Meniscus +6, Contusion +3, Effusion 0, Medial OA -4, Lateral OA -7, Fracture -10,
+    ACL -11, Synovitis -39. Guess: complement gain +0.0006 to +0.0012, solo -0.002 to -0.003.'
+  mechanism: 'The posed option of two-views-wide-and-posed (built by that seed if it has not run). View table: every
+    one of the six types a single view, 120 mm, image anchors with offset 0, unposed; slices Axial T1/PD 6, Axial fluid
+    6, Coronal T1/PD 5, Coronal fluid 5, Sagittal T1/PD 5, Sagittal fluid 5. The 64 mm sagittal fluid detail view is
+    removed with its slices. model.view_knee_scale true (inactive with no posed view). When no view is posed the first
+    look may be skipped if every output is unchanged.'
+  precedents:
+  - 'rn18-field-120-control against view-frozen-control and rn18-view-label-bias (fold 0): blend +5.5 and +6.7 x1e-4.'
+  - 'field-120-single (mixed-field, fold 0): blend with the contrast-split run +10.9, solo -3.7.'
+  novelty: The pre-view framing on the ResNet-50 recipe, as an ensemble member.
+  coverage: Every study and every label.
+  exploitation: 'Read the complement gain, per label, solo and sixth-member blend. Activation: the same per-view pose metrics,
+    zero on every view, and the view count in the logged view names.'
+  budget: '32 images per study against 37; expected 0.8 to 0.9 of the reference''s time, under 16 GB.'
+  implementation: 'Files: configs/campaign.yaml, and the posed option and metrics if two-views-wide-and-posed has not built
+    them. Check on CPU that the config loads and one batch gives zero pose on every view.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The cheapest whole-framing change, the old recipe's framing.
+- id: per-knee-scale-off
+  mechanism_id: per-knee-scale
+  parent_idea_id: null
+  title: Per-knee view scale off (model.view_knee_scale false); every view posed at scale 1, everything else the recipe's
+  opportunity: 'Evidence (prior-work.md, Pose settings): the per-knee crop size run (anatomy-recipe, fold 1) in an equal
+    blend with the recipe of its time, which had no per-knee scale, +6.7 x1e-4 against a retraining''s +2.0; solo +3.2.
+    The recipe adopted the scale on 2026-10-10, so the run without it is now the different member. Per label in that
+    blend MCL +49, Synovitis +21, Medial OA +14, Medial Meniscus +10, PF OA +10, Baker''s +9, Effusion +7, ACL -4, Contusion
+    -4, Lateral Meniscus -7, Lateral OA -10, Fracture -15. Guess: complement gain +0.0006 to +0.0010.'
+  mechanism: 'A model option view_knee_scale (default true, the recipe). When false, first_look_pose appends scale 1 for
+    every view in place of the per-knee size over 17.087 clamped to 0.87 to 1.13. View table as the recipe''s.'
+  precedents:
+  - 'crop-size-per-knee-from-the-first-look (anatomy-recipe, fold 1): blend +6.7, solo +3.2, correlation 0.993.'
+  novelty: First run of the posed recipe without the per-knee scale.
+  coverage: Every study with a trusted pose; every label.
+  exploitation: 'Read the complement gain, per label, solo and sixth-member blend. Activation: a validation metric of the
+    mean applied scale and the share of studies at 1, which must be 1 and 1.0 here and spread for the control''s code.'
+  budget: 'Same images as the recipe; about 1.0 of the reference''s time and 16.4 GB.'
+  implementation: 'Files: config.py (model.view_knee_scale), modeling/model.py, training/lightning.py (the scale metrics),
+    configs/campaign.yaml. Check on CPU that one batch gives scale 1 everywhere with the option off and the recipe''s scales
+    with it on.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A one-line option whose earlier run gave the third-largest complement on fold 1.
+- id: coronal-crops-a-ninth-wider
+  mechanism_id: posed-field-sizes
+  parent_idea_id: null
+  title: Coronal T1/PD at 93.333333 mm and coronal fluid at 103.703704 mm (both a ninth wider), posed as the recipe; nothing
+    else changes
+  opportunity: 'Evidence (prior-work.md, Single-type widenings): coronal crops a ninth wider (anatomy-masks, fold 1) in
+    an equal blend with its incumbent +4.1 x1e-4 against a retraining''s +2.0, solo -0.3; the only single-type widening
+    above the yardstick. Per label Medial Meniscus +14, Lateral Meniscus +11, MCL +10, Synovitis +10, PF OA +9, Effusion
+    +5, Fracture +5, Lateral OA +2, Contusion 0, ACL -1, Medial OA -1, Baker''s -15. The 93 mm coronal fluid view holds
+    the collateral region in 35% of knees. Guess: complement gain +0.0004 to +0.0007, solo level.'
+  mechanism: 'Configuration only. Coronal T1/PD field_mm 93.333333 and Coronal fluid field_mm 103.703704, slices and anchors
+    as the recipe''s; every other view and model.view_knee_scale true as the recipe''s.'
+  precedents:
+  - 'coronal-crops-a-ninth-wider (anatomy-masks, fold 1): blend +4.1, solo -0.3, correlation 0.994.'
+  - 'sagittal-crops-a-ninth-wider (anatomy-masks, fold 1): blend -0.9, solo -8.0.'
+  novelty: The coronal widening on the ResNet-50 recipe.
+  coverage: Every study with coronal series; every label.
+  exploitation: 'Read the complement gain, per label, solo and sixth-member blend. Activation: the recorded effective view
+    table and the logged canvas pixel size of the two coronal views (0.4167 and 0.4630 mm).'
+  budget: 'Same images; about 1.0 of the reference''s time and 16.4 GB.'
+  implementation: 'Files: configs/campaign.yaml only. Check that the config loads.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Configuration only and level on its own.
+- id: soft-bone-shares-for-the-joint-plane
+  mechanism_id: pose-estimation
+  parent_idea_id: null
+  title: Fit the joint plane with each token weighted by its continuous femur plus tibia share instead of keeping only tokens
+    above one half; everything else the recipe's
+  opportunity: 'Evidence (prior-work.md, Pose estimation): the same change (anatomy-masks, fold 1) in an equal blend with
+    its incumbent +4.2 x1e-4 against a retraining''s +2.0, solo -0.4. Per label Fracture +21, MCL +19, PF OA +12, Medial
+    Meniscus +11, ACL +6, Effusion +4, Synovitis +3, Lateral Meniscus -2, Medial OA -3, Contusion -6, Lateral OA -7,
+    Baker''s -7. A different plane moves every posed crop and the routing frame. Guess: complement gain +0.0004 to +0.0008,
+    solo level.'
+  mechanism: 'In the joint-plane fit of model.py (the bone weight before the refits, about line 829), weight each token by
+    valid times (femur + tibia) and its target by valid times (femur - tibia), and keep the Gaussian refit as a separate
+    factor that multiplies that weight at each refit, as in the frozen candidate outputs/autoresearch/anatomy-masks/experiments/soft-bone-shares-fit-the-joint-plane-20261008T033130Z-816591b0/changes.diff;
+    port its fit lines, not its diagnostics. View table and settings as the recipe''s.'
+  precedents:
+  - 'soft-bone-shares-fit-the-joint-plane (anatomy-masks, fold 1): blend +4.2, solo -0.4, correlation 0.994.'
+  - 'sparse-first-look-at-interior-depth-quantiles (anatomy-masks, fold 1): blend +4.2, solo 0.0.'
+  novelty: A different pose estimate on the ResNet-50 recipe.
+  coverage: Every study with an anatomy plane fit; every label.
+  exploitation: 'Read the complement gain, per label, solo and sixth-member blend. Activation: a validation metric of the
+    share of plane-fit weight carried by tokens at or below one half bone share, above zero here and zero for the recipe''s
+    fit, and the mean angle between the two planes on the same batch.'
+  budget: 'Same images; about 1.0 of the reference''s time and 16.4 GB.'
+  implementation: 'Files: modeling/model.py (the fit), modeling/spatial_tokens.py (identity strings), training/lightning.py
+    (the metrics). Check on CPU that one batch fits a plane and that the weights match the description.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A pose-source change with a flat solo cost and a fold-1 complement above the yardstick.
+exhausted_directions: 'Not exhausted. Ruled out by earlier runs (prior-work.md): widening one posed view type alone (sagittal
+  fluid 100, 106, 112 and 120 mm, sagittal crops a ninth wider, coronal fluid 108 and 120 mm: blends -2.0 to +1.9 x1e-4);
+  learned per-view shifts; crops centred on the notch or the menisci; a crop centre per contrast; two posed views sharing
+  one type''s slices; axial at 100, 130 or 140 mm.'

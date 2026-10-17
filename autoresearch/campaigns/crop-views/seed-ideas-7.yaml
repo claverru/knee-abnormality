@@ -1,0 +1,30 @@
+ideas:
+- id: coronal-wider-scale-off
+  mechanism_id: posed-field-sizes
+  parent_idea_id: coronal-crops-a-ninth-wider
+  title: Combine coronal-crops-a-ninth-wider (coronal T1/PD 93.33 mm, coronal fluid 103.70 mm) with per-knee-scale-off
+    (model.view_knee_scale false); everything else the control's
+  opportunity: 'Evidence (this campaign, fold 2, x1e-4 against the control): both runs are better alone at both multipliers,
+    coronal-crops-a-ninth-wider x4 +16.5 and x1 +28 (Fracture +39, Lateral OA +34, PF OA +29, Synovitis +28, MCL +27),
+    per-knee-scale-off x4 +7.7 and x1 +13 (Medial OA +36, Synovitis +23, Lateral Meniscus +17). They act on different
+    labels and each adds to the other in a blend (+5.8 and +2.0). The wider coronal Fracture gain repeats an earlier ResNet-18
+    result (coronal T1/PD 93 mm, fold 1, Fracture +0.0053). Guess: the two gains are mostly additive, x4 +0.0018 to +0.0024
+    against the control, complement gain above +13.6.'
+  mechanism: 'Combines two named runs: coronal-crops-a-ninth-wider''s view table (Coronal T1/PD field_mm 93.333333, Coronal
+    fluid field_mm 103.703704, every other view as the control''s, all posed) and per-knee-scale-off''s model.view_knee_scale
+    false. Nothing else changes.'
+  precedents:
+  - 'coronal-crops-a-ninth-wider (this campaign): x4 0.939467, blend +13.6, sixth member +3.9.'
+  - 'per-knee-scale-off (this campaign): x4 0.938595, blend +9.8, sixth member +3.1.'
+  novelty: The two solo gains of the campaign in one recipe.
+  coverage: Every study and every label.
+  exploitation: 'Read the solo x4 and x1 against the control and both parents, per label (Fracture, Lateral OA, PF OA, MCL
+    from the coronal fields; Medial OA, Synovitis, Lateral Meniscus from the scale), the complement gain and the sixth-member
+    blend. Activation: val_knee_crop_scale_mean 1 and the logged coronal canvas pixel sizes 0.4167 and 0.4630 mm.'
+  budget: 'Same images as the recipe; about 1.0 of the reference''s time and 16.4 GB.'
+  implementation: 'Files: configs/campaign.yaml only. Check that the config loads.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Both parents are solo improvements on different labels; the combination is the candidate recipe change
+    for main.
+exhausted_directions: 'Not exhausted.'

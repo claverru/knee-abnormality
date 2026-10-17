@@ -1,0 +1,41 @@
+ideas:
+- id: wide-view-on-distinct-depths
+  mechanism_id: wide-unposed-views
+  parent_idea_id: two-views-wide-and-posed
+  title: two-views-wide-and-posed with each type's posed and wide views drawn as one selection of their combined budget
+    and split by depth, so the two views never read the same depth
+  opportunity: 'Evidence (keeper count on 12 fold-2 validation studies with the two-views-wide-and-posed source): each
+    view of a type selects its slices independently from the same pool, so at x1 the wide view''s depths are 0 to 4%
+    also read by the posed view, but at x4 (posed 12, wide 8 of a 20 to 30 slice series) 53 to 56% of them are. At x4
+    each changed type then covers about 16 distinct depths, 12 of them fine, against the control''s 20 fine ones. two-views-wide-and-posed
+    gained +0.0014 at x1 and lost -0.0006 at x4 against the control; its x4 minus x1 was 0.0073 against a median of 0.0082
+    for 28 fold-2 ResNet-50 runs (10th to 90th percentile 0.0075 to 0.0090) and the control''s 0.0093. Adoption reads
+    x4. Guess: complement gain above two-views-wide-and-posed''s +7.6 x1e-4, x4 solo level with the control.'
+  mechanism: 'Configuration of two-views-wide-and-posed (the incumbent''s view table: coronal T1/PD, coronal fluid and
+    sagittal T1/PD each a posed view on 3 slices and an unposed image-centred 120 mm view on 2). Change in the loader:
+    when a series type has more than one view that selects its own slices (DataConfig.view_sources), select_triplets runs
+    once for the type with the sum of those views'' budgets and the first view''s kind key and seed, so the type reads
+    exactly the triplets one view of that budget would read, at training and evaluation alike. The selected triplets,
+    ordered by depth, are dealt to the views in proportion to their budgets, evenly interleaved along the depth order
+    (largest remainder over the ranks), deterministically, so each view spans the type''s depth range and no depth is
+    read twice. The shared sagittal fluid detail view and single-view types are unchanged; with the control''s table the
+    loader''s output is the control''s. Sampling metadata records the combined selection per view.'
+  precedents:
+  - 'two-views-wide-and-posed (this campaign): blend +7.6 x1e-4, x4 0.937262, x1 0.929920.'
+  - 'rn18-sagittal-fluid-72-and-112mm (fold 1): two views taking slices from one budget, blend -4.5, solo -27.4.'
+  novelty: First joint slice selection for two views of one series type.
+  coverage: Every study with coronal or sagittal T1/PD or coronal fluid series; every label.
+  exploitation: 'Read the complement gain against two-views-wide-and-posed''s, per label, the x4 minus x1 gap and the
+    sixth-member blend. Activation: a validation metric of the share of a type''s depths read by more than one of its
+    own-selection views (0 here, about 0.03 at x1 for two-views-wide-and-posed), and the distinct depths per changed type.'
+  budget: 'Same images per study as two-views-wide-and-posed; about its 2,741 s (1.05 of the reference) and 16.4 GB.'
+  implementation: 'Files: data/dataset.py (_prepare_slot: the joint selection and the split), data/preprocessing/sampling.py
+    only if a helper belongs there, the sampling identity string in the preprocessing identity, training/lightning.py (the
+    activation metric), configs/campaign.yaml as the incumbent''s. Check on CPU with KneeStudyDataset at image multipliers
+    1 and 4 on a few fold-2 validation studies that the changed types read 5 and 20 distinct depths with no repeat, that
+    the posed and wide views get 3 and 2 (12 and 8) of them spread over the range, and that the control''s table gives
+    the control''s selection.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Repairs the measured x4 overlap of the adopted incumbent; the user asked for it on 2026-10-16.
+exhausted_directions: 'Not exhausted.'
