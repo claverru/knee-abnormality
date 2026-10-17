@@ -25,21 +25,28 @@ Results: [2026-10-14 MambaVision-T](../validation/results/2026-10-14-mambavision
 
 ## Dependencies
 
-- **Local:** `mamba-ssm` comes from the project's prebuilt GitHub release wheel (2.3.2.post1, CUDA 12,
-  torch 2.10, cp312), pinned as a URL source in `pyproject.toml`. `[[tool.uv.dependency-metadata]]`
+- **Local, since 2026-10-17 (torch 2.11, Python 3.13 as Kaggle):** `mamba-ssm` 2.3.2.post1 from
+  [Astral's GPU index](https://wheels.astral.sh/) (`cu.12.8.torch.2.11`, cp313, manylinux_2_24),
+  pinned as a URL source in `pyproject.toml`; the state-spaces release wheels stop at torch 2.10. Its
+  `selective_scan_cuda` holds code for compute 7.5 (T4), 8.0 (runs on the 3090), 8.7, 9.0, 10.0
+  and 12.0; on the 3090 the selective scan runs forward and backward in FP16 and FP32. The
+  Kaggle-built 2.2.4 wheel below holds T4 code only and fails on the 3090 ("no kernel image is
+  available for execution on the device"). Before 2026-10-17 the project used the release wheel
+  2.3.2.post1 (CUDA 12, torch 2.10, cp312). `[[tool.uv.dependency-metadata]]`
   gives it and `mambavision` 1.2.0 only `einops`, `torch`, `triton` and `timm`: the published
   metadata would pull in `transformers`, `tilelang`, `quack-kernels` and MambaVision's pins
   (`timm==1.0.15`, `mamba-ssm==2.2.4`). The `mamba-ssm==2.2.4` pin is stale: its release wheels
   stop at torch 2.6, so pip compiles it from source on newer torch. On the 3090 (2026-10-14), the
   trained fold-2 backbone gave bit-identical outputs with 2.3.2 and a 2.2.4 source build in FP32,
   BF16 and FP16; gradients differed only as much as two runs of 2.2.4.
-- **Kaggle** (Python 3.13, torch 2.11, CUDA 12.8 in October 2026): no release wheel covers torch
-  2.11. `outputs/submission/dependencies/kaggle-py313-mambavision` holds a `mamba_ssm` 2.2.4 wheel
-  built on Kaggle for the T4 (compute 7.5, 413 s, notebook `claverru/knee-mamba-ssm-t4-build` with
-  internet on) and the pure `mambavision` 1.2.0 wheel. Export adds that folder for every
-  checkpoint whose backbone is in `BACKBONE_WHEELS` (`src/knee_abnormality/kaggle.py`); the
-  notebook installs all bundled wheels with `--no-deps`. Rebuild the wheel when Kaggle's torch
-  changes, or switch to a release wheel once one covers it.
+- **Kaggle** (Python 3.13, torch 2.11, CUDA 12.8 in October 2026): since 2026-10-17
+  `outputs/submission/dependencies/kaggle-py313-mambavision` holds the same Astral `mamba_ssm`
+  2.3.2.post1 wheel as the local environment (284 MB, sha256 7c7287b4…) and the pure `mambavision`
+  1.2.0 wheel; it has not yet run in a submission. Export adds that folder for every checkpoint whose
+  backbone is in `BACKBONE_WHEELS` (`src/knee_abnormality/kaggle.py`); the notebook installs all
+  bundled wheels with `--no-deps`. The earlier 2.2.4 wheel, built on Kaggle for the T4 only
+  (compute 7.5, 413 s, notebook `claverru/knee-mamba-ssm-t4-build`), stays in
+  `kaggle-py313-mamba`.
 
 ## New batch sizes
 
