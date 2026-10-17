@@ -1,0 +1,61 @@
+ideas:
+- id: axial-views-unposed
+  mechanism_id: axial-pose
+  parent_idea_id: null
+  title: The recipe with both axial views unposed (image-centred 120 mm, no shift, turn, scale or jitter); every coronal
+    and sagittal view posed as the recipe's
+  opportunity: 'Evidence (this campaign and view-poses run notes): unposed-120-mm-everywhere, which removes every pose,
+    gained alone Lateral OA +30, Baker''s +27, Effusion +22 x1e-4 and lost Synovitis -31, Contusion -42, Fracture -100;
+    in a blend with the control Lateral OA +40, Baker''s +26, Effusion +25, PF OA +20, beyond half its solo change +17.7
+    against about +5 for one-setting runs. The step that posed all six views (view-poses run 3, axial pose and per-knee
+    scale added) moved the same labels the other way: Lateral OA -33, Effusion -30, MCL -25, Fracture -21, Synovitis
+    +63, Contusion +38. Guess, moderate confidence: the axial pose centres the crop between the kneecap front and 30 mm
+    in front of the femur back, which cuts the popliteal fossa (Baker''s cysts) and the posterior recesses that axial
+    fluid reads for effusion; Lateral OA is read best alone on axial fluid (0.842). per-knee-scale-off separates the
+    scale. Guess: complement gain +0.0006 to +0.0010 with Baker''s, Effusion and Lateral OA up, solo level to -0.001.'
+  mechanism: 'Configuration only, on the posed option of two-views-wide-and-posed: the control''s view table with posed
+    false on the two axial views (120 mm, image anchors, offset 0, 6 slices each); coronal and sagittal views, the detail
+    view and model.view_knee_scale true as the recipe''s.'
+  precedents:
+  - 'unposed-120-mm-everywhere (this campaign): blend +7.6, solo -20.3, beyond half solo +17.7.'
+  - 'canvases-for-the-pose-in-all-six-views (view-poses run 3, fold 1): Lateral OA -0.0033, Effusion -0.0030, MCL -0.0025,
+    Fracture -0.0021, Synovitis +0.0063, Contusion +0.0038.'
+  novelty: First test of the axial pose alone.
+  coverage: Every study with axial series; every label.
+  exploitation: 'Read the complement gain and per label, Baker''s, Effusion and Lateral OA first, the solo change and
+    the sixth-member blend. Activation: val_unposed_image_fraction about 0.33 and the unposed turn, shift and scale metrics
+    at 0, 1 and 0.'
+  budget: 'Same images as the recipe; about 1.0 of the reference''s time and 16.4 GB.'
+  implementation: 'Files: configs/campaign.yaml only (the posed option is in the incumbent''s source). Check that the config
+    loads and val_unposed metrics are logged.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Separates the cheapest candidate cause of unposed-120-mm-everywhere's Baker's, Effusion and Lateral
+    OA gains, configuration only.
+- id: two-views-wide-with-unposed-axial
+  mechanism_id: wide-unposed-views
+  parent_idea_id: two-views-wide-and-posed
+  title: The incumbent at its turn (two-views-wide-and-posed, or wide-view-on-distinct-depths if adopted) with both axial
+    views unposed
+  opportunity: 'Evidence (this campaign): the two runs complement each other. Adding unposed-120-mm-everywhere to the
+    control plus two-views-wide-and-posed adds +3.4 x1e-4 (Lateral OA +22, Effusion +20, Baker''s +13, PF OA +11, Fracture
+    -18); the reverse adds +3.4 (Fracture +41, Synovitis +22). two-views-wide-and-posed keeps the posed fine views that
+    Fracture needs (+36 alone, against -100 when every view is unposed) but keeps the axial pose. Guess: this combination
+    takes Fracture and Synovitis from the first run and Baker''s, Effusion and Lateral OA from the axial views; complement
+    gain +0.0009 to +0.0014.'
+  mechanism: 'Combines two named runs: the incumbent''s code and view table when this seed starts (two-views-wide-and-posed,
+    or wide-view-on-distinct-depths if adopted, with its joint slice selection) and axial-views-unposed''s change: posed
+    false on the two axial views. Nothing else changes.'
+  precedents:
+  - 'two-views-wide-and-posed (this campaign): blend +7.6, solo -5.6.'
+  - 'unposed-120-mm-everywhere (this campaign): blend +7.6, solo -20.3.'
+  novelty: The combination the per-label complementarity points to.
+  coverage: Every study; every label.
+  exploitation: 'Read the complement gain against the incumbent''s, per label, the solo change and the sixth-member blend.
+    Activation: val_unposed_image_fraction about 0.45 and the unposed metrics at 0, 1 and 0.'
+  budget: 'Same images as the incumbent; about 1.05 of the reference''s time and 16.4 GB.'
+  implementation: 'Files: configs/campaign.yaml only. Check that the config loads.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Runs after axial-views-unposed and wide-view-on-distinct-depths so it starts from the better incumbent.
+exhausted_directions: 'Not exhausted.'

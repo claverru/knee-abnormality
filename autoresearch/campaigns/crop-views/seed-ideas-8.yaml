@@ -1,0 +1,54 @@
+ideas:
+- id: wide-fluid-stream-3-slices
+  mechanism_id: auxiliary-context-stream
+  parent_idea_id: wide-fluid-stream-resnet10t
+  title: wide-fluid-stream-resnet10t with the stream reading 3 evenly spaced slices of each fluid type's first-view selection
+    instead of all of them, so the run fits the time limit
+  opportunity: 'wide-fluid-stream-resnet10t was blocked by the runtime''s time gate, not by a result: its preflight projected
+    3,237 s and, after its one bounded repair, 3,219 s against the 3,141 s ceiling (median step 0.569 s, 16 stream images
+    per study, peak 16.9 GB). Reading 3 slices per fluid type (9 stream images instead of 16) removes about 44% of the
+    stream''s cost; keeper estimate about 2,750 s. The hypothesis is unchanged (prior-work.md, Whole-framing changes
+    and Auxiliary backbones): wide unposed context from a second network beside the posed views. Guess: complement
+    gain +0.0006 to +0.0012.'
+  mechanism: 'Port the reviewed source of wide-fluid-stream-resnet10t''s last attempt (outputs/autoresearch/crop-views/experiments/wide-fluid-stream-resnet10t-20261017T064431Z-1f7248d5,
+    its changes.diff) unchanged, except that the stream reads, for each fluid type, 3 slices evenly spaced over the
+    slices that type''s first view selected (first, middle and last when there are 5 or 6; all when fewer than 3),
+    with their positions and valid rectangles. The main views, the first look, the view table, model.view_knee_scale
+    and every other setting as the control''s.'
+  precedents:
+  - 'wide-fluid-stream-resnet10t (this campaign): blocked at preflight, 3,219 s projected.'
+  - 'two-views-fluid-140 (smart-crops, fold 0): ResNet-10t fluid stream with no gate, blend +7.7, solo -21.2.'
+  novelty: The context stream at a cost that fits.
+  coverage: Every study with fluid series; every label.
+  exploitation: 'Read the complement gain, per label, the solo change and the sixth-member blend. Activation: the share
+    of attention mass on stream tokens per label, and the stream image count per study (about 9).'
+  budget: '9 stream images per study; keeper estimate about 2,750 s (1.05 of the reference); about 16.5 GB.'
+  implementation: 'Files: as wide-fluid-stream-resnet10t''s change (config.py, modeling/, training/lightning.py, configs/campaign.yaml),
+    plus the 3-slice selection for the stream. Check on CPU that the stream reads 3 slices per fluid type and that the
+    tokens reach every pool.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Requeues a seed blocked by the harness cost gate, not by a result.
+- id: wide-fluid-stream-3-slices-own-loss
+  mechanism_id: auxiliary-context-stream
+  parent_idea_id: wide-fluid-stream-3-slices
+  title: wide-fluid-stream-3-slices with the stream's tokens also pooled alone under the target loss and its logits added
+    to the main ones
+  opportunity: 'Replaces wide-fluid-stream-own-loss, which builds on the blocked full stream and would cost more than
+    it. A stream the pools can ignore may not learn; its own loss makes it learn alone. Precedent (prior-work.md, Auxiliary
+    backbones): crop-own-loss blend +5.5, solo -24.7 (fold 0). Guess: complement gain +0.0006 to +0.0012.'
+  mechanism: 'wide-fluid-stream-3-slices unchanged, plus: the stream''s tokens pooled alone by a copy of the target readout
+    (own attention and classifiers, zero-started), trained by the same target loss at weight 1, its logits added to the
+    model''s logits for the twelve labels; the joint pools still see the stream tokens.'
+  precedents:
+  - 'crop-own-loss (smart-crops, fold 0): blend +5.5, solo -24.7.'
+  novelty: A deeply supervised second backbone.
+  coverage: Every study with fluid series; every label.
+  exploitation: 'Read as wide-fluid-stream-3-slices plus the stream''s own x1 macro AUC and the size of its logits against
+    the main ones.'
+  budget: 'Keeper estimate about 2,850 s (1.09 of the reference); about 16.7 GB.'
+  implementation: 'Files: modeling/model.py and training/lightning.py on top of wide-fluid-stream-3-slices; configs/campaign.yaml.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Runs after wide-fluid-stream-3-slices, whose code it extends.
+exhausted_directions: 'Not exhausted.'

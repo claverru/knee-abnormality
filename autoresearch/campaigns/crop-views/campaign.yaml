@@ -1,0 +1,90 @@
+id: crop-views
+recipe: configs/resnet50.yaml
+reference_run: outputs/training/resnet50-silver-fold2
+reference_equivalences: {}
+reference_config_exceptions:
+- paths.anatomy_targets
+- paths.data_root
+- paths.label_manifest
+- paths.meniscus_targets
+reference_identity_exceptions:
+- preprocessing_identity.sources_sha256
+additional_evidence_runs: []
+backlog:
+  refill_below: 3
+  refill_to: 5
+  seed_order: forced
+  rotate_after: 1000000
+budget:
+  mode: range
+  min_fraction: 0.3
+  max_fraction: 1.2
+policy:
+  editable_files:
+  - configs/campaign.yaml
+  - src/knee_abnormality/config.py
+  - src/knee_abnormality/data/dataset.py
+  - src/knee_abnormality/inference/engine.py
+  - src/knee_abnormality/inference/reflection.py
+  - src/knee_abnormality/training/lightning.py
+  editable_directories:
+  - src/knee_abnormality/modeling
+  - src/knee_abnormality/data/preprocessing
+  config_keys:
+  - model.view_knee_scale
+  - model.pretrained_weights
+  - data.mean
+  - data.std
+  config_prefixes:
+  - model.auxiliary
+  list_item_fields:
+    data.series_types:
+    - views
+  input_identity_keys:
+  - preprocessing_identity
+  require_source_change: false
+  configuration_only_ideas: true
+  developer_instructions: 'You have no GPU and must not use one. Allowed checks are static checks, loading configs/campaign.yaml
+    through the config model, building the model on the CPU, and tiny no-gradient forward passes on synthetic or one
+    real study; never return blocked for lack of a GPU. Make every change inside the candidate workspace you were assigned
+    and nowhere else; do not stage the candidate under /tmp, and do not write source/ or changes.diff in the experiment
+    directory. Read contract.md before writing code. The recipe is the ResNet-50 recipe (configs/resnet50.yaml): every
+    view is cut from a 368 px canvas by ViewWindows (modeling/view_windows.py) with the pose of first_look_pose
+    (modeling/model.py): a shift and a turn per view from frame_pose and one per-knee scale per study (size over 17.087,
+    clamped to 0.87 to 1.13), plus a 3 degree, 3 mm training jitter. The view table is data.series_types[].views (config.py
+    ViewConfig: field_mm, slices, horizontal and vertical anchor and offset); the second sagittal fluid view reuses the
+    first view''s slices (DataConfig.view_sources), every other view selects its own. Forced seeds: the config is the control''s
+    recipe plus exactly the seed''s change, even when an earlier seed was adopted: write the full view table the seed
+    gives and model.view_knee_scale true unless the seed turns it off. Code a seed adds stays in later candidates and
+    must leave the control''s behaviour unchanged at the default values. A ResNet-10t auxiliary backbone and all its settings
+    live under model.auxiliary and are off by default; it uses the Refined-RadImageNet ResNet-10t weights (registry entry
+    in modeling/radimagenet.py, file in the torch hub cache, loaded strictly), its own projection, parameter group and anchors,
+    and its tokens, when a seed sends them to the pools, take the same path as the ResNet-50''s after their projection.
+    A new option exists only for a value the campaign varies. New parameters or buffers initialise under torch.random.fork_rng so the reference''s random stream is unchanged
+    where it applies. Keep the speed rules of the recipe: model.channels_last stays true, epoch metrics go through _log_epoch_metric,
+    and code that runs every training step gets no .item(), .cpu(), bool() or int() of a tensor and no Python loop over
+    studies. Every seed adds the validation-only metrics it names as its proof of activation, at most six. Training time
+    must stay within 0.3 to 1.2 of the reference''s 2,617 s (785 to 3,141 s) and peak GPU memory under 19 GB; images per
+    study above the recipe''s raise both. No weight averaging. No tests.'
+  researcher_instructions: 'The campaign has no end: it runs until the user stops it. Never return an empty report and
+    never declare the directions exhausted. Research starts after the forced seeds. The objective is a ResNet-50 run whose
+    views frame the knee differently from the recipe so that it adds to the recipe in an ensemble; adoption is by the
+    runtime''s complement rule (the x4 macro AUC of the equal logit blend with the control minus the control''s, strictly
+    above the incumbent''s; the control''s own bar is +0.00059). Your first product after every completed run is its analysis:
+    the complement gain and its per-label gains sorted from largest gain to largest loss, the run''s own x4 and x1 against
+    the control (x4 0.937820), the complement gain minus half the run''s own x4 change (the part that is not quality,
+    yardstick about +0.0005 from the 29 fold-2 runs in prior-work.md), the training loss per epoch, the training seconds
+    and the peak GPU memory, and the run''s blend as a sixth member with the five fold-2 family runs listed in prior-work.md
+    against those five alone. One run is a starting point, never a verdict: for a run that was not adopted list what it
+    shares with the other runs and name candidate causes; do not write that a reference was lucky or that a difference
+    is noise. Scope: how the views frame the knee: field sizes, image or knee anchoring, posing on or off per view, the
+    per-knee scale, how the pose is estimated, and how a type''s slices are split between views, within the cost limits;
+    and a Refined-RadImageNet ResNet-10t auxiliary backbone that locates the crops, adds wide context tokens, or both.
+    Each idea is one training run that changes one setting against the control, or combines settings of named earlier
+    runs; it marks every claim as evidence-backed or a guess, cites its numbers from prior-work.md or a run, states its
+    expected training time and GPU memory, and names the metrics that prove it active. Out of bounds: everything in the
+    contract''s out-of-bounds list, among it other backbones than the ResNet-50 and the auxiliary ResNet-10t, pretrained
+    weights for the ResNet-50 other than Refined-RadImageNet and timm''s ImageNet resnet50.a1_in1k, image sizes other than 224 px, more images per study than
+    the time and memory limits allow, the labels, routing, attention or readout changes, ensembling weights, weight averaging,
+    test-time augmentation, reflection probabilities, gold-study weighting, trained models in the loader, per-run controls
+    and confirmation or multi-seed runs.'

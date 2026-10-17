@@ -1,0 +1,60 @@
+diff --git a/src/knee_abnormality/modeling/model.py b/src/knee_abnormality/modeling/model.py
+--- a/src/knee_abnormality/modeling/model.py
++++ b/src/knee_abnormality/modeling/model.py
+@@ -41,6 +41,7 @@
+ from knee_abnormality.modeling.plane_readout import PlaneContrastReadout
+ from knee_abnormality.modeling.radimagenet import (
+     RADIMAGENET_WEIGHTS,
++    match_conv_scale,
+     radimagenet_state_dict,
+     resnet_avg_down_state_dict,
+ )
+@@ -249,7 +250,13 @@
+                     num_classes=0,
+                     global_pool="",
+                 ).state_dict()
+-            self.backbone.load_state_dict(resnet_avg_down_state_dict(state), strict=True)
++            self.backbone.load_state_dict(
++                match_conv_scale(
++                    resnet_avg_down_state_dict(state),
++                    resnet_avg_down_state_dict(radimagenet_state_dict(model.backbone)),
++                ),
++                strict=True,
++            )
+         self.feature_mapping = backbone_mapping(model.backbone, self.backbone)
+         self.backbone_stages = backbone_stages(self.backbone, model.stochastic_depth)
+         self.projection = nn.Linear(self.backbone.num_features, PROJECTION_WIDTH)
+diff --git a/src/knee_abnormality/modeling/radimagenet.py b/src/knee_abnormality/modeling/radimagenet.py
+--- a/src/knee_abnormality/modeling/radimagenet.py
++++ b/src/knee_abnormality/modeling/radimagenet.py
+@@ -48,6 +48,30 @@
+     return renamed
+ 
+ 
++def match_conv_scale(
++    state: dict[str, torch.Tensor], reference: dict[str, torch.Tensor]
++) -> dict[str, torch.Tensor]:
++    scaled = dict(state)
++    for key, weight in state.items():
++        if weight.ndim != 4:
++            continue
++        prefix = key.removesuffix("weight")
++        norm = (
++            prefix.replace("downsample.1.", "downsample.2.")
++            if ".downsample.1." in prefix
++            else prefix.replace("conv", "bn")
++        )
++        factor = (
++            reference[key].double().square().mean().sqrt()
++            / weight.double().square().mean().sqrt()
++        )
++        scaled[key] = (weight.double() * factor).to(weight.dtype)
++        mean, var = state[f"{norm}running_mean"], state[f"{norm}running_var"]
++        scaled[f"{norm}running_mean"] = (mean.double() * factor).to(mean.dtype)
++        scaled[f"{norm}running_var"] = (var.double() * factor.square()).to(var.dtype)
++    return scaled
++
++
+ def radimagenet_state_dict(backbone: str) -> dict[str, torch.Tensor]:
+     weights = RADIMAGENET_WEIGHTS[backbone]
+     path = radimagenet_path(backbone)

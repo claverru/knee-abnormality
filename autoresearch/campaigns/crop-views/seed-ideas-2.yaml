@@ -1,0 +1,158 @@
+ideas:
+- id: canvas-locator-resnet10t
+  mechanism_id: auxiliary-locator
+  parent_idea_id: null
+  title: A Refined-RadImageNet ResNet-10t reads each primary series' whole 368 px canvas resized to 224 px, learns the
+    anatomy map from the mask targets, and its map replaces the ResNet-50 first look for the crop pose from epoch 3
+  opportunity: 'Today the pose comes from a no-gradient pass of the ResNet-50 over the central 224 px of each canvas, the
+    view''s own field, so a knee off centre is seen in part, and the shift is capped at 18 mm. A locator that sees the
+    whole canvas (138 to 197 mm) estimates the pose from the whole knee and frees the ResNet-50 from the first look (about
+    32 of the 143 ResNet-50 forward passes per study). Evidence (prior-work.md, Pose estimation): other pose estimates
+    gave +4.2 to +5.3 x1e-4 in a blend against a retraining''s +2.0 (fold 1). Guess: complement gain +0.0004 to +0.0010,
+    solo level to -0.001.'
+  mechanism: 'Under model.auxiliary: a resnet10t.c3_in1k backbone with Refined-RadImageNet weights (restore its entry in
+    modeling/radimagenet.py: file refined_radimagenet_resnet10t.pth, sha256 f5219dff128ca752d47e8acd07817564c10bacbbc4241b3a31845e1a67a079ab,
+    source REFINED_RADIMAGENET_URL resnet10t.pth; the file is in the torch hub cache), its own linear projection to 256
+    and its own seven-class anatomy head, trained with the recipe''s anatomy loss and weight on targets looked up at its
+    token positions. Input: the slices first_look_batch selects, each whole canvas resized from 368 to 224 px, with
+    patient maps and valid rectangles transformed by that resize. Its tokens go through the model''s first-look frame
+    computation (positions, anatomy shares, joint plane and centre, study frame, side) in place of the ResNet-50''s, and
+    frame_pose and the per-knee scale read that result. Epochs 1 and 2 pose from the ResNet-50 first look as today; from
+    epoch 3 from the locator alone, and validation and prediction use the locator. Rate and anchors as the ResNet-50''s
+    (backbone_lr 5e-5, anchors 0.01 early and 0.001 late toward its pretrained weights). Shift and turn limits as the
+    recipe''s. View table and every other setting as the recipe''s.'
+  precedents:
+  - 'soft-bone-shares-fit-the-joint-plane (anatomy-masks, fold 1): blend +4.2, solo -0.4.'
+  - 'spot-shift-locator-keeps-spatial-maps (routing-and-shifts, fold 1): a learned crop point, blend +5.3, solo +1.4.'
+  - 'joint-centre-taught-from-the-masks (view-poses, fold 1): a centre regressed from the masks, blend +2.8, solo -30.7.'
+  - 'Refined-RadImageNet ResNet-10t: 1.10 GMAC at 224 px against the ResNet-50''s 4.09 (measured).'
+  novelty: First pose read by a second network from the whole canvas.
+  coverage: Every study with a trusted pose; every label through the crops.
+  exploitation: 'Read the complement gain, per label, solo and sixth-member blend. Activation: validation metrics of the
+    locator''s anatomy-map accuracy on its targets, the mean absolute difference between its pose and the ResNet-50 first
+    look''s on the same batch (shift in mm, turn in degrees, scale), and the share of studies whose pose came from the
+    locator (1.0 from epoch 3).'
+  budget: 'The locator costs about 32 x 3 x 0.27 = 26 ResNet-50 forward passes per study against the first look''s 32 it
+    replaces from epoch 3: -5% to +10% of the reference''s time; about +1 GB.'
+  implementation: 'Files: config.py (model.auxiliary), modeling/radimagenet.py, modeling/model.py (the locator module,
+    its use in first_look_pose and the epoch switch), modeling/view_windows.py (the resized canvas batch), modeling/spatial_tokens.py
+    (the resnet10t feature mapping and identity strings), training/lightning.py (the locator''s parameter group, anchors,
+    anatomy loss and metrics), configs/campaign.yaml. Check on CPU that the weights load strictly, the config loads,
+    and one batch gives a locator pose of the right shape.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's idea, and the base of canvas-locator-with-context-tokens.
+- id: wide-fluid-stream-resnet10t
+  mechanism_id: auxiliary-context-stream
+  parent_idea_id: null
+  title: A Refined-RadImageNet ResNet-10t reads an unposed, image-centred 120 mm view of the slices each fluid series'
+    first view selects; its tokens join the same pools from the first step, with no gate
+  opportunity: 'Evidence (prior-work.md, Whole-framing changes): framings different in every view added +7 to +16.5 x1e-4
+    in a blend on fold 0. Two-stream precedents: the mixed-field ResNet-10t stream behind a zero-started scalar gate never
+    trained (its readout 0.506) and the run was 120 mm alone; the smart-crops ResNet-10t 140 mm fluid stream feeding the
+    pool from the first step trained, blend +7.7, solo -21.2 (fold 0). Here the stream adds context beside the posed
+    views instead of replacing them. Guess: complement gain +0.0008 to +0.0015, solo -0.001 to +0.001.'
+  mechanism: 'Under model.auxiliary: the ResNet-10t with Refined-RadImageNet weights (as canvas-locator-resnet10t restores
+    them), its own linear projection to 256 and a learned stream embedding added to its tokens. For the three fluid
+    types (axial, coronal, sagittal fluid) it reads the slices the type''s first view selects, cut at 120 mm with image
+    anchors and offset 0, unposed (no shift, turn, scale or jitter). Its tokens carry their positions and enter the same
+    pools and readouts as the ResNet-50''s, the anatomy head included, with no gate. Rate and anchors as the ResNet-50''s.
+    The first look, the view table and every other setting as the recipe''s.'
+  precedents:
+  - 'two-views-fluid-140 (smart-crops, fold 0): ResNet-10t 140 mm fluid stream, no gate, blend +7.7, solo -21.2.'
+  - 'two-stream-paired (mixed-field, fold 0): gated ResNet-10t stream that never trained.'
+  novelty: First wide context stream from a second network beside posed views.
+  coverage: Every study with fluid series; every label.
+  exploitation: 'Read the complement gain, per label, solo and sixth-member blend. Activation: the share of attention mass
+    on stream tokens per label at validation, the stream projection''s weight drift after epoch 1, and the stream token
+    count per study.'
+  budget: '16 images per study through the ResNet-10t, about 16 x 3 x 0.27 = 13 ResNet-50 forward passes on 143: +10% to
+    +15% of the reference''s time; +1 to 2 GB.'
+  implementation: 'Files: config.py (model.auxiliary), modeling/radimagenet.py, modeling/model.py, modeling/view_windows.py
+    (the unposed 120 mm cut for the stream), modeling/spatial_tokens.py (mapping, embeddings, identity strings), data/dataset.py
+    or data/preprocessing if the stream needs its own canvas, training/lightning.py (parameter group, anchors, metrics),
+    configs/campaign.yaml. Check on CPU that the stream tokens reach every pool and that one batch runs.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The cheapest two-backbone context stream with a trained precedent.
+- id: canvas-locator-with-context-tokens
+  mechanism_id: auxiliary-locator
+  parent_idea_id: canvas-locator-resnet10t
+  title: canvas-locator-resnet10t with the locator's full-canvas tokens also entering the pools, so one ResNet-10t pass
+    places the crops and adds wide context
+  opportunity: 'Guess: the locator already encodes every primary canvas; its tokens add 138 to 197 mm context at 0.62 to
+    0.88 mm per pixel at little cost. Comparing with canvas-locator-resnet10t separates the context from the pose, and
+    with canvas-context-tokens-resnet10t the pose from the context. Guess: complement gain +0.0008 to +0.0015.'
+  mechanism: 'canvas-locator-resnet10t unchanged, plus: the locator''s tokens, with a learned stream embedding, enter the
+    same pools and readouts as the ResNet-50''s from the first step, with no gate, and the target losses train the locator
+    through them as well as the anatomy loss. In epochs 1 and 2, while the pose comes from the ResNet-50 first look, the
+    locator tokens still enter the pools.'
+  precedents:
+  - 'canvas-locator-resnet10t (this campaign).'
+  - 'mixed-field-120-160 (fold 0): 160 mm slices beside 120 mm ones, blend +3.6, solo -9.2.'
+  novelty: One auxiliary pass with two uses.
+  coverage: Every study; every label.
+  exploitation: 'Read as canvas-locator-resnet10t plus the share of attention mass on locator tokens per label.'
+  budget: 'As canvas-locator-resnet10t plus the extra tokens in the pools: 0% to +10% of the reference''s time; +1 to
+    2 GB.'
+  implementation: 'Files: modeling/model.py and training/lightning.py on top of canvas-locator-resnet10t; configs/campaign.yaml.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Runs after canvas-locator-resnet10t, whose code it extends.
+- id: wide-fluid-stream-own-loss
+  mechanism_id: auxiliary-context-stream
+  parent_idea_id: wide-fluid-stream-resnet10t
+  title: wide-fluid-stream-resnet10t with the stream's tokens also pooled alone under the target loss and its logits
+    added to the main ones
+  opportunity: 'A stream that the pools can ignore may not learn; its own loss makes it learn alone, and its logits add
+    a second reading inside the model. Precedent (prior-work.md, Auxiliary backbones): crop-own-loss, a crop pooled alone
+    under its own loss, blend +5.5, solo -24.7 (fold 0). Guess: complement gain +0.0006 to +0.0015.'
+  mechanism: 'wide-fluid-stream-resnet10t unchanged, plus: the stream''s tokens are pooled alone by a copy of the target
+    readout (own attention and classifiers, zero-started), trained by the same target loss at weight 1, and its logits
+    are added to the model''s logits for the twelve labels; the joint pools still see the stream tokens.'
+  precedents:
+  - 'crop-own-loss (smart-crops, fold 0): blend +5.5, solo -24.7.'
+  - 'wide-fluid-stream-resnet10t (this campaign).'
+  novelty: A deeply supervised second backbone.
+  coverage: Every study with fluid series; every label.
+  exploitation: 'Read as wide-fluid-stream-resnet10t plus the stream''s own macro AUC at x1 and the size of its logits
+    against the main ones.'
+  budget: '+12% to +18% of the reference''s time; +1 to 2 GB.'
+  implementation: 'Files: modeling/model.py and training/lightning.py on top of wide-fluid-stream-resnet10t; configs/campaign.yaml.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Runs after wide-fluid-stream-resnet10t, whose code it extends.
+- id: canvas-context-tokens-resnet10t
+  mechanism_id: auxiliary-context-stream
+  parent_idea_id: null
+  title: A Refined-RadImageNet ResNet-10t reads each primary series' whole 368 px canvas resized to 224 px and its tokens
+    join the same pools; crops stay posed by the ResNet-50 first look
+  opportunity: 'The canvas extends past the crop: 138 mm for coronal T1/PD and sagittal fluid, 153 mm for coronal fluid
+    and sagittal T1/PD, 197 mm for axial, at 0.62 to 0.88 mm per pixel. Evidence (prior-work.md): fields wider than 140
+    mm helped only beside narrower ones (mixed-field-120-160 blend +3.6, 160 mm alone solo -34). This is the context-only
+    comparison for canvas-locator-with-context-tokens. Guess: complement gain +0.0005 to +0.0012, below wide-fluid-stream-resnet10t
+    for the coarser pixels.'
+  mechanism: 'Under model.auxiliary: the ResNet-10t with Refined-RadImageNet weights, its own projection to 256 and a learned
+    stream embedding. It reads the slices first_look_batch selects, each whole canvas resized from 368 to 224 px with
+    patient maps and valid rectangles transformed by the resize, and its tokens enter the same pools and readouts as
+    the ResNet-50''s, the anatomy head included, from the first step with no gate. The ResNet-50 first look, the pose,
+    the view table and every other setting as the recipe''s. If the run is stopped for time, the repair restricts the
+    stream to the three fluid series.'
+  precedents:
+  - 'mixed-field-120-160 (mixed-field, fold 0): blend +3.6, solo -9.2.'
+  - 'field-160-single-logged (mixed-field, fold 0): 160 mm alone, solo -49.5 against its incumbent.'
+  novelty: Whole-canvas context beside the posed views.
+  coverage: Every study; every label.
+  exploitation: 'Read the complement gain, per label, solo and sixth-member blend. Activation: the share of attention mass
+    on stream tokens per label and the stream token count per study.'
+  budget: '32 images per study through the ResNet-10t, about 26 ResNet-50 forward passes on 143 with the first look kept:
+    +15% to +25% of the reference''s time, the upper end at the 1.2 limit; +1 to 2 GB.'
+  implementation: 'Files: config.py (model.auxiliary), modeling/radimagenet.py, modeling/model.py, modeling/view_windows.py
+    (the resized canvas batch), modeling/spatial_tokens.py, training/lightning.py, configs/campaign.yaml. Reuse the resized
+    canvas batch of canvas-locator-resnet10t when it exists.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's request, and the context-only comparison for the locator with tokens.
+exhausted_directions: 'Not exhausted. Not seeded: the ranking locator (candidate poses scored by the ResNet-50 loss, about
+  +20 to +25% time on a quarter of the studies); the wide stream over all six series (about +20 to +30%); views aimed
+  at single structures from the locator''s map, which wait for canvas-locator-resnet10t.'
