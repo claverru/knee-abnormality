@@ -1,0 +1,25 @@
+ideas:
+- id: nextvit-small-twelve-epochs
+  mechanism_id: family-nextvit-epochs
+  parent_idea_id: nextvit-small-ssld
+  title: NextViT-S (the incumbent) on its source and settings, twelve epochs
+  opportunity: 'Evidence: nextvit-small-ssld is the incumbent (x4 0.938851, x1 0.934578, blend with resnet50-silver-fold2
+    +0.003267, the best of the campaign) after ten epochs, against the former reference FocalNet-T SRF''s twelve; its x1
+    rose through the last epochs (0.930239, 0.932402, 0.934578 at epochs 8 to 10). It trained ten epochs in 3,094 s (309 s
+    per epoch), so twelve take about 3,710 s, inside the 4,881 s bound. The FocalNet-T LRF runs show twelve epochs moved
+    x4 by +0.0005 and the blend by +0.0002 against ten. Guess on size: +0.0005 to +0.0015 at x4.'
+  mechanism: 'trainer.max_epochs 12 and trainer.patience 12 on the incumbent''s config and source (linear decay over the
+    twelve-epoch horizon). Nothing else changes.'
+  precedents:
+  - 'nextvit-small-ssld: x4 0.938851, x1 0.934578, blend +0.003267.'
+  - 'focalnet-tiny-lrf at ten and twelve epochs: x4 0.937354 and 0.937903, blend +0.002710 and +0.002933.'
+  novelty: The former reference's epoch count for the incumbent.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the incumbent, per label, and the blend with the ResNet-50. Activation: the
+    effective config has max_epochs 12.'
+  budget: 'Configuration only: about 3,710 s from the incumbent''s measured 309 s per epoch; 15.9 GiB.'
+  implementation: 'configs/campaign.yaml: trainer.max_epochs 12 and trainer.patience 12. No source change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Forced by the keeper as the incumbent's follow-up; the user asked for follow-ups on promising runs.
+exhausted_directions: None.

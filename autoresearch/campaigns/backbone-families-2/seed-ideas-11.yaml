@@ -1,0 +1,30 @@
+ideas:
+- id: flash-internimage-eight-epochs
+  mechanism_id: family-internimage-epochs
+  parent_idea_id: flash-internimage-seven-epochs
+  title: FlashInternImage-T on the seven-epoch run's source and settings, eight epochs
+  opportunity: 'Evidence: flash-internimage-seven-epochs is the best blend partner of the campaign (equal logit
+    blend with resnet50-silver-fold2 +0.001833 over the ResNet-50 alone, against +0.000779 to +0.001229 for the
+    LingBot runs and negative for every original RadImageNet run) and the closest family alone (x4 -0.002862); its
+    x1 was still rising in the last epochs (0.926572 at epoch 6, 0.927910 at epoch 7). Nine epochs do not fit:
+    internimage-low-resolution-direct-nine-epochs projected 4,414 s with high-resolution-only checkpointing and
+    4,330 s after selective DCNv4 checkpointing, against 4,092 s. Eight epochs on the parent''s fully checkpointed
+    code fit: 0.955 s x 442 steps x 8 + 45 s x 8 = about 3,740 s (the parent''s measured step and validation).
+    Guess on size: +0.0005 to +0.0015 at x4 over the parent, and a larger blend gain.'
+  mechanism: 'trainer.max_epochs 8 and trainer.patience 8 on flash-internimage-seven-epochs'' config and source
+    (DCNv4 in float32, every block checkpointed, the linear decay over the eight-epoch horizon). Nothing else
+    changes.'
+  precedents:
+  - 'flash-internimage-seven-epochs: x4 -0.002862, blend +0.001833.'
+  novelty: One more epoch for the best blend partner.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the incumbent and the parent, per label, and the blend with the ResNet-50.
+    Activation: the effective config has max_epochs 8.'
+  budget: 'Configuration only: the parent''s 0.955 s per step and 7.4 GiB peak; about 3,740 s.'
+  implementation: 'configs/campaign.yaml: trainer.max_epochs 8 and trainer.patience 8 on the parent''s config. No source
+    change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Forced by the keeper after the nine-epoch variant failed its preflight twice; the user asked for
+    follow-ups on promising runs.
+exhausted_directions: None.

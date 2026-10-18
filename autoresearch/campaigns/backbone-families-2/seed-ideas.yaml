@@ -1,0 +1,213 @@
+ideas:
+- id: overlock-xt
+  mechanism_id: family-overlock
+  parent_idea_id: null
+  title: OverLoCK-XT (overlock_xt_in1k_224, training form), context-mixing dynamic convolution with an overview
+    pass, its natten window op replaced by an exact dense PyTorch form, on the recipe's settings
+  opportunity: 'Evidence (prior-work.md, OverLoCK-XT): a convolutional network that first computes a stride-32
+    overview of the whole image and then reruns the stride-16 and stride-32 stages with per-pixel kernels
+    conditioned on that context (ContMix), a top-down design none of the families tried has. 15.5M parameters
+    and 2.84 GMAC, the cheapest in compute of the six. Weights flat at RMS 0.065 to 0.083, in the band where the
+    recipe''s rate and anchors held for FocalNet-T, DaViT-T and MambaVision-T. Apache-2.0 code. Guess on size:
+    level with FocalNet-T to +0.001 at ×4, and value in the blend with the ResNet-50.'
+  mechanism: 'Vendor models/overlock.py and models/contmix.py of LMMMEng/OverLoCK fb6f22b
+    (~/.cache/overlock-src) into src/knee_abnormality/modeling/families/overlock.py, without the natten and
+    mmengine imports and with na2d_av replaced by the dense scatter: the window weights scattered into an
+    HW×HW matrix per head, then a matmul (HW 196 at stride 16, 49 at 32; measured ≤3e-7 from a direct gather
+    with natten''s window rule). Build overlock_xt with drop path 0 and load
+    ~/.cache/torch/hub/checkpoints/overlock_xt_in1k_224.pth strictly (the training form, 1,564 keys). Stages:
+    the stem (patch_embed1) and blocks1 are the stem and first stage; to_stride_8 ends after blocks2 (112 ch);
+    the middle map is the Focus net''s sub_blocks3 output (256 + 84 ch at stride 16, after the Base blocks3 and
+    the Overview blocks4 and high_level_proj have run); the final map is sub_blocks4''s output (420 ch at
+    stride 32). The aux head and the classification head are dropped. Origin 0 px at every stride. Image
+    counts padded to 16 with every BatchNorm taking its batch statistics from the real images only, as
+    EfficientViT-B2 does. Settings: model.backbone the new name, trainer.max_epochs 10, trainer.patience 10,
+    the recipe''s rate 2e-4 and anchors 0.001 and 0.00001.'
+  precedents:
+  - 'FocalNet-T SRF on these settings, fold 2: ×4 0.938816, blend with the ResNet-50 +0.003179 (the reference).'
+  - 'EfficientViT-B2, the first round''s BatchNorm family with depthwise convolutions: real-row BatchNorm
+    padding, ×4 0.938773 with stochastic depth 0.2, blend with the ResNet-50 +0.003098.'
+  novelty: First top-down context network and first dynamic-kernel convolution here.
+  coverage: Every study and every label.
+  exploitation: 'Read ×4 and ×1 against FocalNet-T and per label, then the blend with the ResNet-50 against FocalNet-T''s +0.003179.
+    Activation: the effective config names the backbone; the logged drift of the stem and the Focus stage-4
+    groups after epoch 1 is above zero; on the CPU the dense ContMix output equals the gather reference within
+    1e-5 on the loaded weights.'
+  budget: '2.84 GMAC per image, but 187 BatchNorm, SE, GRN and many small kernels; activations 266 MiB per image
+    against FocalNet-T''s 178 (measured). Guess: 1.0 to 1.5 times ConvNeXt-T''s step, about 300 to 400 s per
+    epoch; memory about 1.5 times FocalNet-T''s activations, so blocks1 and blocks2 are checkpointed when the
+    preflight needs it (the recompute must not update BatchNorm running statistics twice).'
+  implementation: 'Files: modeling/families/overlock.py (vendored model, Apache-2.0 header kept, dense ContMix),
+    modeling/staged_backbones.py or backbone_stages.py (the stage adapter and the real-row BatchNorm padding as
+    for EfficientViT-B2), modeling/spatial_tokens.py (mappings for the stride-16 and stride-32 reads, derived
+    from the downsamplers and raising if they differ), training/lightning.py only if the early-anchor prefixes
+    need the stem''s names, configs/campaign.yaml. Check on CPU: strict load, the stage shapes above, ContMix
+    against the gather reference, the mapping.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Pure PyTorch, small and the only top-down design; first in the user's order.
+- id: transnext-micro
+  mechanism_id: family-transnext
+  parent_idea_id: null
+  title: TransNeXt-Micro (transnext_micro_224_1k), aggregated sliding-window and pooled attention with a
+    convolutional GLU, through its pure-PyTorch attention, on the recipe's settings
+  opportunity: 'Evidence (prior-work.md, TransNeXt-Micro): every query attends to its 3×3 neighbourhood and to 7×7
+    pooled tokens of the whole image in one softmax from stride 4 on, so fine local detail and global context
+    meet in every block; 12.4M parameters, 2.65 GMAC, Apache-2.0 code and weights. Matrices at RMS 0.046 to
+    0.058, the band of the recipe''s settings. Guess on size: level with FocalNet-T to
+    +0.001 at ×4, and value in the blend with the ResNet-50.'
+  mechanism: 'Vendor classification/transnext_native.py of DaiShiResearch/TransNeXt c8a9974
+    (~/.cache/transnext-src) into src/knee_abnormality/modeling/families/transnext.py, imported directly (not
+    through transnext.py, which needs pkg_resources). Build the Micro configuration (embed 48, 96, 192, 384;
+    depths 2, 2, 15, 2; heads 2, 4, 8, 16; pool 7) with img_size 224, pretrain_size 224 and drop path 0, and
+    load ~/.cache/torch/hub/checkpoints/transnext_micro_224_1k.pth strictly (617 tensors). Its position tables
+    are buffers built on the model''s device, never at a fixed cuda device. Stages: patch_embed1 is the stem,
+    stage 1 the first stage; to_stride_8 ends after stage 2 with norm2 (96 ch at 28×28); the middle map is
+    stage 3 after norm3 (192 ch at 14×14); the final map is stage 4 after norm4 reshaped to 384 ch at 7×7.
+    Origin 0 px at every stride. Image counts padded to 16 (depthwise convolutions, no BatchNorm). Training
+    uses the pure-PyTorch attention; the CUDA extension is not built. Settings: model.backbone the new name,
+    trainer.max_epochs 10, trainer.patience 10, the recipe''s rate 2e-4 and anchors 0.001 and 0.00001.'
+  precedents:
+  - 'PVTv2-b2, global spatial-reduction attention from stride 4, fold 2: ×4 0.933099 (first round).'
+  - 'DaViT-T, window and channel attention: ×4 0.936669 (first round).'
+  novelty: First attention that joins a sliding window and pooled global tokens in one softmax here.
+  coverage: Every study and every label.
+  exploitation: 'Read ×4 and ×1 against FocalNet-T and per label, then the blend with the ResNet-50.
+    Activation: the effective config names the backbone; the logged drift of the stem and stage-4 groups after
+    epoch 1 is above zero; the CPU logits of the vendored model on two images equal the repository model''s.'
+  budget: '2.65 GMAC; a 3,136-token first stage through unfold. Guess: 0.8 to 1.2 times FocalNet-T''s step (about
+    250 to 380 s per epoch) and 1.0 to 1.3 times ConvNeXt-T''s memory (the published PyTorch path trained at
+    17.8 GB per A100 at 128 images).'
+  implementation: 'Files: modeling/families/transnext.py (vendored, licence header kept), the stage adapter in
+    modeling/staged_backbones.py or backbone_stages.py, modeling/spatial_tokens.py (mappings derived from the
+    7×7 stride-4 stem and the 3×3 stride-2 downsamplers), configs/campaign.yaml. The temperature, query
+    embedding, local position bias and position MLPs stay in their stage''s parameter group. Check on CPU: strict
+    load, the stage shapes, the mapping.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Pure PyTorch and the smallest of the six; second in the user's order.
+- id: vssd-tiny
+  mechanism_id: family-vssd
+  parent_idea_id: null
+  title: VSSD-Tiny (MESA checkpoint, model entry), non-causal state-space duality with attention in the last
+    stage, on the recipe's settings, stem and stage 0 checkpointed
+  opportunity: 'Evidence (prior-work.md, VSSD-Tiny): a state-space family without the scan order that the causal
+    Mamba blocks impose (each block is two matmuls over all tokens), a hybrid like MambaVision-T, whose
+    blend with the ResNet-50 gains +0.001840, but non-causal from stride 4. 23.8M parameters, 4.66 GMAC, pure PyTorch in
+    this configuration. Weights flat at RMS 0.062 to 0.081, the recipe''s band. MIT-tagged weights. Guess on
+    size: level with FocalNet-T to +0.001 at ×4, and value in the blend with the ResNet-50.'
+  mechanism: 'Vendor classification/models/mamba2.py (VMAMBA2 and what it needs from mamba_util.py) of
+    YuHengsss/VSSD c10de2f8 (~/.cache/vssd-src) into src/knee_abnormality/modeling/families/vssd.py, without the
+    fvcore and mamba_ssm imports and with the LINEAR_ATTN_DUALITY path only. Build the configuration of
+    configs/vssd/vssd_tiny_e300.yaml (embed 64, depths 2, 4, 8, 4, heads 2, 4, 8, 16, d_state 64, SSD expansion
+    2, positive dA, attention in the last stage, CPE on, multi-branch) with drop path 0 and load
+    ~/.cache/torch/hub/checkpoints/vssd_tiny_e300_with_mesa_model.pth strictly (the model entry, 421 tensors).
+    Stages: the stem and layers[0] are the stem and first stage; to_stride_8 ends after layers[1]''s blocks,
+    before its downsample (128 ch at 28×28); the middle map is layers[2] before its downsample (256 ch at
+    14×14); the final map is layers[3] through the final LayerNorm (512 ch at 7×7). Origin 0 px at every
+    stride. Image counts padded to 16 with the eight BatchNorms taking statistics from the real images only.
+    The stem and layers[0] run under activation checkpointing (the recompute leaves BatchNorm running statistics
+    alone). Settings: model.backbone the new name, trainer.max_epochs 10, trainer.patience 10, the recipe''s rate
+    2e-4 and anchors 0.001 and 0.00001.'
+  precedents:
+  - 'MambaVision-T without the mask decoder, fold 2: ×4 0.935160, blend with the ResNet-50 +0.001840.'
+  - 'VMamba-T was built and timed on 2026-10-13: 1.07 s per 8 studies at batch 4, 15.5 GB; it did not fit batch 8
+    (docs/modeling/mambavision-backbone.md).'
+  novelty: First non-causal state-space backbone here.
+  coverage: Every study and every label.
+  exploitation: 'Read ×4 and ×1 against FocalNet-T and per label, then the blend with the ResNet-50.
+    Activation: the effective config names the backbone; drift of the stem and stage-3 groups after epoch 1 above
+    zero; the CPU logits of the vendored model on two images equal the repository model''s.'
+  budget: 'Activations 275 MiB per image against FocalNet-T''s 174 (measured); checkpointing the stem and stage 0
+    saves about 31%. Guess: 1.1 to 1.6 times ConvNeXt-T''s step, about 300 to 420 s per epoch; the preflight
+    decides whether ten epochs fit.'
+  implementation: 'Files: modeling/families/vssd.py (vendored, MIT headers kept), the stage adapter with real-row
+    BatchNorm padding, modeling/spatial_tokens.py (mappings derived from the stem and the downsamplers''
+    stride-2 depthwise convolutions), configs/campaign.yaml. Check on CPU: strict load, the stage shapes, the
+    mapping, the checkpointed forward equal to the plain one.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Pure PyTorch here and a different kind of state-space model from MambaVision-T; third in
+    the user's order.
+- id: medsam2-hiera-tiny
+  mechanism_id: family-hiera-medical
+  parent_idea_id: null
+  title: SAM2.1 Hiera-T with the MedSAM2 trunk (MedSAM2_latest.pt), medical segmentation pretraining, rate 1e-4
+    and anchors 0.01 early, 0.0003 late for its shrinking weight scale
+  opportunity: 'Evidence (prior-work.md, MedSAM2 Hiera-T): the same trunk as the first round''s SAM2.1 Hiera-T,
+    fine-tuned in full on 3D CT, MRI and PET with masks at 512 px (2.3 times our scale per side, against SAM2.1''s
+    1024 at 4.6 times), so two of that run''s candidate causes (natural-image pretraining at 1024 px) change while
+    the architecture stays. Its weights fell to 0.68 to 0.74 of SAM2.1''s RMS in the early stages, so the late
+    anchor is set from its own last stage. Guess on size: below FocalNet-T to level at ×4; the
+    family adds medical-pretrained features no member has.'
+  mechanism: 'timm''s sam2_hiera_tiny with num_classes 0 and drop path 0; the trunk loaded from MedSAM2_latest.pt
+    (HF wanglab/MedSAM2, snapshot e4a6f35) through timm''s hieradet_sam2 checkpoint_filter_fn with prefix
+    image_encoder.trunk., strictly except the two head.norm tensors, which keep their ones and zeros (unused by
+    the stage outputs). At 224 px the stage outputs are 96, 192, 384 and 768 channels at strides 4, 8, 16 and 32
+    (stage ends at blocks 0, 2, 9 and 11). to_stride_8 runs the patch embedding with its position embeddings and
+    the first two stages; the middle map is the third stage''s output, the final map the fourth''s. No
+    image-count padding. Settings: model.backbone the new name, trainer.max_epochs 10, trainer.patience 10,
+    optimizer.backbone_lr 0.0001, optimizer.anchor_alpha_early 0.01, optimizer.anchor_alpha_late 0.0003.'
+  precedents:
+  - 'SAM2.1 Hiera-T, rate 1e-4, anchors 0.01 and 0.0001, first round: aborted at epoch 7 at ×1 −0.021 against the
+    MambaVision-T reference; bones localised level or better, menisci and cartilage maps behind.'
+  - 'ResNet-50 recipe (weights 0.062 stem to 0.0073 last stage): rate 5e-5, anchors 0.01 and 0.001, late cost
+    5.3e-8 per relative movement.'
+  novelty: First medical-segmentation-pretrained transformer here.
+  coverage: Every study and every label.
+  exploitation: 'Read ×4 and ×1 against FocalNet-T and per label, the blend with the ResNet-50, and the
+    epoch-1 to epoch-7 ×1 curve against the SAM2.1 run''s. Activation: the effective config names the backbone;
+    the anchor buffers equal the MedSAM2 trunk tensors; drift of the first and last stage groups after epoch 1
+    above zero.'
+  budget: '4.9 GMAC per image; the SAM2.1 run took 4 min 46 s per epoch locally: about 2,900 s for ten epochs;
+    memory near 12 GB.'
+  implementation: 'Files: modeling/staged_backbones.py or backbone_stages.py (the hiera stage adapter, parameter
+    names putting the patch embedding, position embeddings and the first stage under the early anchor; the
+    MedSAM2 loading from the local HF cache), modeling/spatial_tokens.py (mappings derived from the patch
+    embedding and the query pooling, checked against the built model), configs/campaign.yaml. Check on CPU: the
+    load, the four stage shapes, the mapping.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A direct test of the pretraining against the first round's SAM2.1 run; fifth in the user's
+    order.
+- id: lingbot-vit-small
+  mechanism_id: family-lingbot
+  parent_idea_id: null
+  title: LingBot-Vision ViT-S/16 (robbyant/lingbot-vision-vit-small) through timm's DINOv3 ViT with QKV biases,
+    boundary-centric self-supervised features, on the recipe's settings
+  opportunity: 'Evidence (prior-work.md, LingBot-Vision ViT-S/16): DINOv3-style self-distillation with masked
+    boundary modelling, so its patch features are trained to place sub-pixel boundaries, the cue of the located
+    labels (menisci, cartilage, ligaments) where RadioDINO-S/16 lost 85% of its gap. Apache-2.0 code and weights;
+    RoPE, so 224 px needs no position interpolation; distilled from a ViT-g. Blocks at RMS 0.052 to 0.057,
+    RadioDINO''s band, where the recipe''s rate and anchors held. Guess on size: below
+    FocalNet-T to level at ×4; a plain ViT kind no member has.'
+  mechanism: 'timm''s vit_small_patch16_dinov3_qkvb with num_classes 0 and drop path 0, loaded strictly from
+    model.pt (HF robbyant/lingbot-vision-vit-small revision 127cbcec380d) through timm.models.eva.checkpoint_filter_fn.
+    Exposed as a four-stage backbone as the RadioDINO-S/16 adapter was
+    (autoresearch/campaigns/radiodino-settings/radiodino-adapter.patch): the patch embedding as the stem, stages
+    of 1, 2, 5 and 4 blocks, the middle read after block 8 and the final read through the ViT''s final norm and a
+    2×2 average pool (origins 7.5 and 15.5, stride 16 and 32). The CLS and four register tokens pass through every
+    block with their RoPE treatment unchanged (the registers carry the high-norm values, up to 420) and are dropped
+    only where a map is read. No image-count padding. Settings: model.backbone the new name, trainer.max_epochs
+    10, trainer.patience 10, the recipe''s rate 2e-4 and anchors 0.001 and 0.00001.'
+  precedents:
+  - 'RadioDINO-S/16 with this adapter, fold 2: ×4 0.929641 at best; rates 1.4e-4 to 4e-4 within ±0.0006 at ×4,
+    doubled anchors −0.0024 (radiodino-settings campaign).'
+  - 'Swin-T on the MambaVision recipe: ×4 0.937176 (docs/validation/results/2026-10-14-swin-t.md).'
+  novelty: First boundary-supervised self-supervised backbone here.
+  coverage: Every study and every label.
+  exploitation: 'Read ×4 and ×1 against FocalNet-T and per label, the located labels first, then the blend
+    with the ResNet-50. Activation: the effective config names the backbone; the anchor buffers equal the LingBot
+    tensors; drift of the patch embedding and the last block group after epoch 1 above zero; the final map on two
+    CPU images equals timm''s forward_features patch tokens after the norm, pooled.'
+  budget: '4.33 GMAC per image; RadioDINO-S/16 with the same adapter trained inside the window. Guess: about 280 to
+    340 s per epoch, memory near 12 GB.'
+  implementation: 'Files: modeling/staged_backbones.py (the vision-transformer builder of the RadioDINO patch,
+    adapted to the Eva class: RoPE positions passed to each block, prefix tokens kept through the blocks and
+    stripped at the reads, the weights from the local HF cache), modeling/spatial_tokens.py (the two mappings,
+    raising if they differ from the layers), training/lightning.py only if the early-anchor prefixes need the stem''s
+    names, configs/campaign.yaml. Check on CPU: strict load, the shapes, the final-map equality above, the mapping.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The newest pretraining on the list; last in the user's order.
+exhausted_directions: None; the campaign opens on these families.

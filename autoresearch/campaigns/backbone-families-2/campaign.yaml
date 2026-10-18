@@ -1,0 +1,101 @@
+id: backbone-families-2
+recipe: configs/campaign.yaml
+reference_run: outputs/training/focalnet-silver-fold-2
+reference_equivalences: {}
+reference_config_exceptions:
+- paths.label_manifest
+reference_identity_exceptions:
+- preprocessing_identity.sources_sha256
+additional_evidence_runs: []
+backlog:
+  refill_below: 3
+  refill_to: 5
+  seed_order: forced
+  rotate_after: 1000000
+budget:
+  mode: range
+  min_fraction: 0.414
+  max_fraction: 1.2
+policy:
+  editable_files:
+  - configs/campaign.yaml
+  - src/knee_abnormality/config.py
+  - src/knee_abnormality/training/lightning.py
+  - src/knee_abnormality/modeling/model.py
+  - src/knee_abnormality/modeling/staged_backbones.py
+  - src/knee_abnormality/modeling/backbone_stages.py
+  - src/knee_abnormality/modeling/spatial_tokens.py
+  editable_directories:
+  - src/knee_abnormality/modeling/families
+  config_keys:
+  - model.backbone
+  - trainer.max_epochs
+  - trainer.patience
+  - model.stochastic_depth
+  - data.mean
+  - data.std
+  - trainer.gradient_clip_val
+  config_prefixes:
+  - optimizer
+  - model.feature_statistics_augmentation
+  list_item_fields: {}
+  input_identity_keys:
+  - preprocessing_identity
+  require_source_change: false
+  configuration_only_ideas: true
+  developer_instructions: 'You have no GPU and must not use one. Allowed checks are static checks, loading configs/campaign.yaml
+    through the config model, building the model and the optimizer on the CPU, and tiny no-gradient forward passes of
+    the backbone on two synthetic 224 px images; never return blocked for lack of a GPU. Make every change inside the
+    candidate workspace you were assigned and nowhere else; do not stage the candidate under /tmp, and do not write
+    source/ or changes.diff in the experiment directory. Read contract.md and prior-work.md before writing code. The recipe
+    is the FocalNet-T SRF recipe (configs/focalnet.yaml at twelve epochs); each forced seed adds one backbone family as a
+    backbone the model can build and switches model.backbone to it with the settings the seed names. A family that timm
+    provides is built from timm; any other family is vendored from its official repository (the commit and files the
+    seed and prior-work.md name, licence header kept) into src/knee_abnormality/modeling/families/<family>.py and loads
+    the official checkpoint from the local path prior-work.md gives, strictly, failing loudly on any missing or unexpected
+    key. Compiled kernels (CUDA or Triton extensions) are installed in the environment by the keeper before the seed runs;
+    never build, download or pip install anything, and when a kernel the seed needs is missing, return blocked naming it.
+    A pure-PyTorch reference path may be used only for CPU checks, never for training, unless the seed says so. Every
+    family is exposed to the model the way the existing ones are: a stride-8 point (to_stride_8, where the
+    feature-statistics augmentation acts), a stride-16 middle map and a stride-32 final map through
+    modeling/backbone_stages.py, a group_matcher with the stem and four stage groups, parameter names that put the stem
+    and the first stage under the early anchor (training/lightning.py EARLY_ANCHOR_PREFIXES), and verified feature-cell
+    anchors in modeling/spatial_tokens.py (BACKBONE_MAPPINGS plus a mapping function that derives origin and stride from
+    the layers and raises if they differ). Families with depthwise convolutions and no BatchNorm pad the image count to a
+    multiple of 16 as ConvNeXt does (backbone_stages.py), because cuDNN plans depthwise convolutions once per unseen image
+    count; families with BatchNorm are zero-padded only when every BatchNorm takes its batch statistics from the real
+    images alone (as EfficientViT-B2 does). Triton kernels may be checked on the CPU with TRITON_INTERPRET=1 on tiny
+    tensors. The existing backbones (ResNet-50, ConvNeXt-T, MambaVision-T, FocalNet-T, EfficientViT-B2) must build and
+    behave exactly as before. A new option exists only for a value the campaign intends to vary. New parameters or
+    buffers initialise under torch.random.fork_rng so the reference''s random stream is unchanged where it applies. Keep
+    the speed rules of the recipe: model.channels_last stays true unless the seed says otherwise, epoch metrics go through
+    _log_epoch_metric, and code that runs every training step gets no .item(), .cpu(), bool() or int() of a tensor and no
+    Python loop over studies. Inference runs on Kaggle T4s in float16 or float32 (no bfloat16): every new operator must
+    run in both. At most six new metrics per seed. Ten epochs (trainer.max_epochs 10, trainer.patience 10) unless the
+    idea names another count; the reference''s twelve is FocalNet-T''s own. Training time must stay within 1,684 to
+    4,881 s (0.414 to 1.20 of the reference''s 4,067 s, the user''s bound of 2026-10-18); the preflight measures every candidate on real batches before it
+    trains. No weight averaging. No tests.'
+  researcher_instructions: 'The campaign has no end: it runs until the user stops it. Never return an empty report
+    and never declare the directions exhausted. Research starts after the forced seeds. Since 2026-10-18 the user wants
+    exploration of new architectures, not optimisation: do not propose epochs, rates, anchors, reads or other settings
+    for a family that has already run; propose only families of the contract that have not run yet, on the settings
+    their prior work gives. The epoch count is a family
+    setting: ten by default; an idea may change one family''s epochs as its one setting, citing that family''s loss
+    curves and the time bound. Your first product after every completed run is its analysis: both multipliers against
+    the incumbent and against the FocalNet-T reference (×4 0.938816, ×1 0.933241), the training loss per epoch, the
+    per-label AUC changes sorted from largest gain to largest loss, the training seconds and the peak GPU memory, and
+    the equal logit blend of the run with the ResNet-50 resnet50-silver-fold2 (×4 0.937820) against the reference''s
+    blend (+0.003179 over the ResNet-50 alone): the purpose is a backbone family that adds to the blend. Adoption is by
+    the runtime under the shared rule; say which side of it the run falls on. One run is a starting point, never a
+    verdict on a family: for a run that was not adopted list what it shares with the other runs and name candidate
+    causes; do not write that a reference was lucky or that a difference is noise. The scope is the six families of
+    the contract: their adapters (stage split, read depths, padding, normalisation of the reads) and their training
+    settings set from their own properties (weight scale, normalisation layers, depthwise convolutions, pretraining).
+    Each idea is one training run that changes one setting of one family, or combines settings of named earlier runs;
+    it marks every claim as evidence-backed or a guess, cites its numbers from prior-work.md or a run, and states its
+    expected training time and GPU memory. Name the metrics that prove the idea active. Out of bounds: everything in the
+    contract''s out-of-bounds list, among it other backbone families, model sizes or pretrained weights than the six,
+    image sizes other than 224 px, more slices or images per study, the labels, new routing, attention or readout
+    structure downstream of the backbone''s maps, ensembling, weight averaging, test-time augmentation, reflection
+    probabilities, gold-study weighting, trained models in the loader, per-run controls and confirmation or multi-seed
+    runs.'

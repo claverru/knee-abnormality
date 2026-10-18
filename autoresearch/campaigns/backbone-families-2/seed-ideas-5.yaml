@@ -1,0 +1,108 @@
+ideas:
+- id: radimagenet-densenet121
+  mechanism_id: family-radimagenet-densenet
+  parent_idea_id: null
+  title: Original RadImageNet DenseNet-121 (keeper-converted Keras weights), input in [0, 1], rate and anchors
+    from its weight scale
+  opportunity: 'Evidence (prior-work-radimagenet.md): RadImageNet weights are the pretraining of the strongest
+    backbone here (the Refined-RadImageNet ResNet-50, x4 0.937820), and the original CNNs were never run on the
+    current recipe. The conversion equals the Keras model to 5e-6 and its BatchNorm statistics match our [0, 1]
+    slices at every layer (median variance ratio 1.00). Dense connectivity is a kind no member has. Guess on
+    size: below FocalNet-T to level at x4; value in the blend with the ResNet-50.'
+  mechanism: 'A backbone named radimagenet_densenet121: timm densenet121 (memory_efficient False, drop rate 0,
+    num_classes 0) loaded from ~/.cache/torch/hub/checkpoints/radimagenet_densenet121_keras.pt with
+    load_state_dict(strict=False), failing on any missing key except num_batches_tracked or any unexpected key,
+    and checking the file''s sha256 58f410cd84dc0963789f3a715d3526358eb0792dfbb87b851a264ef4cdc06ef6. Stages:
+    features.conv0, norm0, pool0 and denseblock1 are the stem and first stage; to_stride_8 ends after
+    transition1 and denseblock2 (28x28); the middle map is denseblock3''s output (14x14, after transition2);
+    the final map is transition3, denseblock4, norm5 and a ReLU (7x7). BatchNorm everywhere and no depthwise
+    convolution: no image-count padding (as the ResNet-50). Settings: model.backbone radimagenet_densenet121,
+    data.mean [0, 0, 0], data.std [1, 1, 1], optimizer.backbone_lr 0.0005, optimizer.anchor_alpha_early
+    0.00016, optimizer.anchor_alpha_late 0.0000016, trainer.max_epochs 10, trainer.patience 10.'
+  precedents:
+  - 'Refined-RadImageNet ResNet-50, the same images: resnet50-silver-fold2 x4 0.937820.'
+  - 'Old backbone search (old pipeline, gold-selected): RadImageNet DenseNet-121 0.816707, 39th of 40.'
+  novelty: First densely connected backbone and first original RadImageNet CNN on the current recipe.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the incumbent and per label, then the blend with the ResNet-50.
+    Activation: the effective config names the backbone; the loaded conv0 weight equals the file''s; drift of the
+    stem and stage-4 groups after epoch 1 above zero.'
+  budget: 'Measured 0.083 s per 64 images forward and backward, 4.1 GiB per 64: about 3,000 s for ten epochs,
+    about 17 GiB at 256 images.'
+  implementation: 'Files: modeling/staged_backbones.py or backbone_stages.py (the builder and stage adapter),
+    modeling/spatial_tokens.py (mappings derived from conv0, pool0 and the 2x2 average-pool transitions, raising
+    if they differ from the layers), training/lightning.py only if the early-anchor prefixes need the stem''s
+    names, configs/campaign.yaml. Check on CPU: the load, the hash, the stage shapes, the mapping.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Forced by the keeper at the user's request of 2026-10-17; the cheapest exact conversion.
+- id: radimagenet-inception-v3
+  mechanism_id: family-radimagenet-inception
+  parent_idea_id: null
+  title: Original RadImageNet InceptionV3 (keeper-converted Keras weights, Keras average pooling), input in
+    [0, 1], rate and anchors from its weight scale
+  opportunity: 'Evidence (prior-work-radimagenet.md): the RadImageNet pretraining of the strongest backbone here,
+    multi-branch Inception blocks no member has, and the cheapest of the three (0.051 s per 64 images). The
+    conversion equals the Keras model to 3e-6 with Keras pooling. Guess on size: below FocalNet-T to level at
+    x4; value in the blend with the ResNet-50.'
+  mechanism: 'A backbone named radimagenet_inception_v3: timm inception_v3 (num_classes 0, drop rate 0) whose
+    three branch-pool average poolings (InceptionA, InceptionC, InceptionE: kernel 3, stride 1, padding 1)
+    use count_include_pad=False as Keras does, set in the family''s own module, not by patching torch; loaded
+    from ~/.cache/torch/hub/checkpoints/radimagenet_inception_v3_keras.pt with load_state_dict(strict=False),
+    failing on any missing key except num_batches_tracked or any unexpected key, sha256
+    af10f5171cb38e5a519c10745a71fceca6a267d8a011be3bc32874e0f9a98c7a. Stages: Conv2d_1a to Conv2d_4a with
+    both max pools are the stem; Mixed_5b is the first stage; to_stride_8 ends after Mixed_5d (25x25); the
+    middle map is Mixed_6e''s output (12x12); the final map Mixed_7c''s (5x5). The maps are 25, 12 and 5 cells
+    with non-zero origins because the stride-2 layers are unpadded; the mapping derives them. No image-count
+    padding. Settings: model.backbone radimagenet_inception_v3, data.mean [0, 0, 0], data.std [1, 1, 1],
+    optimizer.backbone_lr 0.00066, optimizer.anchor_alpha_early 0.000091, optimizer.anchor_alpha_late
+    0.00000091, trainer.max_epochs 10, trainer.patience 10.'
+  precedents:
+  - 'Refined-RadImageNet ResNet-50, the same images: resnet50-silver-fold2 x4 0.937820.'
+  novelty: First Inception backbone here.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the incumbent and per label, then the blend with the ResNet-50.
+    Activation: the effective config names the backbone; the branch pools exclude padding (a CPU check on a
+    constant input gives the constant at the border); drift of the stem and stage-4 groups after epoch 1 above
+    zero.'
+  budget: 'Measured 0.051 s per 64 images, 1.9 GiB per 64: about 2,400 s for ten epochs.'
+  implementation: 'Files: modeling/families/inception.py (the Keras-pooling InceptionA, C and E as subclasses of
+    timm''s, or a builder replacing their forward), the builder and stage adapter, modeling/spatial_tokens.py
+    (mappings from the unpadded stride-2 convolutions and max pools: centre s*i + (k-1)/2), configs/campaign.yaml.
+    Check on CPU: the load, the hash, the pooling, the stage shapes, the mapping.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Forced by the keeper at the user's request of 2026-10-17.
+- id: radimagenet-inception-resnet-v2
+  mechanism_id: family-radimagenet-inception-resnet
+  parent_idea_id: null
+  title: Original RadImageNet InceptionResNetV2 (keeper-converted Keras weights), input in [0, 1], rate and
+    anchors from its weight scale
+  opportunity: 'Evidence (prior-work-radimagenet.md): the RadImageNet pretraining of the strongest backbone here
+    with residual Inception blocks, the largest of the three. The conversion equals the Keras model to 5e-6.
+    Guess on size: below FocalNet-T to level at x4; value in the blend with the ResNet-50.'
+  mechanism: 'A backbone named radimagenet_inception_resnet_v2: timm inception_resnet_v2 (num_classes 0, drop
+    rate 0) loaded from ~/.cache/torch/hub/checkpoints/radimagenet_inception_resnet_v2_keras.pt with
+    load_state_dict(strict=False), failing on any missing key except num_batches_tracked or any unexpected key,
+    sha256 3322cd7f261c7680bf44b887cbde5e2e65277b4a4d55ff55ed31bb25736ea178. Stages: conv2d_1a to conv2d_4a
+    with both max pools are the stem; mixed_5b is the first stage; to_stride_8 ends after the repeat (block35)
+    group (25x25); the middle map is repeat_1''s output (block17, 12x12); the final map is mixed_7a, repeat_2,
+    block8 and conv2d_7b (5x5). Non-zero origins from the unpadded stride-2 layers; the mapping derives them.
+    No image-count padding. Settings: model.backbone radimagenet_inception_resnet_v2, data.mean [0, 0, 0],
+    data.std [1, 1, 1], optimizer.backbone_lr 0.00056, optimizer.anchor_alpha_early 0.000127,
+    optimizer.anchor_alpha_late 0.00000127, trainer.max_epochs 10, trainer.patience 10.'
+  precedents:
+  - 'Refined-RadImageNet ResNet-50, the same images: resnet50-silver-fold2 x4 0.937820.'
+  novelty: First residual Inception backbone here.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the incumbent and per label, then the blend with the ResNet-50.
+    Activation: the effective config names the backbone; drift of the stem and stage-4 groups after epoch 1 above
+    zero.'
+  budget: 'Measured 0.108 s per 64 images, 3.5 GiB per 64: about 3,500 s for ten epochs, about 15 GiB at 256
+    images.'
+  implementation: 'Files: the builder and stage adapter, modeling/spatial_tokens.py (mappings from the unpadded
+    stride-2 layers), configs/campaign.yaml. Check on CPU: the load, the hash, the stage shapes, the mapping.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Forced by the keeper at the user's request of 2026-10-17; last because it is the slowest.
+exhausted_directions: None.

@@ -1,0 +1,48 @@
+ideas:
+- id: flash-internimage-tiny
+  mechanism_id: family-internimage
+  parent_idea_id: null
+  title: FlashInternImage-T (flash_intern_image_t_1k_224), learned deformable sampling through the DCNv4 CUDA op
+    in float32, on the recipe's settings
+  opportunity: 'Evidence (prior-work.md, FlashInternImage-T): every block samples nine learned positions per group
+    instead of a fixed grid, so it can follow curved and thin structures (menisci, cartilage, ligaments), the
+    labels where the first round''s families lost most. 28.7M parameters, 4.85 GMAC, LayerNorm only, MIT code.
+    Weights flat at RMS 0.085 to 0.107, MambaVision-T''s and DaViT-T''s range on these settings. Guess on size:
+    level with FocalNet-T to +0.0015 at ×4.'
+  mechanism: 'Vendor the FlashInternImage model of OpenGVLab/DCNv4 4b848f7 (~/.cache/flashinternimage-src/DCNv4,
+    classification/models/flash_intern_image.py and the DCNv4 module wrapper) into
+    src/knee_abnormality/modeling/families/internimage.py, calling the DCNv4 extension installed in the
+    environment (dcnv4 1.0.0.post2+knee1, built in Kaggle''s image for compute 7.5 and 8.6, with the block
+    multiplier taken from the factors of H·W: prior-work.md, upstream batch bug) through its DCNv4Function; import
+    it lazily inside the module, never at file import.
+    Build the T configuration (channels 64, groups 4, 8, 16, 32, depths 4, 4, 18, 4, offset scale 1, MLP ratio 4,
+    no layer scale, no post-norm) with drop path 0 and load
+    ~/.cache/torch/hub/checkpoints/flash_intern_image_t_1k_224_model.pth strictly; conv_head and the classifier
+    are dropped. The DCNv4 call runs in float32 with autocast disabled around it (its bfloat16 backward fails and
+    the recipe trains under bf16-mixed), and im2col_step equals the call''s image count, so each call is one chunk.
+    Stages: the stem and levels[0] are the stem and first stage; to_stride_8 ends after levels[1] with its norm
+    (128 ch at 28×28); the middle map is levels[2]''s output (256 ch at 14×14); the final map levels[3]''s (512
+    ch at 7×7). Origin 0 px at every stride. No image-count padding (no depthwise convolution, no BatchNorm).
+    Settings: model.backbone the new name, trainer.max_epochs 10, trainer.patience 10, the recipe''s rate 2e-4 and
+    anchors 0.001 and 0.00001.'
+  precedents:
+  - 'MambaVision-T at RMS 0.08 to 0.09 and DaViT-T at 0.086 to 0.089 trained on these settings (×4 0.935160 and
+    0.936669).'
+  novelty: First deformable-sampling backbone here.
+  coverage: Every study; aimed at the located labels (menisci, OA compartments, ACL, MCL).
+  exploitation: 'Read ×4 and ×1 against FocalNet-T and per label, the located labels first, then the blend
+    with the ResNet-50. Activation: the effective config names the backbone; drift of the stem and stage-4 groups and
+    of the offset projections after epoch 1 above zero; the CPU reference (dcnv3_core_pytorch with DCNv4''s
+    layout) equals the model''s logits on two images where the keeper''s GPU check of the op is recorded.'
+  budget: 'Guess: 1.4 to 2 times ConvNeXt-T''s step with the CUDA op in float32, about 330 to 450 s per epoch;
+    memory 1.2 to 1.5 times ConvNeXt-T''s. Gradient checkpointing per block (with_cp) is available if the
+    preflight needs it.'
+  implementation: 'Files: modeling/families/internimage.py (vendored, licence headers kept), the stage adapter,
+    modeling/spatial_tokens.py (mappings from the two stride-2 stem convolutions and the stride-2 downsamplers),
+    configs/campaign.yaml. Check on CPU with the pure-PyTorch reference core substituted for the op (CPU checks
+    only): strict load, the stage shapes, the mapping.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The only deformable family; last, at the user's order, because its CUDA op must be built
+    first.
+exhausted_directions: None; the campaign opens on these families.

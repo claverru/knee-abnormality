@@ -1,0 +1,46 @@
+ideas:
+- id: lingbot-vit-small-stride16
+  mechanism_id: family-lingbot
+  parent_idea_id: null
+  title: LingBot-Vision ViT-S/16 (robbyant/lingbot-vision-vit-small) through timm's DINOv3 ViT with QKV biases,
+    boundary-centric self-supervised features, on the recipe's settings, feature-statistics augmentation at its
+    stride-16 map after block 3 (no stride-8 map exists)
+  opportunity: 'Evidence (prior-work.md, LingBot-Vision ViT-S/16): DINOv3-style self-distillation with masked boundary
+    modelling, so its patch features are trained to place sub-pixel boundaries, the cue of the located labels (menisci,
+    cartilage, ligaments) where RadioDINO-S/16 lost 85% of its gap. Apache-2.0 code and weights; RoPE, so 224 px
+    needs no position interpolation; distilled from a ViT-g. Blocks at RMS 0.052 to 0.057, RadioDINO''s band, where
+    the recipe''s rate and anchors held. Guess on size: below FocalNet-T to level at ×4; a plain ViT kind no member
+    has.'
+  mechanism: 'timm''s vit_small_patch16_dinov3_qkvb with num_classes 0 and drop path 0, loaded strictly from model.pt
+    (HF robbyant/lingbot-vision-vit-small revision 127cbcec380d) through timm.models.eva.checkpoint_filter_fn. Exposed
+    as a four-stage backbone as the RadioDINO-S/16 adapter was (autoresearch/campaigns/radiodino-settings/radiodino-adapter.patch):
+    the patch embedding as the stem, stages of 1, 2, 5 and 4 blocks, the middle read after block 8 and the final
+    read through the ViT''s final norm and a 2×2 average pool (origins 7.5 and 15.5, stride 16 and 32). The CLS
+    and four register tokens pass through every block with their RoPE treatment unchanged (the registers carry the
+    high-norm values, up to 420) and are dropped only where a map is read. A plain ViT has no stride-8 map: to_stride_8
+    returns the stride-16 patch map after the stem and the first two stages (block 3), exactly as the RadioDINO-S/16
+    adapter did, and the feature-statistics augmentation acts there; this is the contract''s stated exception for
+    plain ViTs, not a resampling or an added mechanism. No image-count padding. Settings: model.backbone the new
+    name, trainer.max_epochs 10, trainer.patience 10, the recipe''s rate 2e-4 and anchors 0.001 and 0.00001.'
+  precedents:
+  - 'RadioDINO-S/16 with this adapter, fold 2: ×4 0.929641 at best; rates 1.4e-4 to 4e-4 within ±0.0006 at ×4, doubled
+    anchors −0.0024 (radiodino-settings campaign).'
+  - 'Swin-T on the MambaVision recipe: ×4 0.937176 (docs/validation/results/2026-10-14-swin-t.md).'
+  novelty: First boundary-supervised self-supervised backbone here.
+  coverage: Every study and every label.
+  exploitation: 'Read ×4 and ×1 against FocalNet-T and per label, the located labels first, then the blend with
+    the ResNet-50. Activation: the effective config names the backbone; the anchor buffers equal the LingBot tensors;
+    drift of the patch embedding and the last block group after epoch 1 above zero; the final map on two CPU images
+    equals timm''s forward_features patch tokens after the norm, pooled.'
+  budget: '4.33 GMAC per image; RadioDINO-S/16 with the same adapter trained inside the window. Guess: about 280
+    to 340 s per epoch, memory near 12 GB.'
+  implementation: 'Files: modeling/staged_backbones.py (the vision-transformer builder of the RadioDINO patch, adapted
+    to the Eva class: RoPE positions passed to each block, prefix tokens kept through the blocks and stripped at
+    the reads, the weights from the local HF cache), modeling/spatial_tokens.py (the two mappings, raising if they
+    differ from the layers), training/lightning.py only if the early-anchor prefixes need the stem''s names, configs/campaign.yaml.
+    Check on CPU: strict load, the shapes, the final-map equality above, the mapping.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: 'Requeued by the keeper: the first attempt (lingbot-vit-small) was blocked only because the
+    contract named a stride-8 point a plain ViT does not have; the contract now states the RadioDINO exception.'
+exhausted_directions: None.

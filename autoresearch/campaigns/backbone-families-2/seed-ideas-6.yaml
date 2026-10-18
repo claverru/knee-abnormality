@@ -1,0 +1,31 @@
+ideas:
+- id: lingbot-decay-early-anchor-1e-4
+  mechanism_id: family-lingbot-anchor
+  parent_idea_id: lingbot-stage-decay-08
+  title: LingBot ViT-S/16 with stage decay 0.8 and the early anchor lowered from 0.001 to 0.0001, so block 0 stops
+    being pulled back to its start
+  opportunity: 'Evidence (runs lingbot-vit-small-stride16 and lingbot-stage-decay-08): in both runs the drift of
+    stage 1 (block 0, under the early anchor) falls through training, 0.022 to 0.010 and 0.017 to 0.009, while
+    every other group rises; FocalNet-T''s first stage under the same anchor rises to 0.045. Block 0''s layer-scale
+    gammas are small (0.15 mean absolute, prior-work.md), so its task gradient is small and the anchor term
+    dominates its Adam update. The decay run fixed the stem (drift 0.039 at epoch 9, FocalNet-T''s 0.036 to 0.040)
+    and gained +0.0043 at x4 over the parent (-0.006109 against the incumbent). Guess on size: +0.001 to +0.003
+    at x4 over lingbot-stage-decay-08.'
+  mechanism: 'optimizer.anchor_alpha_early 0.0001 on the config of lingbot-stage-decay-08 (stage decay 0.8,
+    rate 2e-4, late anchor 0.00001 following the rate, ten epochs). The stem''s rate stays 8.2e-5, so its relative
+    step is unchanged; only the pull of the early anchor on the stem and block 0 drops tenfold.'
+  precedents:
+  - 'lingbot-stage-decay-08: x4 -0.006109 against the incumbent, +0.0043 over lingbot-vit-small-stride16.'
+  - 'ResNet-18 early-stage anchor variants: -0.0004 (refined-radimagenet prior work), a different weight scale.'
+  novelty: First change of LingBot's anchors.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the incumbent and lingbot-stage-decay-08, per label, and the blend with the
+    ResNet-50. Activation: the effective config has anchor_alpha_early 0.0001; backbone_drift_stage1 at epoch 9
+    above the parent''s 0.009.'
+  budget: 'Configuration only: the parent''s 0.553 s per step, about 3,120 s, 14.4 GiB.'
+  implementation: 'configs/campaign.yaml: optimizer.anchor_alpha_early 0.0001 on lingbot-stage-decay-08''s config.
+    No source change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Forced by the keeper from a pattern repeated in both LingBot runs.
+exhausted_directions: None.
