@@ -1,0 +1,36 @@
+ideas:
+- id: radimagenet-densenet121-stage-decay-06
+  mechanism_id: family-radimagenet-densenet-rate
+  parent_idea_id: radimagenet-densenet121
+  title: RadImageNet DenseNet-121 with the backbone rate decayed 0.6 per stage, giving its flat weights the
+    refined ResNet-50's depth profile of relative steps
+  opportunity: 'Evidence (curve review of resnet50-silver-fold2, radimagenet-densenet121 and focalnet-silver-fold-2):
+    the Refined-RadImageNet ResNet-50''s conv RMS falls with depth (0.062 stem, 0.023, 0.015, 0.011, 0.0073), so one
+    rate gives relative steps rising 8.5x from 8e-4 at the stem to 6.8e-3 at layer4, and its stem and layer1 barely
+    move (drift 0.008 and 0.018). The original DenseNet-121 weights are flat (0.105 to 0.122), so rate 5e-4 gives
+    4.3e-3 at every stage; its stem and stage-1 drift were 0.066 and 0.058, its validation BCE spiked at the first
+    full-rate epoch (0.446 to 0.581), it underfits (smallest validation-minus-training gap, 0.018) and its x4 losses
+    sit in fine-structure labels (MCL -0.029, Lateral Meniscus -0.021). Gradients scale as 1/RMS at every stage
+    (grad x RMS matches the ResNet-50 per stage), so Adam''s relative step lr/RMS is the right quantity. The original
+    ResNet-50 lost more at the higher of two rates (2026-09-28). Guess on size: +0.003 to +0.006 at x4 over
+    radimagenet-densenet121.'
+  mechanism: 'optimizer.backbone_lr_stage_decay 0.6 on radimagenet-densenet121''s config (backbone_lr stays 5e-4;
+    training/lightning.py build_optimizer gives rate x 0.6^depth, depth 4 for the stem, 3 for denseblock1 and
+    transition1, 2, 1, and 0 for denseblock4 and norm5). Relative steps become about 6.5e-4, 1.1e-3, 1.8e-3, 2.6e-3
+    and 4.3e-3 from stem to stage 4, the refined ResNet-50''s profile. Everything else as radimagenet-densenet121
+    (its source with the raw middle read, ten epochs, anchors 1.6e-4 and 1.6e-6).'
+  precedents:
+  - 'radimagenet-densenet121: x4 -0.009849 against the incumbent.'
+  - 'LingBot stage decay 0.8 against its parent: +0.0043 at x4 (this campaign).'
+  novelty: First depth profile of the rate on an original RadImageNet backbone.
+  coverage: Every study; aimed at the fine-structure labels.
+  exploitation: 'Read x4 and x1 against the incumbent and radimagenet-densenet121, per label, the validation loss at
+    epoch 1 against the parent''s spike, and the blend with the ResNet-50. Activation: the effective config has
+    backbone_lr_stage_decay 0.6; stem drift at epoch 9 below the parent''s 0.066.'
+  budget: 'Configuration only: the parent''s about 3,300 s and 19.2 GiB.'
+  implementation: 'configs/campaign.yaml: optimizer.backbone_lr_stage_decay 0.6 on radimagenet-densenet121''s config.
+    No source change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Forced by the keeper from the subagent curve review the user asked for; the top-ranked cause.
+exhausted_directions: None.

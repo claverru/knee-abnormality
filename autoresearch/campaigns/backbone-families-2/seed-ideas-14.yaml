@@ -1,0 +1,28 @@
+ideas:
+- id: focalnet-tiny-lrf-twelve-epochs
+  mechanism_id: family-focalnet-lrf-epochs
+  parent_idea_id: focalnet-tiny-lrf
+  title: FocalNet-T LRF on its source and settings, twelve epochs (the reference FocalNet-T SRF's length)
+  opportunity: 'Evidence: focalnet-tiny-lrf is the best new family of the campaign: x4 -0.001463 (0.937354 alone), x1
+    -0.001082, and the equal logit blend with resnet50-silver-fold2 gains +0.002710 over the ResNet-50 alone, against
+    +0.001833 for the next family (FlashInternImage-T) and the reference FocalNet-T SRF''s +0.003179. It trained ten
+    epochs against the reference''s twelve, and its x1 rose through the last epoch (0.930623 at epoch 9, 0.932159 at
+    epoch 10). Its ten epochs took 3,714 s (371 s per epoch), so twelve take about 4,460 s, inside the 4,881 s bound.
+    Guess on size: +0.001 to +0.002 at x4 over the parent, near the reference alone.'
+  mechanism: 'trainer.max_epochs 12 and trainer.patience 12 on focalnet-tiny-lrf''s config and source (stage-0
+    checkpointing, the recipe''s rate and anchors, linear decay over the twelve-epoch horizon). Nothing else changes.'
+  precedents:
+  - 'focalnet-tiny-lrf: x4 -0.001463, blend +0.002710.'
+  - 'focalnet-silver-fold-2 (the reference): FocalNet-T SRF at twelve epochs, x4 0.938816, blend +0.003179.'
+  novelty: The reference's epoch count for its LRF sibling.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the incumbent and the parent, per label, and the blend with the ResNet-50.
+    Activation: the effective config has max_epochs 12.'
+  budget: 'Configuration only: about 4,460 s from the parent''s measured 371 s per epoch; 15.6 GiB.'
+  implementation: 'configs/campaign.yaml: trainer.max_epochs 12 and trainer.patience 12 on the parent''s config. No
+    source change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Forced by the keeper after the best new-family result; the user asked for follow-ups on
+    promising runs and set the 1.2 bound that makes twelve epochs fit.
+exhausted_directions: None.

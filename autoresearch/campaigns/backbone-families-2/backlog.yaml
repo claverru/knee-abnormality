@@ -1,0 +1,10 @@
+revision: 645
+queue:
+- hgnetv2-b4-ssld
+- mambaout-tiny
+- tresnet-m-in21k
+- cs3darknet-l
+- ghostnetv2-160
+- twins-svt-small
+- res2net50d
+- bit-resnetv2-50-in21k

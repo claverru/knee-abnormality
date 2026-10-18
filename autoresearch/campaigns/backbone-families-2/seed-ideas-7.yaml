@@ -1,0 +1,32 @@
+ideas:
+- id: radimagenet-densenet121-normalized-middle
+  mechanism_id: family-radimagenet-densenet-read
+  parent_idea_id: radimagenet-densenet121
+  title: RadImageNet DenseNet-121 with the stride-16 map read through transition3's own BatchNorm and a ReLU,
+    as DenseNet itself consumes it
+  opportunity: 'Evidence (run radimagenet-densenet121, epochs 0 to 3, against focalnet-silver-fold-2): the total
+    training loss tracks FocalNet-T (0.560 against 0.553 at epoch 3) but the heads that read the stride-16 map lag:
+    meniscus loss 0.710 against 0.644 (validation 0.677 against 0.606), anatomy 0.717 against 0.677 (validation
+    0.671 against 0.656). The middle map is denseblock3''s raw output, a concatenation of un-normalised convolution
+    outputs: on eight real slices its RMS is 4.74, channel RMS 2.3 to 19.9 (median 4.2), against 0.43 for the final
+    map (norm5 and ReLU); after transition3.norm, the BatchNorm DenseNet applies to exactly this tensor, it is
+    0.52 (measured by the keeper). Guess on size: +0.002 to +0.005 at x4 over radimagenet-densenet121, mostly on
+    the meniscus and located labels.'
+  mechanism: 'In the DenseNet stage adapter the middle map becomes relu(features.transition3.norm(denseblock3
+    output)); the final path is unchanged (transition3 still takes the raw denseblock3 output, so the network''s
+    own computation is untouched). The middle width stays 1024. Everything else as radimagenet-densenet121 (its
+    source and config).'
+  precedents:
+  - 'radimagenet-densenet121: the parent, running at the time of writing.'
+  novelty: First normalised read of a raw concatenated map here.
+  coverage: Every study; aimed at the meniscus and located labels.
+  exploitation: 'Read x4 and x1 against the incumbent and the parent, per label, the meniscus and anatomy losses
+    against the parent, and the blend with the ResNet-50. Activation: the middle map''s RMS on the first training
+    batch is below 1.5 (logged once), and the meniscus training loss at epoch 3 is below the parent''s 0.710.'
+  budget: 'One BatchNorm and ReLU on a 1024 x 14 x 14 map: the parent''s time (about 3,300 s) and memory.'
+  implementation: 'modeling/backbone_stages.py (DenseNetStages.deep), on the parent''s source. Check on CPU: the
+    middle map equals relu(transition3.norm(denseblock3 output)) and the final map is unchanged.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Forced by the keeper from the parent's curves at the user's request.
+exhausted_directions: None.

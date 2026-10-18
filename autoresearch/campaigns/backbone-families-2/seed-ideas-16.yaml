@@ -1,0 +1,155 @@
+ideas:
+- id: tresnet-m-in21k
+  mechanism_id: family-tresnet
+  parent_idea_id: null
+  title: TResNet-M (tresnet_m.miil_in21k_ft_in1k), ImageNet-21k pretraining, on the recipe's settings
+  opportunity: 'Evidence (prior-work-candidates.md): MIIL ImageNet-21k pretraining; space-to-depth stem, anti-aliased
+    downsampling, SE; RMS 0.061 to 0.073 flat (the recipe''s band); 0.071 s and 2.37 GiB per 64, about 2,760 s and
+    11 GiB. Guess: below NextViT-S to level at x4, a different blend pattern.'
+  mechanism: 'model.backbone tresnet_m.miil_in21k_ft_in1k with its pretrained_cfg normalisation (mean 0, std 1:
+    data.mean [0,0,0], data.std [1,1,1]): stage ends body.layer2 (128 ch, stride 8), body.layer3 (1024, 16), body.layer4
+    (2048, 32). BatchNorm, no depthwise convolution: no image-count padding. Settings: the recipe''s rate 2e-4 and
+    anchors 0.001 and 0.00001. Integration (prior-work-radimagenet.md, integration defects): the backbone exposes
+    timm''s pretrained_cfg; a stride-8 point (to_stride_8, where the feature-statistics augmentation acts), a stride-16
+    middle map and a stride-32 final map through modeling/backbone_stages.py at the stages named below; a group_matcher
+    with the stem and four stage groups; the stem and first stage under the early anchor; spatial-token mappings
+    derived from the layers and raising if they differ (prior-work-candidates.md has the strides). If the stride-16
+    and stride-32 grids are not 2:1, both 2x2 repeats in modeling/model.py become the nearest-centre gather (prior-work-radimagenet.md).
+    Weights from timm (pretrained=True), already in the torch hub cache. Ten epochs, patience ten.'
+  precedents: &id001
+  - 'NextViT-S (SSLD 6M), the incumbent: x4 0.938851, blend with the ResNet-50 +0.003267.'
+  - Families pretrained apart from RadImageNet add to the ResNet-50 blend; RadImageNet-pretrained ones subtract
+    (prior-work-candidates.md).
+  novelty: New architecture for the blend with the ResNet-50.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the incumbent and per label, then the equal logit blend with resnet50-silver-fold2
+    against NextViT-S''s +0.003267. Activation: the effective config names the backbone; drift of the stem and stage-4
+    groups after epoch 1 above zero.'
+  budget: 'Measured 0.071 s and 2.37 GiB per 64: about 2,760 s.'
+  implementation: The stage adapter, the spatial-token mapping (space-to-depth stem and anti-aliased downsampling),
+    configs/campaign.yaml.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Forced by the keeper at the user's request of 2026-10-18 (explore new architectures); measured
+    to fit (prior-work-candidates.md, second batch).
+- id: cs3darknet-l
+  mechanism_id: family-cspdarknet
+  parent_idea_id: null
+  title: CS3DarkNet-L (cs3darknet_l.c2ns_in1k), cross-stage-partial DarkNet, on the recipe's settings
+  opportunity: 'Evidence (prior-work-candidates.md): CSP DarkNet, the YOLO backbone design, no member like it; RMS
+    falling 0.107 to 0.034 with median 0.048 (FocalNet-T''s scale); the fastest candidate, 0.049 s and 2.68 GiB
+    per 64, about 2,333 s. Guess: below NextViT-S at x4.'
+  mechanism: 'model.backbone cs3darknet_l.c2ns_in1k: stage ends stages.1 (256 ch, stride 8), stages.2 (512, 16),
+    stages.3 (1024, 32). BatchNorm, no depthwise convolution: no image-count padding. Settings: the recipe''s rate
+    2e-4 and anchors 0.001 and 0.00001 (median RMS 0.048). Integration (prior-work-radimagenet.md, integration defects):
+    the backbone exposes timm''s pretrained_cfg; a stride-8 point (to_stride_8, where the feature-statistics augmentation
+    acts), a stride-16 middle map and a stride-32 final map through modeling/backbone_stages.py at the stages named
+    below; a group_matcher with the stem and four stage groups; the stem and first stage under the early anchor;
+    spatial-token mappings derived from the layers and raising if they differ (prior-work-candidates.md has the
+    strides). If the stride-16 and stride-32 grids are not 2:1, both 2x2 repeats in modeling/model.py become the
+    nearest-centre gather (prior-work-radimagenet.md). Weights from timm (pretrained=True), already in the torch
+    hub cache. Ten epochs, patience ten.'
+  precedents: *id001
+  novelty: New architecture for the blend with the ResNet-50.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the incumbent and per label, then the equal logit blend with resnet50-silver-fold2
+    against NextViT-S''s +0.003267. Activation: the effective config names the backbone; drift of the stem and stage-4
+    groups after epoch 1 above zero.'
+  budget: 'Measured 0.049 s and 2.68 GiB per 64: about 2,333 s.'
+  implementation: The stage adapter, the spatial-token mapping, configs/campaign.yaml.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Forced by the keeper at the user's request of 2026-10-18 (explore new architectures); measured
+    to fit (prior-work-candidates.md, second batch).
+- id: ghostnetv2-160
+  mechanism_id: family-ghostnet
+  parent_idea_id: null
+  title: GhostNetV2-160 (ghostnetv2_160.in1k), ghost modules with decoupled fully connected attention, rate and
+    anchors from its weight scale
+  opportunity: 'Evidence (prior-work-candidates.md): cheap ghost features and DFC attention, no member like it;
+    RMS falling 0.324 to 0.081 (median 0.125, 2.66 x FocalNet-T''s); 0.072 s and 3.39 GiB per 64, about 2,785 s.
+    Guess: below NextViT-S at x4.'
+  mechanism: 'model.backbone ghostnetv2_160.in1k: stage ends blocks.3 (64 ch, stride 8), blocks.5 (128, 16), and
+    the final map after blocks.9 (960, 32). BatchNorm with depthwise convolutions: pad image counts to 16 with BatchNorm
+    statistics from the real images only. Settings by the weight-scale rule (median RMS 0.125): backbone_lr 0.00053,
+    anchor_alpha_early 0.00014, anchor_alpha_late 0.0000014. Integration (prior-work-radimagenet.md, integration
+    defects): the backbone exposes timm''s pretrained_cfg; a stride-8 point (to_stride_8, where the feature-statistics
+    augmentation acts), a stride-16 middle map and a stride-32 final map through modeling/backbone_stages.py at
+    the stages named below; a group_matcher with the stem and four stage groups; the stem and first stage under
+    the early anchor; spatial-token mappings derived from the layers and raising if they differ (prior-work-candidates.md
+    has the strides). If the stride-16 and stride-32 grids are not 2:1, both 2x2 repeats in modeling/model.py become
+    the nearest-centre gather (prior-work-radimagenet.md). Weights from timm (pretrained=True), already in the torch
+    hub cache. Ten epochs, patience ten.'
+  precedents: *id001
+  novelty: New architecture for the blend with the ResNet-50.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the incumbent and per label, then the equal logit blend with resnet50-silver-fold2
+    against NextViT-S''s +0.003267. Activation: the effective config names the backbone; drift of the stem and stage-4
+    groups after epoch 1 above zero.'
+  budget: 'Measured 0.072 s and 3.39 GiB per 64: about 2,785 s.'
+  implementation: The stage adapter with real-row BatchNorm padding, the spatial-token mapping, configs/campaign.yaml.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Forced by the keeper at the user's request of 2026-10-18 (explore new architectures); measured
+    to fit (prior-work-candidates.md, second batch).
+- id: twins-svt-small
+  mechanism_id: family-twins
+  parent_idea_id: null
+  title: Twins-SVT-S (twins_svt_small.in1k), locally grouped and global sub-sampled attention, on the recipe's settings
+  opportunity: 'Evidence (prior-work-candidates.md): alternating local-window and global sub-sampled attention with
+    conditional position encodings; RMS 0.062 to 0.070 flat (the recipe''s band); 0.087 s and 3.56 GiB per 64, about
+    3,076 s. Guess: below NextViT-S to level at x4.'
+  mechanism: 'model.backbone twins_svt_small.in1k: stage ends block.1 (128 ch, stride 8), block.2 (256, 16), block.3
+    (512, 32), with the final norm. LayerNorm with depthwise position-encoding convolutions: pad image counts to
+    16 as ConvNeXt does. Settings: the recipe''s rate 2e-4 and anchors 0.001 and 0.00001. Integration (prior-work-radimagenet.md,
+    integration defects): the backbone exposes timm''s pretrained_cfg; a stride-8 point (to_stride_8, where the
+    feature-statistics augmentation acts), a stride-16 middle map and a stride-32 final map through modeling/backbone_stages.py
+    at the stages named below; a group_matcher with the stem and four stage groups; the stem and first stage under
+    the early anchor; spatial-token mappings derived from the layers and raising if they differ (prior-work-candidates.md
+    has the strides). If the stride-16 and stride-32 grids are not 2:1, both 2x2 repeats in modeling/model.py become
+    the nearest-centre gather (prior-work-radimagenet.md). Weights from timm (pretrained=True), already in the torch
+    hub cache. Ten epochs, patience ten.'
+  precedents: *id001
+  novelty: New architecture for the blend with the ResNet-50.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the incumbent and per label, then the equal logit blend with resnet50-silver-fold2
+    against NextViT-S''s +0.003267. Activation: the effective config names the backbone; drift of the stem and stage-4
+    groups after epoch 1 above zero.'
+  budget: 'Measured 0.087 s and 3.56 GiB per 64: about 3,076 s.'
+  implementation: The stage adapter with padding to 16, the spatial-token mapping (patch embeddings), configs/campaign.yaml.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Forced by the keeper at the user's request of 2026-10-18 (explore new architectures); measured
+    to fit (prior-work-candidates.md, second batch).
+- id: res2net50d
+  mechanism_id: family-res2net
+  parent_idea_id: null
+  title: Res2Net50d (res2net50d.in1k), multi-scale split residual blocks, rate and anchors from its falling weight
+    scale
+  opportunity: 'Evidence (prior-work-candidates.md): hierarchical multi-scale splits inside each bottleneck; ImageNet-1k,
+    not RadImageNet; RMS falling 0.040 to 0.012 (median 0.018, 0.38 x FocalNet-T''s); 0.095 s and 3.91 GiB per 64,
+    about 3,228 s. Guess: below NextViT-S at x4.'
+  mechanism: 'model.backbone res2net50d.in1k: stage ends layer2 (512 ch, stride 8), layer3 (1024, 16), layer4 (2048,
+    32). BatchNorm, no depthwise convolution: no image-count padding. Settings by the weight-scale rule (median
+    RMS 0.018): backbone_lr 0.000077, anchor_alpha_early 0.0068, anchor_alpha_late 0.000068. Integration (prior-work-radimagenet.md,
+    integration defects): the backbone exposes timm''s pretrained_cfg; a stride-8 point (to_stride_8, where the
+    feature-statistics augmentation acts), a stride-16 middle map and a stride-32 final map through modeling/backbone_stages.py
+    at the stages named below; a group_matcher with the stem and four stage groups; the stem and first stage under
+    the early anchor; spatial-token mappings derived from the layers and raising if they differ (prior-work-candidates.md
+    has the strides). If the stride-16 and stride-32 grids are not 2:1, both 2x2 repeats in modeling/model.py become
+    the nearest-centre gather (prior-work-radimagenet.md). Weights from timm (pretrained=True), already in the torch
+    hub cache. Ten epochs, patience ten.'
+  precedents: *id001
+  novelty: New architecture for the blend with the ResNet-50.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the incumbent and per label, then the equal logit blend with resnet50-silver-fold2
+    against NextViT-S''s +0.003267. Activation: the effective config names the backbone; drift of the stem and stage-4
+    groups after epoch 1 above zero.'
+  budget: 'Measured 0.095 s and 3.91 GiB per 64: about 3,228 s.'
+  implementation: The stage adapter (the ResNet stages may serve), the spatial-token mapping (deep stem, average-pool
+    shortcuts), configs/campaign.yaml.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Forced by the keeper at the user's request of 2026-10-18 (explore new architectures); measured
+    to fit (prior-work-candidates.md, second batch).
+exhausted_directions: None.

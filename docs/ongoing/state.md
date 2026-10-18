@@ -36,6 +36,12 @@ measured outcomes are in the [validation results](../validation/results/INDEX.md
   [backbone-families campaign](../validation/results/2026-10-16-backbone-families.md)
   ([code](../modeling/focalnet-and-efficientvit-backbones.md)). The new adapters leave the ResNet-50,
   MambaVision-T and ConvNeXt-Tiny paths unchanged.
+- **NextViT-S config, since 2026-10-18:** `configs/nextvit.yaml` (NextViT-S, SSLD 6M pretraining, the
+  FocalNet-T settings, ten epochs), adopted in the
+  [backbone-families-2 campaign](../validation/results/2026-10-18-backbone-families-2.md) on fold 2 (×4
+  0.938851, ×1 0.934578; equal logit blend with the ResNet-50 +0.003267, the best partner so far) and
+  trained on all five folds with one seed per fold (`outputs/training/nextvit-silver-fold-{k}`)
+  ([code](../modeling/focalnet-and-efficientvit-backbones.md#nextvit-s)).
 - **Dead paths removed, 2026-10-14 (user decision):** weight averaging, the report-attribute heads,
   the scanner confusion head, dropout and series dropout, activation checkpointing and frozen
   backbone, unused folds, the ReXNet, EfficientNet and CoAtNet mappings, the ResNet-18, ResNet-10t

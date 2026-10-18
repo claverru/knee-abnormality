@@ -1,0 +1,91 @@
+ideas:
+- id: inceptionnext-tiny
+  mechanism_id: family-inceptionnext
+  parent_idea_id: null
+  title: InceptionNeXt-T (inception_next_tiny.sail_in1k), inception depthwise token mixing, on the recipe's settings
+  opportunity: 'Evidence (prior-work-candidates.md): MetaNeXt with an inception depthwise mixer (square, band and
+    identity branches); RMS 0.094 to 0.101 flat, in the recipe''s band. Measured 0.079 s and 3.72 GiB per 64: about
+    2,918 s, about 17.5 GiB. Guess on size: below FocalNet-T to level at x4.'
+  mechanism: 'model.backbone inception_next_tiny.sail_in1k: stage ends stages.1 (192 ch, stride 8), stages.2 (384,
+    16), stages.3 (768, 32). BatchNorm with depthwise convolutions: pad image counts to 16 with BatchNorm statistics
+    from the real images only. Settings: the recipe''s rate 2e-4 and anchors 0.001 and 0.00001, ten epochs. Integration
+    (prior-work-radimagenet.md, integration defects): the backbone exposes timm''s pretrained_cfg; a stride-8 point
+    (to_stride_8, where the feature-statistics augmentation acts), a stride-16 middle map and a stride-32 final
+    map through modeling/backbone_stages.py, taken at the timm feature_info stages named below; a group_matcher
+    with the stem and four stage groups; the stem and first stage under the early anchor; spatial-token mappings
+    derived from the layers and raising if they differ. If a grid is not 2:1 between the stride-16 and stride-32
+    maps, both 2x2 repeats in modeling/model.py become the nearest-centre gather (prior-work-radimagenet.md). Weights
+    from timm (pretrained=True), already in the torch hub cache.'
+  precedents: &id001
+  - 'FocalNet-T SRF on these settings: x4 0.938816, blend +0.003179 (the reference).'
+  - 'FlashInternImage-T: blend +0.0017 to +0.0018; every RadImageNet-pretrained family negative (prior-work-candidates.md).'
+  novelty: New family for the blend with the ResNet-50.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the incumbent and per label, then the equal logit blend with resnet50-silver-fold2
+    against FocalNet-T''s +0.003179. Activation: the effective config names the backbone; drift of the stem and
+    stage-4 groups after epoch 1 above zero.'
+  budget: 'Measured 0.079 s and 3.72 GiB per 64: about 2,918 s.'
+  implementation: The stage adapter with real-row BatchNorm padding, the spatial-token mapping, configs/campaign.yaml.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Forced by the keeper at the user's request of 2026-10-18 (new families); measured to fit (prior-work-candidates.md).
+- id: hgnetv2-b4-ssld
+  mechanism_id: family-hgnetv2
+  parent_idea_id: null
+  title: HGNetV2-B4 (hgnetv2_b4.ssld_stage2_ft_in1k), SSLD-pretrained light convolution network, rate and anchors
+    from its falling weight scale
+  opportunity: 'Evidence (prior-work-candidates.md): SSLD semi-supervised pretraining; aggregated light blocks;
+    weight RMS falls 0.058 to 0.020 (median 0.027), ResNet-like. The fastest candidate: 0.051 s and 2.63 GiB per
+    64, about 2,374 s. Guess on size: below FocalNet-T at x4, a different blend pattern.'
+  mechanism: 'model.backbone hgnetv2_b4.ssld_stage2_ft_in1k: stage ends stages.1 (512 ch, stride 8), stages.2 (1024,
+    16), stages.3 (2048, 32). BatchNorm with depthwise convolutions: pad image counts to 16 with BatchNorm statistics
+    from the real images only. Settings by the weight-scale rule (median RMS 0.027, 0.57 x): backbone_lr 0.000115,
+    anchor_alpha_early 0.003, anchor_alpha_late 0.00003, ten epochs. Integration (prior-work-radimagenet.md, integration
+    defects): the backbone exposes timm''s pretrained_cfg; a stride-8 point (to_stride_8, where the feature-statistics
+    augmentation acts), a stride-16 middle map and a stride-32 final map through modeling/backbone_stages.py, taken
+    at the timm feature_info stages named below; a group_matcher with the stem and four stage groups; the stem and
+    first stage under the early anchor; spatial-token mappings derived from the layers and raising if they differ.
+    If a grid is not 2:1 between the stride-16 and stride-32 maps, both 2x2 repeats in modeling/model.py become
+    the nearest-centre gather (prior-work-radimagenet.md). Weights from timm (pretrained=True), already in the torch
+    hub cache.'
+  precedents: *id001
+  novelty: New family for the blend with the ResNet-50.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the incumbent and per label, then the equal logit blend with resnet50-silver-fold2
+    against FocalNet-T''s +0.003179. Activation: the effective config names the backbone; drift of the stem and
+    stage-4 groups after epoch 1 above zero.'
+  budget: 'Measured 0.051 s and 2.63 GiB per 64: about 2,374 s.'
+  implementation: The stage adapter with real-row BatchNorm padding, the spatial-token mapping, configs/campaign.yaml.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Forced by the keeper at the user's request of 2026-10-18 (new families); measured to fit (prior-work-candidates.md).
+- id: mambaout-tiny
+  mechanism_id: family-mambaout
+  parent_idea_id: null
+  title: MambaOut-T (mambaout_tiny.in1k), gated convolutional blocks without the state-space mixer, on the recipe's
+    settings
+  opportunity: 'Evidence (prior-work-candidates.md): gated CNN blocks with a 7x7 depthwise convolution, the design
+    that removes Mamba''s SSM; RMS 0.090 to 0.095 flat, the recipe''s band. Measured 0.095 s and 5.07 GiB per 64:
+    about 3,239 s. Guess on size: below FocalNet-T to level at x4.'
+  mechanism: 'model.backbone mambaout_tiny.in1k: stage ends stages.1 (192 ch, stride 8), stages.2 (384, 16), stages.3
+    (576, 32). LayerNorm with depthwise convolutions: pad image counts to 16 as ConvNeXt does. Settings: the recipe''s
+    rate 2e-4 and anchors 0.001 and 0.00001, ten epochs. Memory about 23.8 GiB at 256 images: checkpoint the stem
+    and stages.0. Integration (prior-work-radimagenet.md, integration defects): the backbone exposes timm''s pretrained_cfg;
+    a stride-8 point (to_stride_8, where the feature-statistics augmentation acts), a stride-16 middle map and a
+    stride-32 final map through modeling/backbone_stages.py, taken at the timm feature_info stages named below;
+    a group_matcher with the stem and four stage groups; the stem and first stage under the early anchor; spatial-token
+    mappings derived from the layers and raising if they differ. If a grid is not 2:1 between the stride-16 and
+    stride-32 maps, both 2x2 repeats in modeling/model.py become the nearest-centre gather (prior-work-radimagenet.md).
+    Weights from timm (pretrained=True), already in the torch hub cache.'
+  precedents: *id001
+  novelty: New family for the blend with the ResNet-50.
+  coverage: Every study and every label.
+  exploitation: 'Read x4 and x1 against the incumbent and per label, then the equal logit blend with resnet50-silver-fold2
+    against FocalNet-T''s +0.003179. Activation: the effective config names the backbone; drift of the stem and
+    stage-4 groups after epoch 1 above zero.'
+  budget: 'Measured 0.095 s and 5.07 GiB per 64: about 3,239 s plus stage-0 checkpointing.'
+  implementation: The stage adapter with padding to 16 and stage-0 checkpointing, the spatial-token mapping, configs/campaign.yaml.
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Forced by the keeper at the user's request of 2026-10-18 (new families); measured to fit (prior-work-candidates.md).
+exhausted_directions: None.
