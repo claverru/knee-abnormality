@@ -38,6 +38,7 @@ from knee_abnormality.modeling.augmentation import (
     sample_reflection_parameters,
 )
 from knee_abnormality.modeling.backbone_stages import backbone_stages
+from knee_abnormality.modeling.families.nextvit import NextViTBackbone
 from knee_abnormality.modeling.plane_readout import PlaneContrastReadout
 from knee_abnormality.modeling.radimagenet import (
     RADIMAGENET_WEIGHTS,
@@ -208,11 +209,12 @@ class KneeAbnormalityModel(nn.Module):
             backbone_kwargs["avg_down"] = True
         focalnet = model.backbone == "focalnet_tiny_srf.ms_in1k"
         efficientvit = model.backbone == "efficientvit_b2.r224_in1k"
-        if (model.stochastic_depth > 0 or focalnet) and not efficientvit:
+        nextvit = model.backbone == "nextvit_small.bd_ssld_6m_in1k"
+        if (model.stochastic_depth > 0 or focalnet or nextvit) and not efficientvit:
             backbone_kwargs["drop_path_rate"] = model.stochastic_depth
         with (
             torch.random.fork_rng(devices=[])
-            if focalnet or efficientvit
+            if focalnet or efficientvit or nextvit
             else nullcontext()
         ):
             self.backbone = (
@@ -231,6 +233,8 @@ class KneeAbnormalityModel(nn.Module):
                     **backbone_kwargs,
                 )
             )
+            if nextvit:
+                self.backbone = NextViTBackbone(self.backbone)
         if pretrained and model.pretrained_weights == "radimagenet":
             state = radimagenet_state_dict(model.backbone)
             if model.backbone == "resnet50.a1_in1k":

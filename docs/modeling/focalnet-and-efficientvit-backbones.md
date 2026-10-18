@@ -53,3 +53,22 @@ against 0.938154 at ten). EfficientViT-B2 adds `model.stochastic_depth: 0.2` and
 Checked on CPU in float32 against the five-fold runs' source: two training steps with stochastic
 depth 0.2 and padded image counts give identical outputs, gradients and BatchNorm running
 statistics, and identical evaluation outputs.
+
+## NextViT-S
+
+NextViT-S (`nextvit_small.bd_ssld_6m_in1k`, SSLD semi-supervised pretraining on 6M images) trains
+from `configs/nextvit.yaml`: `configs/focalnet.yaml` with the backbone changed, the recipe's rate
+2e-4 and anchors 0.001 and 0.00001 for its flat weight scale (RMS 0.052), ten epochs. It was
+provisionally adopted in the backbone-families-2 campaign on fold 2 (2026-10-18): ×4 0.938851
+against FocalNet-T SRF's 0.938816 at twelve epochs, ×1 0.934578 against 0.933241, and an equal logit
+blend with the ResNet-50 `resnet50-silver-fold2` of 0.941087 (+0.003267 over the ResNet-50 alone,
+the best partner of the campaign). Training about 3,400 s, peak 15.9 GiB.
+
+- **Wrapper** (`NextViTBackbone` in `modeling/families/nextvit.py`): timm's stem, stages, final
+  norm, feature info and pretrained_cfg, with a stem-plus-four-stage group matcher.
+- **Stage adapter:** `StemStages` with the final `norm`; the middle width is stage 3's 512 channels.
+  BatchNorm only and no depthwise convolution, so image counts are not padded.
+- **Token mapping** (`_nextvit_mapping` in `modeling/spatial_tokens.py`): the stem's convolutions
+  and the 2×2 average-pool patch embeddings (ceil mode, padding excluded) give origins 2, 6 and
+  14 px at strides 8, 16 and 32; the walk raises if a block convolution moves an anchor or the
+  pooling differs.
