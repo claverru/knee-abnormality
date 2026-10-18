@@ -9,6 +9,7 @@ from timm.models.resnet import ResNet
 from torch import nn
 from torch.utils.checkpoint import checkpoint
 
+from knee_abnormality.modeling.families.nextvit import NextViTBackbone
 from knee_abnormality.modeling.staged_backbones import StagedBackbone
 
 CONVNEXT_IMAGE_COUNT_STEP = 16
@@ -270,6 +271,9 @@ class EfficientVitStages(StemStages):
 
 
 BACKBONE_STAGES = {
+    NextViTBackbone: lambda backbone: StemStages(
+        backbone, backbone.norm, backbone.feature_info[-2]["num_chs"], 1
+    ),
     ResNet: ResNetStages,
     ConvNeXt: lambda backbone: StemStages(
         backbone,

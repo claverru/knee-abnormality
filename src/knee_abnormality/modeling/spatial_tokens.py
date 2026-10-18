@@ -1,5 +1,6 @@
 import torch
 from timm.layers import to_2tuple
+from timm.models.nextvit import NextConvBlock, NextTransformerBlock
 from timm.models.resnet import Bottleneck
 from torch import nn
 
@@ -8,8 +9,19 @@ from knee_abnormality.modeling.staged_backbones import STAGED_BACKBONES
 CONVNEXT_BACKBONES = ("convnext_tiny.in12k_ft_in1k",)
 FOCALNET_BACKBONES = ("focalnet_tiny_srf.ms_in1k",)
 EFFICIENTVIT_BACKBONES = ("efficientvit_b2.r224_in1k",)
+NEXTVIT_BACKBONES = ("nextvit_small.bd_ssld_6m_in1k",)
 
 BACKBONE_MAPPINGS = {
+    **{
+        f"{name}{suffix}": {
+            "layout": "NCHW",
+            "origin": [origin, origin],
+            "stride": [stride, stride],
+            "anchors": "convolution_stem_and_average_pool_centers",
+        }
+        for name in NEXTVIT_BACKBONES
+        for suffix, origin, stride in (("", 14.0, 32.0), (".layer3", 6.0, 16.0))
+    },
     **{
         f"{name}.layer3": {
             "layout": "NCHW",
@@ -194,6 +206,56 @@ def _efficientvit_mapping(
     return mapping
 
 
+def _nextvit_mapping(
+    backbone: nn.Module, stages: int = 4
+) -> tuple[float, float, float, float]:
+    mapping = _spatial_mapping([layer.conv for layer in backbone.stem])
+    expected = (
+        (0.0, 0.0, 4.0, 4.0),
+        (2.0, 2.0, 8.0, 8.0),
+        (6.0, 6.0, 16.0, 16.0),
+        (14.0, 14.0, 32.0, 32.0),
+    )
+    if len(backbone.stages) != 4 or mapping != expected[0]:
+        raise ValueError("NextViT stem geometry differs from verified anchors")
+    for index, stage in enumerate(backbone.stages[:stages]):
+        for block in stage.blocks:
+            if not isinstance(block, (NextConvBlock, NextTransformerBlock)):
+                raise TypeError("Unsupported NextViT spatial block")
+            pool = block.patch_embed.pool
+            if not isinstance(pool, nn.Identity):
+                if (
+                    not isinstance(pool, nn.AvgPool2d)
+                    or to_2tuple(pool.kernel_size) != (2, 2)
+                    or to_2tuple(pool.stride) != (2, 2)
+                    or to_2tuple(pool.padding) != (0, 0)
+                    or not pool.ceil_mode
+                    or pool.count_include_pad
+                    or pool.divisor_override is not None
+                    or any(224 % (2 * stride) for stride in mapping[2:])
+                ):
+                    raise ValueError(
+                        "NextViT pooling geometry changed for 224px inputs"
+                    )
+                kernel = to_2tuple(pool.kernel_size)
+                step = to_2tuple(pool.stride)
+                mapping = (
+                    mapping[0] + (kernel[0] - 1) * mapping[2] / 2,
+                    mapping[1] + (kernel[1] - 1) * mapping[3] / 2,
+                    mapping[2] * step[0],
+                    mapping[3] * step[1],
+                )
+            if any(
+                _spatial_mapping([layer], mapping) != mapping
+                for layer in block.modules()
+                if isinstance(layer, nn.Conv2d)
+            ):
+                raise ValueError("NextViT residual geometry changed")
+        if mapping != expected[index]:
+            raise ValueError("NextViT stage geometry differs from verified anchors")
+    return mapping
+
+
 def _resnet_mapping(
     backbone: nn.Module, stages: int = 4
 ) -> tuple[float, float, float, float]:
@@ -246,6 +308,11 @@ def _resnet_mapping(
 
 
 _BACKBONE_MAPPING_FUNCTIONS = {
+    **{name: _nextvit_mapping for name in NEXTVIT_BACKBONES},
+    **{
+        f"{name}.layer3": lambda backbone: _nextvit_mapping(backbone, 3)
+        for name in NEXTVIT_BACKBONES
+    },
     "resnet50.a1_in1k": _resnet_mapping,
     "resnet50.a1_in1k.layer3": lambda backbone: _resnet_mapping(backbone, 3),
     **{
