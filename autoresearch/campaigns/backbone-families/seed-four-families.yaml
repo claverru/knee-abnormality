@@ -18,7 +18,7 @@ ideas:
     against the built model. Settings: model.backbone the new name; rate 2e-4 and anchors 0.001 and 0.00001, the
     recipe''s (relative step 2.2e-3 to 2.6e-3, as MambaVision-T''s).'
   precedents:
-  - 'Swin-T on the MambaVision recipe, fold 2, 2026-10-14: ×4 0.937176, 4,023 s, 23.4 GB (docs/validation/results/2026-10-14-swin-t.md).'
+  - 'Swin-T on the MambaVision recipe, fold 2, 2026-10-14: ×4 0.937176, 4,023 s, 23.4 GB (docs/validation/results/backbones/2026-10-14-swin-t.md).'
   - 'FocalNet-T SRF in this campaign: 23 GB at 332 W in P2 without spilling; 5.5 min per epoch after its speed repair.'
   novelty: First channel-attention backbone here.
   coverage: Every study and every label.
@@ -93,7 +93,7 @@ ideas:
     0.00003, whose cost per relative movement on the last stage (0.00003 × 0.044² = 5.8e-8) matches the ResNet-50''s
     (5.3e-8) and MambaVision-T''s (8.5e-8), where the recipe''s 0.00001 would give a third of it.'
   precedents:
-  - 'MaViT-S: BatchNorm with depthwise convolutions cost 8 s per new image count unpadded (docs/modeling/mambavision-backbone.md).'
+  - 'MaViT-S: BatchNorm with depthwise convolutions cost 8 s per new image count unpadded (docs/modeling/backbones/mambavision-backbone.md).'
   - 'PVTv2-b2 (weights 0.045 to 0.056) and RadioDINO-S/16: the recipe''s rate held.'
   novelty: First linear-attention backbone and first padded BatchNorm family here.
   coverage: Every study and every label.

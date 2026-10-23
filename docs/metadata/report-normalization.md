@@ -38,7 +38,7 @@ report.
 Reproduce with:
 
 ```bash
-rtk proxy uv run --locked python -m scripts.adhoc.normalize_reports
+uv run --locked python -m scripts.adhoc.normalize_reports
 ```
 
 [`scripts/adhoc/normalize_reports.py`](../../scripts/adhoc/normalize_reports.py)

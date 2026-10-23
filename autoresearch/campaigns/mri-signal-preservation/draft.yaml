@@ -112,7 +112,7 @@ prior_work: "# Source findings and measured precedents\n\n`data/preprocessing/de
   \ | smooth-bias-field-augmentation-20260926T011026Z-b7fa0f09 | +0.000571; [-0.001339, +0.002414] | outputs/autoresearch/augmentation/experiments/smooth-bias-field-augmentation-20260926T011026Z-b7fa0f09\
   \ |\n| Global nonlinear intensity augmentation | ReXNet; combined_v1; scanner_v1 fold 2; seed 1704794368\
   \ | gin-intensity-augmentation-v3-20260926T074639Z-0d98d2fa | +0.001332; [-0.001163, +0.003813] | outputs/autoresearch/augmentation/experiments/gin-intensity-augmentation-v3-20260926T074639Z-0d98d2fa\
-  \ |\n\n`docs/validation/results/2026-09-28-campaign-rescoring.md` reports that smoothing's saved comparison\
+  \ |\n\n`docs/validation/results/validation-and-ensembles/2026-09-28-campaign-rescoring.md` reports that smoothing's saved comparison\
   \ becomes approximately +0.0008, 80% [-0.0009, +0.0027], on rebuild_state_v2. It also reports the external\
   \ `half-stack-vs-smoothing-dsu` comparison at approximately +0.0011 originally and +0.0020 after re-scoring,\
   \ with the latter interval [-0.0005, +0.0046]. That is a bundled main-recipe result, not attribution\

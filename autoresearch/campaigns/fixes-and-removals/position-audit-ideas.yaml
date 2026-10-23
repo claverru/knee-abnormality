@@ -54,7 +54,7 @@ ideas:
     anterior_axis, the meniscus mask, the OA regions and the half-knee loss are untouched.
   precedents:
   - 'run-notes.md, 6: computed-centre-3d-position, a tie with 1D and 2D replaced.'
-  - 'docs/validation/results/2026-10-03-learnable-views-campaign.md: seven replace runs averaging zero.'
+  - 'docs/validation/results/crops-and-views/2026-10-03-learnable-views-campaign.md: seven replace runs averaging zero.'
   novelty: First run of the recipe without position embeddings.
   coverage: Every token of every study.
   exploitation: >-

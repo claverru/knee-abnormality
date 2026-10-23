@@ -1,15 +1,18 @@
-# Current preparation and overlapping triplets
+# Final preparation and overlapping triplets
 
-Evidence: unverified working notes, official/public sources checked on
-2026-09-09, and the local acquisition audit on 2026-09-10; see
-[provenance](../research/provenance.md).
+Evidence: official/public sources checked on 2026-09-09, the local acquisition audit on 2026-09-10
+and the implementation notes below; see [provenance](../research/provenance.md).
 
-The current baseline prepares pixels on the fly and uses 224-pixel centered
-crops at 0.625 mm in-plane spacing, giving 140-mm coverage after the
-[completed crop comparison](../validation/results/2026-09-12-140-mm-crop-result.md).
-Earlier 0.80 mm inspections and the
-historical cached-pipeline notes below are unverified evidence, not current
-defaults.
+Pixels are prepared on the fly. The final recipe (`configs/resnet50.yaml`) uses 224-pixel views with
+`reference_field_mm: 120.0` (0.5357 mm in-plane; this replaced the 140 mm, 0.625 mm crop of the
+[crop comparison](../validation/results/crops-and-views/2026-09-12-140-mm-crop-result.md) on
+2026-10-01, see the [field-of-view history](field-of-view-selection-history.md)). Axial series keep the
+image-centred 120 mm view; coronal and sagittal series use per-type view tables (coronal T1/PD 84 mm, coronal fluid 93.33 mm, sagittal T1/PD 93.33 mm, sagittal fluid 84 mm and a 64 mm
+sagittal fluid detail view, knee-anchored horizontally, with 7 mm sagittal and 10 mm vertical offsets;
+[plane and fluid spacing](plane-fluid-spacing-review.md)). With `model.slice_channels: repeated_middle`
+the middle slice of each triplet feeds all three channels, and reflection, contrast mixing,
+augmentation and mirror TTA run on the middle slice only. Earlier 0.80 mm inspections and the
+historical cached-pipeline notes are unverified evidence, not defaults.
 
 ## Series indexing, guards and exclusions
 
@@ -23,9 +26,9 @@ validation and Kaggle inference.
   for any other encoding; it costs 0.306 ms per header on Kaggle against
   pydicom's 7.6 ms. Prefix reads and frame payloads are fetched on a thread pool
   behind `KneeStudyDataset(io_threads=...)`, defaulting to 1 so training and
-  validation stay serial, with inference at `INFERENCE_IO_THREADS = 16`. Prepared
+  validation stay serial, with inference at `INFERENCE_IO_THREADS = 8`. Prepared
   batches are audited identical to the serial and pydicom paths
-  ([loading speedup](../backlog/loading-speedup/attribution.md#what-the-shipped-changes-bought)).
+  ([loading speedup](../inference/profiling/loading-cost-attribution.md#what-the-shipped-changes-bought)).
   Besides the pose and pixel descriptor it keeps
   12 series tags (`SeriesTags` in `dicom.py`) and stores the most common tag set
   as a compact `SeriesSummary`: `SeriesNumber`, reformat flag, same-protocol
@@ -37,7 +40,7 @@ validation and Kaggle inference.
   from it by more than the orientation tolerance (1e-3), are removed before
   sorting. Instances without a
   pose are kept; if no layout is self-consistent, nothing is removed. This is a
-  hidden-test defence ([research](../research/series-filtering-signals.md#localizers-scouts-and-calibration));
+  hidden-test defence ([research](../research/data-and-validation/series-filtering-signals/INDEX.md));
   it removes no training or example-test instance.
 - **Study cleaning** (`clean_series` in `data/preprocessing/filtering.py`),
   decided on all indexed series of a study before `estimate_reference` and
@@ -53,7 +56,7 @@ validation and Kaggle inference.
      first, then the highest `SeriesNumber`, then the higher UID. These are
      retakes, Philips second reconstructions and exact copies with full headers.
      Headers only
-     ([result](../validation/results/2026-09-22-series-cleaning-rules.md#same-signature-groups)).
+     ([result](../validation/results/sampling/2026-09-22-series-cleaning-rules.md#same-signature-groups)).
   3. *Contrast relabel:* a header candidate is a series whose fat-suppression
      evidence contradicts its slot. The evidence is `ScanOptions` FS/WE, an
      inversion-recovery sequence, or a fat-suppression description without T1
@@ -83,7 +86,7 @@ validation and Kaggle inference.
   6 series, exactly the 5 ankle series of `…93672103` and the stray sagittal of
   `…42012883`; the 5 body/spine-coil studies are untouched; one study centre
   changes (`…93672103`, RMS 42.05 → 0.48 mm, now accepted); the guard removes
-  nothing ([census](../metadata/series-filtering-census.md#implemented-rule-2026-09-17)).
+  nothing ([census](../metadata/series-filtering-census/implemented-rule.md)).
   Rules 2 and 4 together drop 237 series. That is every pixel-identical copy (33 in 9
   studies, one per pair, including the Siemens `DESS MPR` copy rather than its
   original) plus 204 superseded series in 163 studies; 52 of those are in 42
@@ -100,7 +103,7 @@ validation and Kaggle inference.
 
 Implemented 2026-09-17 behind `data.robust_center_outlier_mm` and removed on 2026-09-18 after four
 training runs at 10, 20 and 30 mm landed inside the control spread
-([results](../validation/results/2026-09-18-overnight-results.md)), a subgroup check on the 21
+([results](../validation/results/campaigns-and-queues/2026-09-18-overnight-results.md)), a subgroup check on the 21
 studies it changes showed neither harm nor benefit, and the combined run scored 0.938 publicly
 against 0.939 for the checkpoint it replaced. A rejected study centre again samples every series
 locally, which is also the flattest coverage in the dataset: local pools draw their targets
@@ -136,10 +139,10 @@ repeats them tap by tap in float32, bit-identically. Training, validation and
 local prediction loaders call it in their workers (`collate_prepared`) and ship
 uint8 images, because the local GPU is the bottleneck there; the Kaggle
 prediction worker ships the raw rows (`prepare_on_loader=False`) and prepares
-them on the T4s, because its four vCPUs are. Frames that are not 8/16-bit, or
+them on the T4s, because its four vCPUs are the bottleneck. Frames that are not 8/16-bit, or
 whose rescale exceeds 1e30, are resampled on the CPU and shipped as float32
 regions. See the
-[measurement and parity evidence](../inference/2026-09-22-kaggle-x4-startup-and-gpu-preparation.md#gpu-preparation).
+[measurement and parity evidence](../inference/profiling/2026-09-22-kaggle-x4-startup-and-gpu-preparation.md#gpu-preparation).
 
 Decoded frames and failures are cached within the current item's type
 preparation attempts. A decoded frame with under 1% non-zero stored pixels
@@ -156,7 +159,7 @@ study at ×4 contains one.
 Metadata separates triplets, channel appearances, unique files, distinct middle
 geometry, decode attempts, placement errors and missing capacity.
 
-The physical-preparation inspection (`scripts/adhoc/inspect_physical_preparation.py`,
+The physical-preparation inspection (`scripts/adhoc/inspect_physical_preparation.py` (removed),
 removed; last in commit `df4b6cd`) checked serial/four-thread and row-order agreement and independent clipping
 populations against the CPU preparation; it reads prepared images and bounds that
 the loader no longer produces.

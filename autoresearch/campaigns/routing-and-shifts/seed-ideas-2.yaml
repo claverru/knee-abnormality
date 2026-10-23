@@ -91,7 +91,7 @@ ideas:
     lateral_meniscus_tear_location, marrow_edema_location and patellar_facet) stay excluded. No target's region changes.
   precedents:
   - 'attributes_v5.md (worktree knee-abnormality-jevk5-attributes-v4), Core against rings: the four counts from the v4 answers.'
-  - 'docs/ongoing/side-routed-heads.md: located targets hold on unseen knees (tear place 33%, edema by compartment 25% explained).'
+  - 'docs/modeling/side-routed-heads.md: located targets hold on unseen knees (tear place 33%, edema by compartment 25% explained).'
   novelty: First located target across the core-ring boundary; first extra supervision on ACL's region.
   coverage: Training only; every study with v4 answers for the four questions.
   exploitation: >-

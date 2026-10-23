@@ -41,7 +41,7 @@ ideas:
   - 'run-notes.md, the global-context run and run 22: free modules at the head rate.'
   - 'seed-ideas-10.yaml and seed-ideas-11.yaml: the same pull on squeeze-and-excitation and on coordinate
     attention.'
-  - 'docs/ongoing/radimagenet-backbone.md: how the Refined-RadImageNet weights are loaded.'
+  - 'docs/modeling/backbones/resnet-radimagenet-backbones.md: how the Refined-RadImageNet weights are loaded.'
   novelty: First global-context block held near the identity.
   coverage: Every image, at stages two to four.
   exploitation: 'Read the macro and the per-label table at both multipliers against the incumbent and

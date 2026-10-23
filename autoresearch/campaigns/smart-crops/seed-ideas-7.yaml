@@ -28,7 +28,7 @@ ideas:
   precedents:
   - 'plane-conditioned-batchnorm (revisits campaign), one bank per plane in the upper stages on
     the single-scale 140 mm recipe, -0.0010, 80% [-0.0018, -0.0002], rejected; it took 1,247 s
-    (docs/validation/results/2026-10-01-revisits-campaign.md). This idea splits by pixel size, not
+    (docs/validation/results/campaigns-and-queues/2026-10-01-revisits-campaign.md). This idea splits by pixel size, not
     plane, and in the early stages, not the upper ones.'
   - 'view-specific-early-batch-statistics, proposed by the researcher on t1pd-detail-84 with two
     banks (zoomed and wide) and never queued (ideas.yaml).'

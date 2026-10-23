@@ -29,8 +29,8 @@ ideas:
     are unchanged. Validation, prediction and Kaggle inference run the same backbone. No option and no
     config field.'
   precedents:
-  - 'docs/ongoing/radimagenet-backbone.md: how the Refined-RadImageNet weights are loaded.'
-  - 'docs/research/input-resolution.md: downsampling must be antialiased; the repository resampler is,
+  - 'docs/modeling/backbones/resnet-radimagenet-backbones.md: how the Refined-RadImageNet weights are loaded.'
+  - 'docs/research/geometry-and-views/input-resolution.md: downsampling must be antialiased; the repository resampler is,
     the backbone is not.'
   novelty: First anti-aliased downsampling inside the backbone.
   coverage: Every image, at the three stride-two transitions.

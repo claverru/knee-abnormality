@@ -161,7 +161,7 @@ ideas:
     loss, weight 0.075, exactly as in the noisy-labels run. Nothing else changes.
   precedents:
   - 'early-learning-regularization (noisy-labels): outputs/autoresearch/noisy-labels/experiments/early-learning-regularization-20260923T124737Z-7aba30fc/changes.diff'
-  - 'Per-label analysis: docs/ongoing/early-learning-regularization.md'
+  - 'Per-label analysis: docs/history/early-learning-regularization.md'
   - Combined with the class-balance schedule it lost Lateral OA -0.0086 and PF OA
     -0.0075, an interaction risk with other loss terms.
   novelty: First run on the knee-geometry recipe, which adds the half-knee loss the
@@ -203,7 +203,7 @@ ideas:
   precedents:
   - 'side-normalized-3d-position (knee-geometry, never run): autoresearch/campaigns/knee-geometry/ideas.yaml'
   - 'token-attention run with 3D RoPE on raw coordinates: outputs/training/token-attention;
-    docs/validation/results/2026-09-23-side-mask-and-token-attention.md'
+    docs/validation/results/pooling-and-attention/2026-09-23-side-mask-and-token-attention.md'
   - study-anchored-through-plane-position logged zero active studies because it required
     one frame-of-reference UID across series; every accepted study fit has several.
     Do not use that gate.
@@ -245,7 +245,7 @@ ideas:
   precedents:
   - 'Adopted learned anatomical strength: autoresearch/anatomical-attention.md'
   - 'Spatial importance map: docs/data-preparation/peripheral-coverage.md#spatial-importance-map'
-  - 'Retired attention prior: docs/validation/results/2026-09-15-attention-prior-result.md'
+  - 'Retired attention prior: docs/validation/results/pooling-and-attention/2026-09-15-attention-prior-result.md'
   novelty: First anatomical bias on the front-back axis, for the label that the map
     places most clearly.
   coverage: PF OA only (OA family rule).
@@ -313,7 +313,7 @@ ideas:
     own-side mask. Evaluation, the backbone pass, image budget, anatomical bias and
     series dropout are unchanged.
   precedents:
-  - 'Spec: docs/backlog/small-changes.md#attention-token-dropout'
+  - 'Spec: docs/backlog/untried-ideas.md#pooling-and-the-attention-head'
   - ACMIL, https://arxiv.org/abs/2311.07125
   novelty: Token-level masking inside retained acquisitions, unlike series dropout.
   coverage: All labels.
@@ -342,7 +342,7 @@ ideas:
     attention distribution, with the same number removed per study-label as #9. Keep
     at least one valid token inside the meniscus own-side mask.'
   precedents:
-  - 'Spec: docs/backlog/small-changes.md#attention-token-dropout'
+  - 'Spec: docs/backlog/untried-ideas.md#pooling-and-the-attention-head'
   - Code of this campaign's attention-token-dropout-random experiment.
   novelty: The attention-challenging arm of the ACMIL idea.
   coverage: All labels.
@@ -374,8 +374,8 @@ ideas:
     the original predictions apart from summation order; missing types contribute
     zero. Image and token budgets unchanged.
   precedents:
-  - 'Spec: docs/backlog/small-changes.md#planecontrast-specific-readouts'
-  - 'Per-type contribution: docs/validation/results/2026-09-17-type-contribution.md'
+  - 'Spec: docs/backlog/untried-ideas.md#pooling-and-the-attention-head'
+  - 'Per-type contribution: docs/validation/results/pooling-and-attention/2026-09-17-type-contribution.md'
   novelty: First per-type readout; count normalization, gated attention and residual
     readouts were different changes.
   coverage: All labels.
@@ -633,7 +633,7 @@ ideas:
     meniscus-position-residualized-values was prepared without a recorded result.
     It subtracts positional contributions from the existing meniscus values; it is
     an overlapping algebraic precedent, not accepted evidence.'
-  - '[General backlog ownership](/home/claudio/src/knee-abnormality/docs/backlog/small-changes.md#planecontrast-specific-readouts):
+  - '[General backlog ownership](/home/claudio/src/knee-abnormality/docs/backlog/untried-ideas.md#pooling-and-the-attention-head):
     type-specific readouts and feature adapters are separate entries. This refines
     the completed readout arm; it does not implement the pending pre-attention adapters.'
   novelty: Retains the shared classifier and constrains only acquisition-specific
@@ -712,7 +712,7 @@ ideas:
     inconclusive, with very small selected-checkpoint scales. Direct supervision of
     the shared detector addresses weak training of an initially gated branch; the
     archived diagnosis does not prove why it stayed small.'
-  - '[Auxiliary-loss backlog](/home/claudio/src/knee-abnormality/docs/backlog/big-bets.md#auxiliary-loss-campaign)
+  - '[Auxiliary-loss backlog](/home/claudio/src/knee-abnormality/docs/backlog/untried-ideas.md#supervision-and-labels)
     owns general auxiliary-head investigations. This proposal combines two completed
     near-misses mechanisms using existing OA targets; it does not consume the separate
     ongoing report-attribute work.'
@@ -801,7 +801,7 @@ ideas:
     tokens.'
   - '[ACMIL](https://arxiv.org/abs/2311.07125) studies multiple attention branches
     and stochastic masking within highly attended instances. This proposal instead
-    uses spatial adjacency and random anchors. The [general attention-dropout backlog](/home/claudio/src/knee-abnormality/docs/backlog/small-changes.md#attention-token-dropout)
+    uses spatial adjacency and random anchors. The [general attention-dropout backlog](/home/claudio/src/knee-abnormality/docs/backlog/untried-ideas.md#pooling-and-the-attention-head)
     owns the broader direction.'
   novelty: Changes the correlation structure of exclusions while preserving their
     count, training boundary and random-key consumption. It is neither a rate/cap

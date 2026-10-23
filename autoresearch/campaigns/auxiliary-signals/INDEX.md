@@ -17,4 +17,4 @@
 | Recording ideas, their ancestry and completed outcomes | [Idea registry](ideas.yaml) |
 | Checking the live queue | [Backlog](backlog.yaml) |
 | Reviewing campaign decisions | [Findings](findings.md) |
-| Reading the outcome: every result, the adoption, the public scores S67–S72 and the findings | [Campaign result](../../../docs/validation/results/2026-09-27-auxiliary-signals-campaign.md) |
+| Reading the outcome: every result, the adoption, the public scores S67–S72 and the findings | [Campaign result](../../../docs/validation/results/campaigns-and-queues/2026-09-27-auxiliary-signals-campaign.md) |

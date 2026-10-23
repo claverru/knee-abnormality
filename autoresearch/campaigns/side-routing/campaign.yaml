@@ -30,7 +30,7 @@ policy:
   require_source_change: true
   configuration_only_ideas: false
   developer_instructions: >-
-    The incumbent is the side-routed design in docs/ongoing/side-routed-heads.md (Design, then
+    The incumbent is the side-routed design in docs/modeling/side-routed-heads.md (Design, then
     Fifth build): one shared classifier for the two meniscus targets and one for the three OA
     targets; tokens placed in a knee frame (fitted centre, header rotation, one learned rotation
     of three angles); routing weights from that frame; a linear position prior on the attention;
@@ -67,7 +67,7 @@ policy:
     delta, a learned value that did not move, a part the model does not use) and work on that:
     measure it, then design from the measurement. Research starts after the forced seeds. Your first product after every completed run is its
     analysis, written from
-    `python -m scripts.tools.report_side_routing --run RUN --base BASE --lineage LINEAGE
+    `609a489:scripts/tools/report_side_routing.py --run RUN --base BASE --lineage LINEAGE
     --siblings SIBLINGS --output FILE` (prior-work.md gives the lineage and the sibling list) and the run's logs: the per-target
     deltas with the sibling range, the routed targets' sum, the localisation deltas, the side
     head, the learned frame angles and widths, and the flags. Only then propose. Each idea is

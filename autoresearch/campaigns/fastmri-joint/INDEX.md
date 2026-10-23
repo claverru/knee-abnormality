@@ -9,7 +9,7 @@ Adoption by the runtime alone: strictly above the incumbent at ×1 and ×4. Trai
 1.25 of the reference's. Worktree `knee-abnormality-fastmri-pretraining`, branch
 `fastmri-pretraining`.
 
-The [remote training host](../../../docs/backlog/refactors/remote-training-host.md) option is
+The [remote training host](../../../autoresearch/runtime.md#training-host) option is
 built and `validate` accepts the campaign; the recipe is this worktree's `configs/training.yaml`.
 
 **Ready to start; the start is the user's call.** Checked on 2026-10-12: the launcher end to end

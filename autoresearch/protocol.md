@@ -124,13 +124,13 @@ or measure robustness across training seeds.
 `provisional_accept` makes the adopted run itself the incumbent reference, and later
 candidates train at its seed. The campaign draws no fresh seed and retrains nothing:
 the fresh-seed control retrain belongs to the user when an adoption is merged into
-main ([project rule](../docs/validation/validation-strategy.md#controlled-comparisons)).
+main ([project rule](../docs/validation/validation-protocol.md)).
 
 **Fold from the recipe (since 2026-09-25).** The campaign's fold is the single
 `validation.folds` entry of its sealed recipe, and its reference run must be on that
 fold. A campaign runs on that fold from start to end; fold rotation happens only when
 the user merges an adoption into main
-([project rule](../docs/validation/validation-strategy.md#controlled-comparisons)).
+([project rule](../docs/validation/validation-protocol.md)).
 Training, comparison, accounting and reporting all use it. A topic the loop chains on an
 incumbent takes that incumbent's recipe, fold and seed
 ([chaining](topic-rotation.md#chaining)).

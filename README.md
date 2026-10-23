@@ -1,19 +1,18 @@
 # Knee abnormality detection
 
 Workspace for the [RSNA Knee Abnormality Detection competition](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection).
-The baseline uses Steven Lee's v4 report-derived labels and five stratified
-folds over all 4,407 studies, with about 20% validation per fold and separate
-gold-label diagnostics.
+The competition has ended; the [final solution](docs/final-solution.md) records the
+ensemble it ended on, how its members were trained and where the weights are.
 
 ## Development
 
 From the repository root:
 
 ```bash
-rtk proxy uv sync --locked
-rtk proxy uv run --locked python -m knee_abnormality.config configs/resnet50.yaml
-rtk proxy uv run --locked python -m scripts.tools.validation prepare
-rtk proxy uv run --locked python -m scripts.pipeline.train configs/resnet50.yaml
+uv sync --locked
+uv run --locked python -m knee_abnormality.config configs/resnet50.yaml
+uv run --locked python -m scripts.tools.validation prepare
+uv run --locked python -m scripts.pipeline.train configs/resnet50.yaml
 ```
 
 Shared Python code lives in `src/knee_abnormality/` (`data/`, `modeling/`,
@@ -33,10 +32,10 @@ The root `justfile` exposes the maintained four-command workflow. All artifact
 and remote identities are explicit:
 
 ```bash
-rtk proxy uv run --locked just train configs/resnet50.yaml --run-id RUN_ID
-rtk proxy uv run --locked just export --checkpoint CHECKPOINT --output OUTPUT
-rtk proxy uv run --locked just infer BUNDLE DATA_ROOT OUTPUT --batch-size 8 --num-workers 2
-rtk proxy uv run --locked just submission-job start --bundle BUNDLE --dataset OWNER/DATASET --notebook OWNER/NOTEBOOK --record RECORD --label "Fold 0"
+uv run --locked just train configs/resnet50.yaml --run-id RUN_ID
+uv run --locked just export --checkpoint CHECKPOINT --output OUTPUT
+uv run --locked just infer BUNDLE DATA_ROOT OUTPUT --batch-size 8 --num-workers 2
+uv run --locked just submission-job start --bundle BUNDLE --dataset OWNER/DATASET --notebook OWNER/NOTEBOOK --record RECORD --label "Fold 0"
 ```
 
 Each recipe passes its arguments to the module it names, so `just RECIPE --help`
@@ -51,8 +50,8 @@ version. A bare `just` lists the recipes without starting work.
   boundaries, configuration, reusable caches, and fast experiment iteration.
 - [Documentation index](docs/INDEX.md): evidence, procedures, and decisions.
 - [Script index](scripts/INDEX.md): find existing commands and place new scripts.
-- [Ongoing work](docs/ongoing/INDEX.md): the next implementation steps.
-- [Backlog](docs/backlog/INDEX.md): ideas not yet started, by experiment type.
+- [Ongoing work](docs/ongoing/INDEX.md): work in progress, empty when nothing is.
+- [Backlog](docs/backlog/INDEX.md): ideas never run, with their evidence.
 - [Environment](docs/architecture/environment.md): dependency pins and setup details.
 
 The maintained train/predict entry points live in `scripts/pipeline/`; label and

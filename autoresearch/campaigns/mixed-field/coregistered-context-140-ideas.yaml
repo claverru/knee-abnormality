@@ -19,9 +19,9 @@ ideas:
   precedents:
   - 'two-stream-paired in this campaign (its result is the condition for this seed).'
   - 'Multi-scale review: concatenation and mean fusion ignored the fine-only signal, per-location
-    fusion recovered it (docs/research/multiscale-features-knee-mri.md).'
+    fusion recovered it (docs/research/geometry-and-views/multiscale-features-knee-mri.md).'
   - 'GLNet-style global and local branches fuse feature maps by position
-    (docs/research/learned-crop-selection.md).'
+    (docs/research/geometry-and-views/learned-crop-selection.md).'
   novelty: Position-wise fusion of two fields of one slice; no earlier run registered two views.
   coverage: All studies and labels, every slice at both fields.
   exploitation: The norm of the added context relative to the token per epoch; the share of

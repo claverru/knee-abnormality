@@ -61,9 +61,9 @@ ideas:
       labels evenly across the epoch's batches, drawn from the training seed and
       epoch. Only batch membership and order change.
     precedents:
-      - docs/validation/results/2026-09-19-balanced-bce-result.md
-      - docs/research/auc_loss_approaches.md#weighting-and-sampling-design-space
-      - docs/backlog/small-changes.md#bce-weighting-and-study-sampling
+      - docs/validation/results/labels-and-losses/2026-09-19-balanced-bce-result.md
+      - docs/research/training-objectives/auc_loss_approaches.md#weighting-and-sampling-design-space
+      - docs/backlog/untried-ideas.md#supervision-and-labels
     novelty: >-
       Added by the user on 2026-09-21. Changes batch composition without changing
       visit frequency or loss weights, so it does not overlap class-balanced BCE's

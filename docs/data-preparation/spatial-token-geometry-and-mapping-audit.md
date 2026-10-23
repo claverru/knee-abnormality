@@ -37,7 +37,7 @@ mixing all three slices, not an isolated voxel or registered correspondence.
 ## Spatial-fusion mapping audit
 
 The initial spatial-fusion comparison stopped after its
-[inference gate failed](../validation/results/2026-09-12-spatial-fusion-engineering-result.md).
+[inference gate failed](../validation/results/sampling/2026-09-12-spatial-fusion-engineering-result.md).
 The regional implementation is historical; the active spatial-token model reuses
 its prepared-pixel and augmentation mapping. The saved audit below describes
 the earlier source identity and does not validate the new token path.
@@ -61,7 +61,7 @@ execute in BF16 during mixed-precision training and round the coordinate map
 differently from the image warp. The correction has been reviewed in source
 only; its numerical error and training impact have not been measured.
 
-The [16-study audit](../../outputs/analysis/s/spatial-fusion-20260912/audit/summary.json)
+The 16-study audit (`outputs/analysis/s/spatial-fusion-20260912/audit/summary.json`, deleted)
 had 15 accepted centers; every study supplied native-valid local tokens from
 three planes, with at least 863 valid anchors per study after augmentation.
 Saved artifacts include per-triplet paths, pixel hashes, references, geometry

@@ -6,7 +6,7 @@ ideas:
     late for its small flat weight scale, ten epochs (relaunch: the first run was aborted at epoch 2 when the user made ten
     epochs the default; twelve was MambaVision-Ts recipe)'
   opportunity: 'Evidence (prior-work.md, DINOv3 ConvNeXt-T): ConvNeXt-T distilled from the DINOv3 7B teacher on 1.7B images,
-    self-supervised dense features instead of ImageNet labels; second of 34 in the 2026 backbone search (docs/modeling/backbone-search.md,
+    self-supervised dense features instead of ImageNet labels; second of 34 in the 2026 backbone search (docs/modeling/backbones/backbone-search.md,
     0.904386). Added at the user''s request on 2026-10-15. Its weights are flat over depth but small (RMS 0.0096 stem, 0.014
     to 0.018 in the stages, against 0.021 to 0.028 for the in12k ConvNeXt-T), so the MambaVision rate and anchors do not transfer.
     Guess on size: level to +0.004 against the reference, and blend value from a self-supervised pretraining.'
@@ -23,7 +23,7 @@ ideas:
   - 'Late anchor: 0.0002 × 0.0159² = 5.1e-8 per relative movement on the last stage, matching the ResNet-50''s (5.3e-8) and
     MambaVision''s (8.5e-8). Early anchor 0.01 as the ResNet-50, the in12k ConvNeXt-T config and Hiera-T.'
   - 'ConvNeXt-T and -S with DINOv3 weights on the ReXNet-style recipe, fold 0, 2026-10-03: ×4 0.927235 at best against 0.932477
-    for the ResNet-18 control, on an older recipe (docs/modeling/backbone-swaps.md).'
+    for the ResNet-18 control, on an older recipe (docs/modeling/backbones/backbone-swaps.md).'
   novelty: First DINOv3 weights on the current recipe.
   coverage: Every study and every label.
   exploitation: 'Read ×4 and ×1 against the reference, the per-label changes and the blends with the ResNet-50 and the reference.

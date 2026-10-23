@@ -18,7 +18,7 @@ ranged from 0.9209 to 0.9368 across runs on 47 positives.
 The summary the researcher checks proposals against. Every figure below was produced on
 2026-10-07; the audits are under `outputs/analysis/f/frame-and-targets/anatomy-sections-audit/` and the drawings
 under `outputs/analysis/f/frame-and-targets/segmenter-benchmark/`. The design the model started
-from is in [side-routed shared heads](../../../docs/ongoing/side-routed-heads.md) and the two
+from is in [side-routed shared heads](../../../docs/modeling/side-routed-heads.md) and the two
 earlier campaigns on it are [routing and shifts](../routing-and-shifts/INDEX.md) and
 [frame and targets](../frame-and-targets/INDEX.md).
 

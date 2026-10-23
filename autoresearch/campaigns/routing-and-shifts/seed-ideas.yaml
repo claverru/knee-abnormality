@@ -39,7 +39,7 @@ ideas:
   precedents:
   - 'Learnable-views run hand-sizes-learned-shifts (sizes pinned, shifts learned, old recipe, fold 0): 0.932905, -0.0004, 80% interval [-0.0014, +0.0005]; frozen source and changes.diff under outputs/autoresearch/learnable-views/experiments/hand-sizes-learned-shifts-20261003T183532Z-8d11d7a5/.'
   - 'autoresearch/campaigns/learnable-views/build-notes.md: shifts within 2.5 mm of the start and 3 to 7 mm apart between runs; the open question on the affine augmentation hiding the signal.'
-  - 'docs/ongoing/side-routed-heads.md, run 24: regions are read in a frame centred per knee on the meniscus spots.'
+  - 'docs/modeling/side-routed-heads.md, run 24: regions are read in a frame centred per knee on the meniscus spots.'
   novelty: First learned view placement on the routed model.
   coverage: Every coronal and sagittal view of every study, in training and at inference; axial 120 mm views keep a zero shift.
   exploitation: >-
@@ -95,7 +95,7 @@ ideas:
     entries on meniscus_medial and meniscus_lateral) follow the wider region; the six
     tear-place targets keep their own routes.
   precedents:
-  - 'docs/ongoing/side-routed-heads.md, The runs sorted: Medial Meniscus 0.9457 to 0.9466 in runs 1 to 5 and 22, 0.9443 in run 24.'
+  - 'docs/modeling/side-routed-heads.md, The runs sorted: Medial Meniscus 0.9457 to 0.9466 in runs 1 to 5 and 22, 0.9443 in run 24.'
   - 'Runs 18, 19 and 30: tight region tables at -0.0019, -0.0016 and -0.0015.'
   novelty: The whole-side meniscus region has not been run on the spot frame with rings and sectors.
   coverage: The two meniscus targets and the routed meniscus report questions, every study.
@@ -145,7 +145,7 @@ ideas:
     is unchanged: it still centres on the meniscus spots.
   precedents:
   - 'autoresearch/campaigns/learnable-views: nothing per study was tried; shifts per series type looked random.'
-  - 'docs/ongoing/side-routed-heads.md: the frame per knee is read from the heads without any marking.'
+  - 'docs/modeling/side-routed-heads.md: the frame per knee is read from the heads without any marking.'
   novelty: First per-study crop placement predicted by the model.
   coverage: Every study in training and at inference; the locator sees every series.
   exploitation: >-
@@ -191,7 +191,7 @@ ideas:
     There is no common point and no projection through the patient maps. Trained by the target
     loss through the sampling grid at the head learning rate.
   precedents:
-  - 'docs/ongoing/side-routed-heads.md, inter-series motion: 99% of same-plane pairs move under 2.7 mm.'
+  - 'docs/modeling/side-routed-heads.md, inter-series motion: 99% of same-plane pairs move under 2.7 mm.'
   novelty: Per-study, per-view placement; the pair with the one-point seed says whether tying the planes together matters.
   coverage: Every coronal and sagittal view of every study.
   exploitation: >-

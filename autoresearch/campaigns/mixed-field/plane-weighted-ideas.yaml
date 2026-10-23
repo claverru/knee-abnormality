@@ -30,7 +30,7 @@ ideas:
   - 'Single-plane inference on the ReXNet control (older split and labels): axial alone loses
     0.15-0.22 on the menisci and 0.084 on ACL but only 0.006 on effusion and 0.001 on Baker''s
     cyst; synovitis loses 0.017 from axial or sagittal alone
-    (docs/validation/results/2026-09-27-single-plane-inference.md).'
+    (docs/validation/results/pooling-and-attention/2026-09-27-single-plane-inference.md).'
   novelty: Unequal field shares that differ by plane; the earlier mixes split every series evenly.
   coverage: All studies and labels. Coronal and most sagittal slices keep full 120 mm detail; the
     wide slices sit where effusion, Baker's cyst and synovitis are read.

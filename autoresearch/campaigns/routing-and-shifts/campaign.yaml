@@ -34,7 +34,7 @@ policy:
   require_source_change: true
   configuration_only_ideas: false
   developer_instructions: >-
-    The incumbent is run 24 of docs/ongoing/side-routed-heads.md (read "Runs at a glance", the
+    The incumbent is run 24 of docs/modeling/side-routed-heads.md (read "Runs at a glance", the
     run 24 design and "What the thirty runs show"): one shared classifier for the two meniscus
     targets and one for the three OA targets; a frame inferred per knee, centred on the two
     meniscus attention spots; regions made of eight sectors, a core, two rings and three

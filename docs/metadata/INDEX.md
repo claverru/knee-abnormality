@@ -8,9 +8,7 @@
 | Checking official CSV schemas, hashes and joins | [Official CSV audit](official-csv-audit.md) |
 | Inspecting acquisition headers and series profiles | [Acquisition and series profiles](acquisition-and-series-profiles.md) |
 | Reproducing report normalization | [Heavy report normalization](report-normalization.md) |
-| Checking knee-side metadata coverage | [2026-09-14 knee-side metadata audit](2026-09-14-knee-side-metadata-audit.md) |
-| Investigating coordinate-based knee-side inference | [Knee-side coordinate investigation](knee-side-coordinate-investigation.md) |
-| Reviewing knee-side assignment and abstention rules | [Knee-side policy audit](knee-side-policy-audit.md) |
+| Auditing knee-side metadata, coordinate-based inference and the assignment and abstention policy | [Knee-side metadata](knee-side/INDEX.md) |
 | Comparing label rates across scanner vendors | [Vendor label associations](vendor-label-associations.md) |
 | Judging whether the hidden test holds sites or vendors absent from training, and which training sites can be inferred from report language and scanner (the 19 plus 3 contributing institutions, the Italian and Mongolian gap) | [Sites and test composition](sites-and-test-composition.md) |
-| Auditing series exclusions and plane or contrast labels | [Series filtering and cleaning census](series-filtering-census.md) |
+| Auditing series exclusions and plane or contrast labels | [Series filtering and cleaning census](series-filtering-census/INDEX.md) |

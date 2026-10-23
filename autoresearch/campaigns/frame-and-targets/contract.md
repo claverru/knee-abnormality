@@ -13,7 +13,7 @@ Improve the side-routed model on three topics at once, continuing the
    extensor tendon involved) as targets read in regions, and which report questions are worth
    their head.
 
-The base and starting incumbent is run 24 of [the line](../../../docs/ongoing/side-routed-heads.md),
+The base and starting incumbent is run 24 of [the line](../../../docs/modeling/side-routed-heads.md),
 `side-routed-spot-frame-ring-sectors`
 (`outputs/training/20261006-163650-side-routed-spot-frame-ring-sectors`: fold 1 of
 `all_5fold_scanner_v2`, seed 1110484336, ResNet-18, ten epochs, ×4 0.925067, ×1 0.917070, 0.953

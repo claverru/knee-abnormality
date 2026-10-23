@@ -1,0 +1,78 @@
+ext-convnext-v3-gen1-fold-0	convnext	convnext-v3-gen1-fold-0	0	-	external	remote		convnext-v3-gen1-fold-0
+ext-convnext-v3-gen1-fold-1	convnext	convnext-v3-gen1-fold-1	1	-	external	remote		convnext-v3-gen1-fold-1
+ext-convnext-v3-gen1-fold-2	convnext	convnext-v3-gen1-fold-2	2	-	external	remote		convnext-v3-gen1-fold-2
+ext-convnext-v3-gen1-fold-3	convnext	convnext-v3-gen1-fold-3	3	-	external	remote		convnext-v3-gen1-fold-3
+ext-convnext-v3-gen1-fold-4	convnext	convnext-v3-gen1-fold-4	4	-	external	remote		convnext-v3-gen1-fold-4
+ext-resnet50-v3-gen1-fold-0	resnet50	resnet50-v3-gen1-fold-0	0	-	external	remote		resnet50-v3-gen1-fold-0
+ext-resnet50-v3-gen1-fold-1	resnet50	resnet50-v3-gen1-fold-1	1	-	external	remote		resnet50-v3-gen1-fold-1
+ext-resnet50-v3-gen1-fold-2	resnet50	resnet50-v3-gen1-fold-2	2	-	external	remote		resnet50-v3-gen1-fold-2
+ext-resnet50-v3-gen1-fold-3	resnet50	resnet50-v3-gen1-fold-3	3	-	external	remote		resnet50-v3-gen1-fold-3
+ext-resnet50-v3-gen1-fold-4	resnet50	resnet50-v3-gen1-fold-4	4	-	external	remote		resnet50-v3-gen1-fold-4
+ext-nextvit-v3-gen1-fold-0	nextvit	nextvit-v3-gen1-fold-0	0	-	external	remote		nextvit-v3-gen1-fold-0
+ext-nextvit-v3-gen1-fold-1	nextvit	nextvit-v3-gen1-fold-1	1	-	external	remote		nextvit-v3-gen1-fold-1
+ext-nextvit-v3-gen1-fold-2	nextvit	nextvit-v3-gen1-fold-2	2	-	external	remote		nextvit-v3-gen1-fold-2
+ext-nextvit-v3-gen1-fold-3	nextvit	nextvit-v3-gen1-fold-3	3	-	external	remote		nextvit-v3-gen1-fold-3
+ext-nextvit-v3-gen1-fold-4	nextvit	nextvit-v3-gen1-fold-4	4	-	external	remote		nextvit-v3-gen1-fold-4
+convnext-v3-pretrain	convnext	configs/convnext-v3-pretrain.yaml	0	353746073	pretrain	remote		v3-ext-table
+resnet50-v3-pretrain	resnet50	configs/resnet50-v3-pretrain.yaml	0	2550308344	pretrain	remote		v3-ext-table
+nextvit-v3-pretrain	nextvit	configs/nextvit-v3-pretrain.yaml	0	1969877380	pretrain	remote		v3-ext-table
+convnext-v3-gen2-fold-0	convnext	configs/convnext-v3-gen2.yaml	0	977104152	finetune	any	--validation.split all_5fold_scanner_v3_r1 --initial-weights @T@/convnext-v3-pretrain/fold_0/last.ckpt	convnext-v3-pretrain,v3-gen2-share
+resnet50-v3-gen2-fold-0	resnet50	configs/resnet50-v3-gen2.yaml	0	1822605410	finetune	any	--validation.split all_5fold_scanner_v3_r2 --initial-weights @T@/resnet50-v3-pretrain/fold_0/last.ckpt	resnet50-v3-pretrain,v3-gen2-share
+nextvit-v3-gen2-fold-0	nextvit	configs/nextvit-v3-gen2.yaml	0	2288901369	finetune	any	--validation.split all_5fold_scanner_v3_r3 --initial-weights @T@/nextvit-v3-pretrain/fold_0/last.ckpt	nextvit-v3-pretrain,v3-gen2-share
+convnext-v3-gen2-fold-1	convnext	configs/convnext-v3-gen2.yaml	1	4048462553	finetune	any	--validation.split all_5fold_scanner_v3_r1 --initial-weights @T@/convnext-v3-pretrain/fold_0/last.ckpt	convnext-v3-pretrain,v3-gen2-share
+resnet50-v3-gen2-fold-1	resnet50	configs/resnet50-v3-gen2.yaml	1	3032505247	finetune	any	--validation.split all_5fold_scanner_v3_r2 --initial-weights @T@/resnet50-v3-pretrain/fold_0/last.ckpt	resnet50-v3-pretrain,v3-gen2-share
+nextvit-v3-gen2-fold-1	nextvit	configs/nextvit-v3-gen2.yaml	1	225348660	finetune	any	--validation.split all_5fold_scanner_v3_r3 --initial-weights @T@/nextvit-v3-pretrain/fold_0/last.ckpt	nextvit-v3-pretrain,v3-gen2-share
+convnext-v3-gen2-fold-2	convnext	configs/convnext-v3-gen2.yaml	2	2848558064	finetune	any	--validation.split all_5fold_scanner_v3_r1 --initial-weights @T@/convnext-v3-pretrain/fold_0/last.ckpt	convnext-v3-pretrain,v3-gen2-share
+resnet50-v3-gen2-fold-2	resnet50	configs/resnet50-v3-gen2.yaml	2	2148879476	finetune	any	--validation.split all_5fold_scanner_v3_r2 --initial-weights @T@/resnet50-v3-pretrain/fold_0/last.ckpt	resnet50-v3-pretrain,v3-gen2-share
+nextvit-v3-gen2-fold-2	nextvit	configs/nextvit-v3-gen2.yaml	2	3080653989	finetune	any	--validation.split all_5fold_scanner_v3_r3 --initial-weights @T@/nextvit-v3-pretrain/fold_0/last.ckpt	nextvit-v3-pretrain,v3-gen2-share
+convnext-v3-gen2-fold-3	convnext	configs/convnext-v3-gen2.yaml	3	296903297	finetune	any	--validation.split all_5fold_scanner_v3_r1 --initial-weights @T@/convnext-v3-pretrain/fold_0/last.ckpt	convnext-v3-pretrain,v3-gen2-share
+resnet50-v3-gen2-fold-3	resnet50	configs/resnet50-v3-gen2.yaml	3	2362585229	finetune	any	--validation.split all_5fold_scanner_v3_r2 --initial-weights @T@/resnet50-v3-pretrain/fold_0/last.ckpt	resnet50-v3-pretrain,v3-gen2-share
+nextvit-v3-gen2-fold-3	nextvit	configs/nextvit-v3-gen2.yaml	3	1763070114	finetune	any	--validation.split all_5fold_scanner_v3_r3 --initial-weights @T@/nextvit-v3-pretrain/fold_0/last.ckpt	nextvit-v3-pretrain,v3-gen2-share
+convnext-v3-gen2-fold-4	convnext	configs/convnext-v3-gen2.yaml	4	3766851970	finetune	any	--validation.split all_5fold_scanner_v3_r1 --initial-weights @T@/convnext-v3-pretrain/fold_0/last.ckpt	convnext-v3-pretrain,v3-gen2-share
+resnet50-v3-gen2-fold-4	resnet50	configs/resnet50-v3-gen2.yaml	4	2254439927	finetune	any	--validation.split all_5fold_scanner_v3_r2 --initial-weights @T@/resnet50-v3-pretrain/fold_0/last.ckpt	resnet50-v3-pretrain,v3-gen2-share
+nextvit-v3-gen2-fold-4	nextvit	configs/nextvit-v3-gen2.yaml	4	4184608238	finetune	any	--validation.split all_5fold_scanner_v3_r3 --initial-weights @T@/nextvit-v3-pretrain/fold_0/last.ckpt	nextvit-v3-pretrain,v3-gen2-share
+rsna-convnext-v3-gen2-fold-0	convnext	convnext-v3-gen2-fold-0	0	-	rsna	local		convnext-v3-gen2-fold-0
+rsna-convnext-v3-gen2-fold-1	convnext	convnext-v3-gen2-fold-1	1	-	rsna	local		convnext-v3-gen2-fold-1
+rsna-convnext-v3-gen2-fold-2	convnext	convnext-v3-gen2-fold-2	2	-	rsna	local		convnext-v3-gen2-fold-2
+rsna-convnext-v3-gen2-fold-3	convnext	convnext-v3-gen2-fold-3	3	-	rsna	local		convnext-v3-gen2-fold-3
+rsna-convnext-v3-gen2-fold-4	convnext	convnext-v3-gen2-fold-4	4	-	rsna	local		convnext-v3-gen2-fold-4
+rsna-resnet50-v3-gen2-fold-0	resnet50	resnet50-v3-gen2-fold-0	0	-	rsna	local		resnet50-v3-gen2-fold-0
+rsna-resnet50-v3-gen2-fold-1	resnet50	resnet50-v3-gen2-fold-1	1	-	rsna	local		resnet50-v3-gen2-fold-1
+rsna-resnet50-v3-gen2-fold-2	resnet50	resnet50-v3-gen2-fold-2	2	-	rsna	local		resnet50-v3-gen2-fold-2
+rsna-resnet50-v3-gen2-fold-3	resnet50	resnet50-v3-gen2-fold-3	3	-	rsna	local		resnet50-v3-gen2-fold-3
+rsna-resnet50-v3-gen2-fold-4	resnet50	resnet50-v3-gen2-fold-4	4	-	rsna	local		resnet50-v3-gen2-fold-4
+rsna-nextvit-v3-gen2-fold-0	nextvit	nextvit-v3-gen2-fold-0	0	-	rsna	local		nextvit-v3-gen2-fold-0
+rsna-nextvit-v3-gen2-fold-1	nextvit	nextvit-v3-gen2-fold-1	1	-	rsna	local		nextvit-v3-gen2-fold-1
+rsna-nextvit-v3-gen2-fold-2	nextvit	nextvit-v3-gen2-fold-2	2	-	rsna	local		nextvit-v3-gen2-fold-2
+rsna-nextvit-v3-gen2-fold-3	nextvit	nextvit-v3-gen2-fold-3	3	-	rsna	local		nextvit-v3-gen2-fold-3
+rsna-nextvit-v3-gen2-fold-4	nextvit	nextvit-v3-gen2-fold-4	4	-	rsna	local		nextvit-v3-gen2-fold-4
+convnext-v3-gen3-fold-0	convnext	configs/convnext-v3-gen3.yaml	0	1167337230	finetune	any	--validation.split all_5fold_scanner_v3_r4 --initial-weights @T@/convnext-v3-pretrain/fold_0/last.ckpt	convnext-v3-pretrain,v3-gen3-share
+resnet50-v3-gen3-fold-0	resnet50	configs/resnet50-v3-gen3.yaml	0	3210684802	finetune	any	--validation.split all_5fold_scanner_v3_r5 --initial-weights @T@/resnet50-v3-pretrain/fold_0/last.ckpt	resnet50-v3-pretrain,v3-gen3-share
+nextvit-v3-gen3-fold-0	nextvit	configs/nextvit-v3-gen3.yaml	0	3682196390	finetune	any	--validation.split all_5fold_scanner_v3_r6 --initial-weights @T@/nextvit-v3-pretrain/fold_0/last.ckpt	nextvit-v3-pretrain,v3-gen3-share
+convnext-v3-gen3-fold-1	convnext	configs/convnext-v3-gen3.yaml	1	249981171	finetune	any	--validation.split all_5fold_scanner_v3_r4 --initial-weights @T@/convnext-v3-pretrain/fold_0/last.ckpt	convnext-v3-pretrain,v3-gen3-share
+resnet50-v3-gen3-fold-1	resnet50	configs/resnet50-v3-gen3.yaml	1	2281471807	finetune	any	--validation.split all_5fold_scanner_v3_r5 --initial-weights @T@/resnet50-v3-pretrain/fold_0/last.ckpt	resnet50-v3-pretrain,v3-gen3-share
+nextvit-v3-gen3-fold-1	nextvit	configs/nextvit-v3-gen3.yaml	1	185642676	finetune	any	--validation.split all_5fold_scanner_v3_r6 --initial-weights @T@/nextvit-v3-pretrain/fold_0/last.ckpt	nextvit-v3-pretrain,v3-gen3-share
+convnext-v3-gen3-fold-2	convnext	configs/convnext-v3-gen3.yaml	2	1554312444	finetune	any	--validation.split all_5fold_scanner_v3_r4 --initial-weights @T@/convnext-v3-pretrain/fold_0/last.ckpt	convnext-v3-pretrain,v3-gen3-share
+resnet50-v3-gen3-fold-2	resnet50	configs/resnet50-v3-gen3.yaml	2	2519792708	finetune	any	--validation.split all_5fold_scanner_v3_r5 --initial-weights @T@/resnet50-v3-pretrain/fold_0/last.ckpt	resnet50-v3-pretrain,v3-gen3-share
+nextvit-v3-gen3-fold-2	nextvit	configs/nextvit-v3-gen3.yaml	2	1134566201	finetune	any	--validation.split all_5fold_scanner_v3_r6 --initial-weights @T@/nextvit-v3-pretrain/fold_0/last.ckpt	nextvit-v3-pretrain,v3-gen3-share
+convnext-v3-gen3-fold-3	convnext	configs/convnext-v3-gen3.yaml	3	3674005124	finetune	any	--validation.split all_5fold_scanner_v3_r4 --initial-weights @T@/convnext-v3-pretrain/fold_0/last.ckpt	convnext-v3-pretrain,v3-gen3-share
+resnet50-v3-gen3-fold-3	resnet50	configs/resnet50-v3-gen3.yaml	3	3317475955	finetune	any	--validation.split all_5fold_scanner_v3_r5 --initial-weights @T@/resnet50-v3-pretrain/fold_0/last.ckpt	resnet50-v3-pretrain,v3-gen3-share
+nextvit-v3-gen3-fold-3	nextvit	configs/nextvit-v3-gen3.yaml	3	203374578	finetune	any	--validation.split all_5fold_scanner_v3_r6 --initial-weights @T@/nextvit-v3-pretrain/fold_0/last.ckpt	nextvit-v3-pretrain,v3-gen3-share
+convnext-v3-gen3-fold-4	convnext	configs/convnext-v3-gen3.yaml	4	1015016933	finetune	any	--validation.split all_5fold_scanner_v3_r4 --initial-weights @T@/convnext-v3-pretrain/fold_0/last.ckpt	convnext-v3-pretrain,v3-gen3-share
+resnet50-v3-gen3-fold-4	resnet50	configs/resnet50-v3-gen3.yaml	4	3557481011	finetune	any	--validation.split all_5fold_scanner_v3_r5 --initial-weights @T@/resnet50-v3-pretrain/fold_0/last.ckpt	resnet50-v3-pretrain,v3-gen3-share
+nextvit-v3-gen3-fold-4	nextvit	configs/nextvit-v3-gen3.yaml	4	347410685	finetune	any	--validation.split all_5fold_scanner_v3_r6 --initial-weights @T@/nextvit-v3-pretrain/fold_0/last.ckpt	nextvit-v3-pretrain,v3-gen3-share
+rsna-convnext-v3-gen3-fold-0	convnext	convnext-v3-gen3-fold-0	0	-	rsna	local		convnext-v3-gen3-fold-0
+rsna-convnext-v3-gen3-fold-1	convnext	convnext-v3-gen3-fold-1	1	-	rsna	local		convnext-v3-gen3-fold-1
+rsna-convnext-v3-gen3-fold-2	convnext	convnext-v3-gen3-fold-2	2	-	rsna	local		convnext-v3-gen3-fold-2
+rsna-convnext-v3-gen3-fold-3	convnext	convnext-v3-gen3-fold-3	3	-	rsna	local		convnext-v3-gen3-fold-3
+rsna-convnext-v3-gen3-fold-4	convnext	convnext-v3-gen3-fold-4	4	-	rsna	local		convnext-v3-gen3-fold-4
+rsna-resnet50-v3-gen3-fold-0	resnet50	resnet50-v3-gen3-fold-0	0	-	rsna	local		resnet50-v3-gen3-fold-0
+rsna-resnet50-v3-gen3-fold-1	resnet50	resnet50-v3-gen3-fold-1	1	-	rsna	local		resnet50-v3-gen3-fold-1
+rsna-resnet50-v3-gen3-fold-2	resnet50	resnet50-v3-gen3-fold-2	2	-	rsna	local		resnet50-v3-gen3-fold-2
+rsna-resnet50-v3-gen3-fold-3	resnet50	resnet50-v3-gen3-fold-3	3	-	rsna	local		resnet50-v3-gen3-fold-3
+rsna-resnet50-v3-gen3-fold-4	resnet50	resnet50-v3-gen3-fold-4	4	-	rsna	local		resnet50-v3-gen3-fold-4
+rsna-nextvit-v3-gen3-fold-0	nextvit	nextvit-v3-gen3-fold-0	0	-	rsna	local		nextvit-v3-gen3-fold-0
+rsna-nextvit-v3-gen3-fold-1	nextvit	nextvit-v3-gen3-fold-1	1	-	rsna	local		nextvit-v3-gen3-fold-1
+rsna-nextvit-v3-gen3-fold-2	nextvit	nextvit-v3-gen3-fold-2	2	-	rsna	local		nextvit-v3-gen3-fold-2
+rsna-nextvit-v3-gen3-fold-3	nextvit	nextvit-v3-gen3-fold-3	3	-	rsna	local		nextvit-v3-gen3-fold-3
+rsna-nextvit-v3-gen3-fold-4	nextvit	nextvit-v3-gen3-fold-4	4	-	rsna	local		nextvit-v3-gen3-fold-4

@@ -14,7 +14,7 @@ ideas:
     signal (docs/modeling/report-attribute-heads.md, Question weighting). The heads are worth keeping:
     +0.00105 x4 at adoption and -0.0006 when removed on the ResNet-18 recipe. The same sharing gave
     the five routed targets +0.0090 to +0.0131 against separate classifiers in the fourth and fifth
-    runs (docs/ongoing/side-routed-heads.md).'
+    runs (docs/modeling/side-routed-heads.md).'
   mechanism: 'Five question families get one shared head each (one attention score column and one classifier
     block of options), routed by the model''s routing weights exactly as the targets are. The option
     lists inside each family are identical in configs/labels/jevk5-report-attribute-targets-v3.1.json
@@ -42,7 +42,7 @@ ideas:
     and PF OA as front_up, the cartilage questions use those three routes in place of medial_back, lateral_back
     and front.'
   precedents:
-  - 'docs/ongoing/side-routed-heads.md, Fourth run and Fifth run: the five routed targets sum to +0.0131
+  - 'docs/modeling/side-routed-heads.md, Fourth run and Fifth run: the five routed targets sum to +0.0131
     and +0.0090 against the reference; localisation +0.002 to +0.013 in the fourth run.'
   - 'docs/modeling/report-attribute-heads.md: adoption at +0.00105 x4 and 0.940 against 0.938 public;
     removal on the ResNet-18 recipe -0.0006 (80% [-0.0011, -0.0001]).'

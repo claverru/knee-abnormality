@@ -14,7 +14,7 @@ ideas:
     augmentation, 26 triplets and 10 epochs.'
   precedents:
   - 'outputs/training/20260928-183517-radimagenet-resnet10t (older recipe, x4 0.922579).'
-  - 'docs/ongoing/radimagenet-backbone.md: RadImageNet ResNet backbones and the weight-RMS rule.'
+  - 'docs/modeling/backbones/resnet-radimagenet-backbones.md: RadImageNet ResNet backbones and the weight-RMS rule.'
   novelty: First ResNet-10t run on the current recipe.
   coverage: All studies and labels.
   exploitation: Per-epoch x1 and per-stage drift against the incumbent; training seconds.
@@ -34,7 +34,7 @@ ideas:
   mechanism: 'model.backbone resnet10t.c3_in1k, RadImageNet weights, optimizer.backbone_lr 6e-5; every
     other setting exactly as the incumbent.'
   precedents:
-  - 'docs/ongoing/radimagenet-backbone.md: weight-RMS rule, 5e-5 (RMS 0.0124) and 6e-5 (RMS 0.0158).'
+  - 'docs/modeling/backbones/resnet-radimagenet-backbones.md: weight-RMS rule, 5e-5 (RMS 0.0124) and 6e-5 (RMS 0.0158).'
   novelty: First ResNet-10t run on the current recipe at its own scaled rate.
   coverage: All studies and labels.
   exploitation: As rn10t-incumbent-recipe.

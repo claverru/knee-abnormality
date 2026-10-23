@@ -1,9 +1,11 @@
 # Inference image count and memory
 
-Select **2× image limits with batch size 2**, following the completed public
-scores on 2026-09-11. New exports and repository test prediction default to 2×;
-validation retains its saved validation multiplier. Each bundle freezes its
-exported density. Baseline4's saved validation already used 2×.
+Dated evidence from 2026-09-11: the baseline4 comparison favoured **2× image limits with batch
+size 2**, and exports and repository test prediction defaulted to 2× (validation keeps its saved
+validation multiplier). Each bundle freezes its exported density. Baseline4's saved validation
+already used 2×. Later submissions moved to ×4 (2026-09-18), ×6 and ×8; those settings and their
+temperatures are in the [ledger](submissions/ledger.md), the choice of ×4 in
+[temperature and count submissions](../validation/results/pooling-and-attention/2026-09-18-temperature-and-count-submissions.md).
 
 | Image multiplier | Inference batch size | Public score | Submission | Submission to observed completion |
 |---|---:|---:|---|---|
@@ -15,7 +17,7 @@ All three use baseline4's selected fold-0 ReXNet-200 epoch-7 checkpoint,
 `outputs/training/baseline4/fold_0/best-epoch=07-val_macro_auc=0.87251.ckpt` (deleted on 2026-09-16), with
 SHA-256 `002778da78be2bb535618f8cb307ee631b94ca561a47e5f691964d879f0d276d`.
 The 2× and 3× submissions share batch size 2; the earlier 1× submission used
-batch size 8. These public scores favor 2× for current single-fold iteration.
+batch size 8. These public scores favoured 2× for single-fold iteration at the time.
 The intervals include queue and evaluation time plus up to one 30-second
 polling interval, so they do not isolate model inference. That 3× was the faster
 run is nonetheless likely: the efficiency leaderboard showed the 3× submission
@@ -37,7 +39,7 @@ selected epoch-7 checkpoint and its saved config. Values are GiB:
 
 Batch-8 values extrapolate batch-dependent memory linearly after subtracting
 model parameters; they are estimates, not measured batch-8 runs. Batch 8 is too
-risky at 3× on a 16 GB T4. Keep **batch 2 for inference**. Different GPU
+risky at 3× on a 16 GB T4, and batch 2 was used for inference then. Different GPU
 workspaces and hidden-study composition can change the peaks, so these are
 planning measurements rather than a worst-case guarantee.
 

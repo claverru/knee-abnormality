@@ -1,6 +1,6 @@
 # Refined-RadImageNet campaign
 
-**Closed: stopped by the user on 2026-10-04 at 20:43 CEST after 18 scored runs and two manual ones; the one adoption is the checkpoint normalization, on main since 2026-10-05 ([results](../../../docs/validation/results/2026-10-04-refined-radimagenet-campaign.md)).** It tested how to get more out of Refined-RadImageNet
+**Closed: stopped by the user on 2026-10-04 at 20:43 CEST after 18 scored runs and two manual ones; the one adoption is the checkpoint normalization, on main since 2026-10-05 ([results](../../../docs/validation/results/backbones/2026-10-04-refined-radimagenet-campaign.md)).** It tested how to get more out of Refined-RadImageNet
 pretraining on the ResNet-18 recipe: the checkpoint's own input statistics, the authors'
 policy-gradient mask (their mask-trained weights and the mask in our fine-tuning), the pretrained
 165-class head with its 18 knee classes, and adjacent slices through Cross-D and ACS

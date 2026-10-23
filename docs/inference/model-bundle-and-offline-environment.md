@@ -10,10 +10,10 @@ resolved device, precision and timing. `export.py` freezes those components and
 offline dependencies, while `submit.py` versions the private Dataset, launches
 the notebook, verifies its output and submits that exact version.
 
-Local and visible Kaggle checks establish the baseline3 artifact described
-below. They do not establish hidden-data mounts, compressed-image mix, full
-runtime or a successful scored submission. Unsupported series are logged and
-ignored; a study with no decodable supported acquisition fails explicitly.
+Local and visible Kaggle checks established the baseline3 artifact (see
+[early submission details](submissions/early-submission-details.md)); scored submissions later
+confirmed the hidden-data path. Unsupported series are logged and ignored; a study with no decodable
+supported acquisition fails explicitly.
 
 Code: [prediction CLI](../../scripts/pipeline/predict.py),
 [inference engine](../../src/knee_abnormality/inference/engine.py),
@@ -25,9 +25,8 @@ Code: [prediction CLI](../../scripts/pipeline/predict.py),
 
 ## Model bundle and offline environment
 
-Freeze a selected fold checkpoint after reviewing its complete validation
-results. Start with one checkpoint so the first submitted run measures a
-small, reproducible pipeline. `export.py` also accepts more than one
+A bundle freezes selected fold checkpoints after review of their complete validation results.
+The first submissions used one checkpoint; `export.py` also accepts more than one
 checkpoint to build a multi-checkpoint ensemble bundle; see
 [below](#multi-checkpoint-ensemble-bundles).
 
@@ -93,7 +92,7 @@ builds an ensemble bundle instead:
   macro AUC on this project's 5-fold OOF). Decoding stays single-pass, so
   extra members cost close to their own forward time rather than a repeated
   load; see the
-  [x4 loading profile](2026-09-18-kaggle-x4-profile-after-index-changes.md)
+  [x4 loading profile](profiling/2026-09-18-kaggle-x4-profile-after-index-changes.md)
   for the loader-wait/forward split this assumes. A one-member bundle is a
   mean over one value, bit-identical to a plain forward pass.
 - `--attention-temperature` accepts one value (applied to every member) or
@@ -117,6 +116,20 @@ builds an ensemble bundle instead:
   was confirmed to keep the pre-ensemble `manifest.json`/`config.json` schema
   and to reproduce a plain forward pass bit for bit.
 
+Checkpoints from different source trees or data settings cannot share one bundle: the exporter and
+Kaggle loader reject a member whose `preprocessing_identity.sources_sha256` differs from the bundled
+source (`identity.validate_preprocessing_identity`), and `_validate_members` in
+`scripts/pipeline/export.py` and `load_ensemble_models` require identical `data` sections (so members
+at different `data.study_slice_total` cannot share a pass). S80 (2026-09-29) worked around this by
+shipping two bundles in one dataset and a hand-written notebook (scratchpad `ens/submit_ensemble.py`,
+never in the repository) that ran `scripts.pipeline.predict` once per bundle and averaged the CSVs:
+0.949 public against 0.944 for each member (S78, S79), but about 41 min of scoring because every test
+study was decoded twice, and its bundle search walked all of `/kaggle/input` (345 s before inference on
+the three public studies). The source differences between those two members were additive (an import
+move in `data/dataset.py`, RadImageNet/ResNet support in `modeling/model.py`, ResNet mappings in
+`modeling/spatial_tokens.py`). A single-pass route (a recorded parity proof per differing member, or
+separate data and model identities, plus a bundle-level triplet total) was proposed and never built.
+
 ### Backbone mode
 
 `export.py --backbone` records how the FP16 backbone runs on Kaggle, in `manifest.json`'s
@@ -130,7 +143,7 @@ In both modes the prediction worker holds each member's backbone in FP16.
   GPU. The bundle's submission description carries `eager`.
 
 The choice is per bundle because the graph pools depend on the members' families, not only their
-count ([compile](2026-10-19-torch-compile-backbone.md#a-graph-sized-ensemble)).
+count ([compile](profiling/2026-10-19-torch-compile-backbone.md#a-graph-sized-ensemble)).
 
 ### Reflection test-time augmentation (TTA2)
 
@@ -169,7 +182,7 @@ argument there invalidates every existing checkpoint and makes `export.py` refus
 `model.py` stays byte-identical, so every checkpoint that predates the transform remains
 valid. `inference/reflection.py` itself has since joined the hashed sources, so editing the
 transform now invalidates existing checkpoints
-([detail-view coordinates](../validation/results/2026-10-05-code-audit-measurements.md#f01-reflection-tta-detail-coordinates)).
+([detail-view coordinates](../validation/results/campaigns-and-queues/2026-10-05-code-audit-measurements.md#f01-reflection-tta-detail-coordinates)).
 
 Verified equal to forcing reflection inside the model: on two fold-0 studies the two
 routes agree to **exactly 0.0**, while both differ from the unreflected pass by 0.087.
@@ -208,7 +221,7 @@ Because labels and folds are not bundled, reproducing validation through a bundl
 original data root and the checkpoint's label manifest, run from the bundle's own code:
 
 ```bash
-rtk proxy uv run --locked env PYTHONPATH=outputs/submission/exports/BUNDLE/code \
+uv run --locked env PYTHONPATH=outputs/submission/exports/BUNDLE/code \
   python -m scripts.pipeline.predict outputs/submission/exports/BUNDLE/config.json \
   --bundle outputs/submission/exports/BUNDLE --data-root data \
   --label-manifest configs/labels/combined-label-sources.json \
@@ -223,7 +236,7 @@ CPU, and hashes packaged files. Readiness requires target Python/platform values
 and all three decoder wheels. Export runs no local inference and records no
 verification evidence, so a bundle claims neither numerical parity nor fresh codec
 execution; the on-demand
-[inference verification](fast-submission-preparation.md) is a separate diagnostic.
+[inference verification](justfile-recipes.md#optional-verification-diagnostic) is a separate diagnostic.
 A required preprocessing identity matches the checkpoint
 to the copied dataset/preprocessing sources, algorithm and reliability rules;
 missing or mismatched identities fail export. Bundled prediction recomputes
@@ -241,20 +254,20 @@ and the second JPEG 2000 according to the
 Verify real images using the listed syntaxes; the tiny example set need not
 exercise every codec.
 
-**Kaggle's notebook image runs Python 3.13 since 2026-10-03** (S98's first attempts failed on the
+**Kaggle's notebook image ran Python 3.13 from 2026-10-03** (S98's first attempts failed on the
 cp312 codec wheels, then on a missing `pydantic-settings`). The wheels that work are in
 `outputs/submission/dependencies/kaggle-py313`: `pylibjpeg` 2.1.0, `pylibjpeg-libjpeg` 2.4.0 and
 `pylibjpeg-openjpeg` 2.5.0 (cp313), `pydantic_settings` 2.15.0 and `python_dotenv` 1.2.3. They
-are the export defaults since 2026-10-04 (`KAGGLE_PYTHON`, `KAGGLE_WHEELS` and the pinned
+were the export defaults from 2026-10-04 (`KAGGLE_PYTHON`, `KAGGLE_WHEELS` and the pinned
 `OFFLINE_WHEELS` in `src/knee_abnormality/kaggle.py`), `prepare-codecs` downloads all five, and
 export refuses a wheel directory that lacks one. S98 to S102 passed the folder and version as
-flags. The local project stays on Python 3.12. Backbones with compiled kernels add their own
+flags. The local project moved to Python 3.13 on 2026-10-17 (torch 2.11). Backbones with compiled kernels add their own
 folder, listed in `BACKBONE_WHEELS`: export copies it for every member with that backbone, so a
 MambaVision-T bundle carries `kaggle-py313-mambavision`
-([wheels](../modeling/mambavision-backbone.md#dependencies)).
+([wheels](../modeling/backbones/mambavision-backbone.md#dependencies)).
 
-Inspect the notebook's Python, Torch/CUDA build, GPU compute capability and
-compiled architecture support before selecting wheels. A local RTX 3090
+The notebook's Python, Torch/CUDA build, GPU compute capability and
+compiled architecture support had to be inspected before selecting wheels. A local RTX 3090
 bfloat16 run does not establish compatibility with another accelerator.
 The installed Torch API provides
 `torch.cuda.is_bf16_supported(including_emulation=False)` to distinguish native
@@ -264,3 +277,28 @@ that the Torch build itself supports the chosen GPU. The
 records the relevant package inventory. Resolve/install from attached local
 wheels with package-index access disabled; avoid blind upgrades of the whole
 training environment inside a scored notebook.
+
+## Preprocessing identity and the physical sampler
+
+Runs on the physical sampler use `physical_gaussian_overlap_spatial_tokens_v1` (later identities such as
+`…reflection_v10`), which includes fixed gap, complete-link grouping, local-fallback, seed, retry and
+unique-slice intensity rules. Source hashing includes `data/preprocessing/sampling.py` (one entry of
+`identity.PREPROCESSING_SOURCES`); export copies the package and records SciPy in its runtime
+dependency manifest. SciPy is a locked project dependency and already installed in the pinned Kaggle
+runtime, so no package was added.
+
+- Until 2026-09-17, checkpoint compatibility checks required the configured seed to match the saved
+  seed, because a seeded permutation broke evaluation supplier ties between overlapping acquisitions.
+  From identity `…reflection_v10`, a fixed
+  [source ranking](../data-preparation/physical-sampling/implemented-sampler.md) breaks them,
+  prediction datasets receive no seed and the check is gone; resume still compares the seed with the
+  rest of the training settings.
+- Old checkpoints and bundles retain their original config and source; strict identity validation
+  rejects using them with the sampler. The 2× inference multiplier and tensor shapes were kept.
+  Loader capacity ranking estimates possible overlapping triplets (`max(n_images - 2, 0)`) rather than
+  dividing unique files into non-overlapping inputs; geometry and run constraints can lower the
+  estimate, and actual input counts come from preparation.
+- On the pinned accepted-center cohort, validation realizes 6,248 triplets versus 5,659 historically,
+  **10.4% more CNN inputs** at the same nominal limits. This is metadata/preparation evidence, not an
+  inference runtime, memory or accuracy measurement
+  ([verification](../data-preparation/physical-sampling/implementation-verification.md)).

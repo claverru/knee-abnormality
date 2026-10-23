@@ -1,7 +1,7 @@
 # Accurate sampling centers
 
 Midpoint sampling remains selected after the
-[completed comparison](../validation/results/2026-09-12-accurate-centers-result.md).
+[completed comparison](../validation/results/sampling/2026-09-12-accurate-centers-result.md).
 The geometric sampler was not adopted. Its shared foundation remains: the
 pooled loader indexes all supported acquisitions before sampling and
 fits one study point to their acquisition-center lines, balancing total weight
@@ -30,7 +30,7 @@ unchanged. Production now uses the shared Gaussian sampler documented above.
 The archived 2026-09-12 candidate shifted only the center while retaining the original
 half-span, allowing different weights at the two endpoints.
 
-The [real-data audit](../../outputs/analysis/a/accurate-centers-20260912/summary.json)
+The real-data audit (`outputs/analysis/a/accurate-centers-20260912/summary.json`, deleted)
 reprocessed the saved 128-study, 721-series sample: 124 accepted studies,
 four RMS rejections, 696 projected series, 24 study-rejection midpoints and
 one out-of-range midpoint. Accepted points differ from the all-slice reference
@@ -38,17 +38,17 @@ by at most 0.00056 mm. Validation allocations changed 2,269 triplet centers;
 per-series deterministic and seeded selections repeated exactly. This sample
 did not exercise missing planes or invalid/mixed-source metadata.
 
-Six training-member [coverage sheets](../../outputs/analysis/a/accurate-centers-20260912/coverage_00.png)
+Six training-member coverage sheets (deleted)
 include the out-of-range case, high residuals and large shifts. Yellow boxes
 mark the retained crop and red crosses project the study reference onto native
 images. Reviewed cases preserve knee coverage, but acquisition agreement is
 not local registration evidence or an accuracy result. The series table records
 the selected triplet indices and shifts. The final source audit is saved in
-[`accurate-centers-final-20260912`](../../outputs/analysis/a/accurate-centers-final-20260912/summary.json).
+`accurate-centers-final-20260912` (`outputs/analysis/a/accurate-centers-final-20260912/summary.json`, deleted).
 The completed audit utility and candidate sampler are preserved together in
 that directory's `source_snapshot.zip` and the training run's source snapshot.
 Extract into a separate directory and use its `src` on `PYTHONPATH` to rerun
-`scripts/adhoc/audit_sampling_centers.py` with the config/selection/reference
+`scripts/adhoc/audit_sampling_centers.py` (removed) with the config/selection/reference
 paths recorded in the audit artifacts. The retired candidate is not a
 production configuration option.
 
@@ -136,7 +136,7 @@ describe what the sampler actually sees.
   `data.sampling_sigma_fraction`, not the 40-mm sigma above:
 
   ```bash
-  rtk proxy uv run --locked python -m scripts.adhoc.analyze_study_center_extents --output-dir outputs/analysis/study-center-extents-new
+  uv run --locked python -m scripts.adhoc.analyze_study_center_extents --output-dir outputs/analysis/study-center-extents-new
   ```
 
 See [modeling](../modeling/unverified-modeling-notes.md#window-sampling) for slice-window selection and

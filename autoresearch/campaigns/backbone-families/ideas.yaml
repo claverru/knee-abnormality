@@ -23,7 +23,7 @@ ideas:
     0.0001; everything else the recipe''s.'
   precedents:
   - "Swin-T on the MambaVision recipe, fold 2, 2026-10-14: \xD74 0.937176, blend with\
-    \ the ResNet-50 +0.0016 (docs/validation/results/2026-10-14-swin-t.md)."
+    \ the ResNet-50 +0.0016 (docs/validation/results/backbones/2026-10-14-swin-t.md)."
   - 'ResNet-50 recipe (weights 0.062 stem to 0.0073 last stage): rate 5e-5, anchors
     0.01 and 0.001.'
   novelty: First attention-only backbone with dense segmentation pretraining here.
@@ -168,7 +168,7 @@ ideas:
     (depthwise convolutions, no BatchNorm). Settings: model.backbone the new name;
     rate and anchors the recipe''s.'
   precedents:
-  - 'ConvNeXt-T padding of image counts to multiples of 16 (docs/modeling/mambavision-backbone.md,
+  - 'ConvNeXt-T padding of image counts to multiples of 16 (docs/modeling/backbones/mambavision-backbone.md,
     New batch sizes): 4.3 s per unseen count without it.'
   novelty: First modulation-based backbone here.
   coverage: Every study and every label.
@@ -247,7 +247,7 @@ ideas:
     rate 5e-5 and anchors 0.01 early, 0.0002 late for its small flat weight scale
   opportunity: 'Evidence (prior-work.md, DINOv3 ConvNeXt-T): ConvNeXt-T distilled
     from the DINOv3 7B teacher on 1.7B images, self-supervised dense features instead
-    of ImageNet labels; second of 34 in the 2026 backbone search (docs/modeling/backbone-search.md,
+    of ImageNet labels; second of 34 in the 2026 backbone search (docs/modeling/backbones/backbone-search.md,
     0.904386). Added at the user''s request on 2026-10-15. Its weights are flat over
     depth but small (RMS 0.0096 stem, 0.014 to 0.018 in the stages, against 0.021
     to 0.028 for the in12k ConvNeXt-T), so the MambaVision rate and anchors do not
@@ -270,7 +270,7 @@ ideas:
     \ 0.01 as the ResNet-50, the in12k ConvNeXt-T config and Hiera-T."
   - "ConvNeXt-T and -S with DINOv3 weights on the ReXNet-style recipe, fold 0, 2026-10-03:\
     \ \xD74 0.927235 at best against 0.932477 for the ResNet-18 control, on an older\
-    \ recipe (docs/modeling/backbone-swaps.md)."
+    \ recipe (docs/modeling/backbones/backbone-swaps.md)."
   novelty: First DINOv3 weights on the current recipe.
   coverage: Every study and every label.
   exploitation: "Read \xD74 and \xD71 against the reference, the per-label changes\
@@ -418,7 +418,7 @@ ideas:
     \ to 2.6e-3, as MambaVision-T's)."
   precedents:
   - "Swin-T on the MambaVision recipe, fold 2, 2026-10-14: \xD74 0.937176, 4,023 s,\
-    \ 23.4 GB (docs/validation/results/2026-10-14-swin-t.md)."
+    \ 23.4 GB (docs/validation/results/backbones/2026-10-14-swin-t.md)."
   - 'FocalNet-T SRF in this campaign: 23 GB at 332 W in P2 without spilling; 5.5 min
     per epoch after its speed repair.'
   novelty: First channel-attention backbone here.
@@ -546,7 +546,7 @@ ideas:
     \ a third of it."
   precedents:
   - 'MaViT-S: BatchNorm with depthwise convolutions cost 8 s per new image count unpadded
-    (docs/modeling/mambavision-backbone.md).'
+    (docs/modeling/backbones/mambavision-backbone.md).'
   - 'PVTv2-b2 (weights 0.045 to 0.056) and RadioDINO-S/16: the recipe''s rate held.'
   novelty: First linear-attention backbone and first padded BatchNorm family here.
   coverage: Every study and every label.
@@ -666,7 +666,7 @@ ideas:
     ten epochs the default; twelve was MambaVision-Ts recipe)'
   opportunity: 'Evidence (prior-work.md, DINOv3 ConvNeXt-T): ConvNeXt-T distilled
     from the DINOv3 7B teacher on 1.7B images, self-supervised dense features instead
-    of ImageNet labels; second of 34 in the 2026 backbone search (docs/modeling/backbone-search.md,
+    of ImageNet labels; second of 34 in the 2026 backbone search (docs/modeling/backbones/backbone-search.md,
     0.904386). Added at the user''s request on 2026-10-15. Its weights are flat over
     depth but small (RMS 0.0096 stem, 0.014 to 0.018 in the stages, against 0.021
     to 0.028 for the in12k ConvNeXt-T), so the MambaVision rate and anchors do not
@@ -689,7 +689,7 @@ ideas:
     \ 0.01 as the ResNet-50, the in12k ConvNeXt-T config and Hiera-T."
   - "ConvNeXt-T and -S with DINOv3 weights on the ReXNet-style recipe, fold 0, 2026-10-03:\
     \ \xD74 0.927235 at best against 0.932477 for the ResNet-18 control, on an older\
-    \ recipe (docs/modeling/backbone-swaps.md)."
+    \ recipe (docs/modeling/backbones/backbone-swaps.md)."
   novelty: First DINOv3 weights on the current recipe.
   coverage: Every study and every label.
   exploitation: "Read \xD74 and \xD71 against the reference, the per-label changes\
@@ -912,7 +912,7 @@ ideas:
     \ The feature-statistics augmentation stays outside the checkpointed stages."
   precedents:
   - 'MaViT-S: BatchNorm with depthwise convolutions cost 8 s per new image count unpadded
-    (docs/modeling/mambavision-backbone.md).'
+    (docs/modeling/backbones/mambavision-backbone.md).'
   - 'PVTv2-b2 (weights 0.045 to 0.056) and RadioDINO-S/16: the recipe''s rate held.'
   - 'efficientvit-b2 (2026-10-16): the preflight ran out of memory at its 52nd training
     batch under the 22.5 GiB cap (22.29 GiB allocated), so it never trained; blocked

@@ -25,7 +25,7 @@ ideas:
     reversal (reversal cast to its dtype), returned under "view_to_wide". Wide views are
     unchanged in both paths (V is the identity, and they use the grid). Nothing else changes.
   precedents:
-  - 'docs/validation/results/2026-10-05-code-audit-measurements.md, F01: parity of the two TTA variants against the training reflection and their pooled out-of-fold scores.'
+  - 'docs/validation/results/campaigns-and-queues/2026-10-05-code-audit-measurements.md, F01: parity of the two TTA variants against the training reflection and their pooled out-of-fold scores.'
   - 'docs/data-preparation/reflection-geometry-and-previews.md: 2D anchors stay in the augmented image frame.'
   novelty: First correction of detail-view positions under reflection since the detail views arrived on 2026-10-02.
   coverage: >-
@@ -111,7 +111,7 @@ ideas:
     view_position with side 0 places the coronal window at the centre (its offset is 0) and the
     sagittal window with its fixed direction.
   precedents:
-  - 'docs/validation/results/2026-10-05-code-audit-measurements.md, F04 and F05: 170 studies with unknown side, 4,400 with a fitted centre.'
+  - 'docs/validation/results/campaigns-and-queues/2026-10-05-code-audit-measurements.md, F04 and F05: 170 studies with unknown side, 4,400 with a fitted centre.'
   novelty: First separation of "centre known" from "side known".
   coverage: About 3.7% of training studies and the same share of validation; any test study with an unknown side.
   exploitation: >-
@@ -169,7 +169,7 @@ ideas:
     resampled_std.clamp_min_(0) before it is applied. Nothing else changes; the probability
     stays 0.5.
   precedents:
-  - 'docs/validation/results/2026-10-01-revisits-campaign.md: no DSU on ResNet-18, -0.0013 (80% [-0.0027, -0.0001]), so the mechanism stays.'
+  - 'docs/validation/results/campaigns-and-queues/2026-10-01-revisits-campaign.md: no DSU on ResNet-18, -0.0013 (80% [-0.0027, -0.0001]), so the mechanism stays.'
   novelty: First run with the scale restricted to non-negative values.
   coverage: Training only, half of the acquisitions.
   exploitation: >-

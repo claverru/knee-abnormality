@@ -47,7 +47,7 @@ policy:
     the integration and activation declarations and the guardrail JSON in the report. An
     unwritable experiment directory is never a reason to return blocked.
     The incumbent is described in prior-work.md (The incumbent) and drawn in
-    docs/ongoing/side-routed-heads.md: one shared classifier for the two meniscus targets and
+    docs/modeling/side-routed-heads.md: one shared classifier for the two meniscus targets and
     one for the three OA targets; a frame inferred per knee in KneeAbnormalityModel.study_frames
     (centre and side axis from the two meniscus spots; forward tilt, the two height cuts, the
     core and the ring radius regressed per knee); regions in _regions

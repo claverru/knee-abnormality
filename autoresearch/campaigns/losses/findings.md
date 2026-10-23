@@ -91,8 +91,8 @@ Evidence:
 - candidate source/src/knee_abnormality/training/losses/focal.py:11-25 (mask, focal factors, class weight, mean over observed)
 - baseline source/src/knee_abnormality/training/lightning.py:104-118 (parent BCE helper; semantics matched)
 - candidate source/src/knee_abnormality/training/lightning.py:307-312 (training_step call, float32 logits preserved)
-- docs/research/per-label-losses.md:104-111 (proposed soft-target focal definition, whole-cell class weight, differentiate through focal factors)
-- docs/research/per-label-losses.md:102 (loss scale and focal exponent change updates at the same nominal LR)
+- docs/research/training-objectives/per-label-losses.md:104-111 (proposed soft-target focal definition, whole-cell class weight, differentiate through focal factors)
+- docs/research/training-objectives/per-label-losses.md:102 (loss scale and focal exponent change updates at the same nominal LR)
 - jobs/developer-20260920T113454Z-48711e4e/report.json (gamma=0 equals BCE at 1.2057465314865112; finite gradients at logits +/-50)
 - diff -rq baseline/source vs candidate/source: only configs/training.yaml, config.py, lightning.py differ plus new training/losses/ (__init__.py empty)
 
@@ -230,7 +230,7 @@ Evidence:
 - outputs/autoresearch/losses/jobs/researcher-20260920T121718Z-2ea25138/scratch/contrast-evidence-20260920.md:9-57 (cross-label correlation, contrast AUC, pair coverage)
 - same note:59-72 (inference decorrelation negative result), :74-85 (snapshot ensembling), :87-99 (per-label scale, report groups), :101-112 (Brier gradient profile)
 - reproduction scripts: same scratch dir structure.py, contrast.py, decouple.py, probe.py
-- docs/research/auc_loss_approaches.md:135-136,235-237 (cross-label direction ranked out on opinion, no local measurement)
+- docs/research/training-objectives/auc_loss_approaches.md:135-136,235-237 (cross-label direction ranked out on opinion, no local measurement)
 - src/knee_abnormality/training/lightning.py:104,307 (masked BCE call site both proposals target)
 
 ## completion-20260920T124339Z-2948d523
@@ -1110,7 +1110,7 @@ Unresolved concerns:
 Evidence:
 - Proposal source: outputs/autoresearch/losses/jobs/researcher-20260920T171556Z-b263ac05/report.json
 - outputs/autoresearch/losses/jobs/researcher-20260920T171556Z-b263ac05/scratch/draw-noise-20260920.md sections 1-4 and draw_noise.py (CPU-only analysis of saved artifacts)
-- docs/validation/results/2026-09-19-relative-sampler-width-result.md#count-multipliers: recorded x1..x4 fold-0 table for control-check and sigma-fraction-0867
+- docs/validation/results/sampling/2026-09-19-relative-sampler-width-result.md#count-multipliers: recorded x1..x4 fold-0 table for control-check and sigma-fraction-0867
 - src/knee_abnormality/training/lightning.py:222-228 (non-persistent buffer), :305-320 (training_step, study_uid, float32 logits) in baseline/source, verified directly
 - src/knee_abnormality/data/dataset.py:190-197: triplet selection seeded by (study uid, training_seed, epoch), verified directly
 - shared-bce-ranking-20260920T112958Z-a2e23db7 finding and comparison/comparison.json: +52 s (3.3%) pair-loop cost, ~182 s ceiling headroom, macro delta [-0.00329, +0.00479]

@@ -24,7 +24,7 @@ ideas:
     (model, optimizer, lr_scheduler, epoch 89, args: torchvision recipe, SGD lr 0.1, 90 epochs,
     AutoAugment imagenet, CutMix 1.0); model keys carry the _orig_mod. prefix and load strictly into
     timm resnet50 with num_classes 165 (checked 2026-10-01). Median convolution RMS 0.0136.'
-  - 'docs/research/radimagenet-weights.md#refined-radimagenet-resnets.'
+  - 'docs/research/backbones-and-pretraining/radimagenet-weights.md#refined-radimagenet-resnets.'
   - 'outputs/training/20260928-180252-radimagenet-resnet50-lr3e-4: about 170 s per epoch for ResNet-50.'
   novelty: First Refined-RadImageNet ResNet-50 run.
   coverage: All studies and labels.

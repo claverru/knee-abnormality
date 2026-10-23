@@ -46,7 +46,7 @@ ideas:
   - 'outputs/analysis/encoding-usage-{graph-forced,token-graph,attention-prior}/results.json: removing
     the 1D code cost −0.0030 [−0.0043, −0.0018], −0.0012 [−0.0022, −0.0001] and −0.0007 macro. Removing
     the 2D code cost −0.0001 to −0.0007; removing plane or contrast cost about 0.'
-  - 'docs/validation/results/2026-09-17-test-time-allocation.md#where-evidence-sits-along-the-slice-axis:
+  - 'docs/validation/results/sampling/2026-09-17-test-time-allocation.md#where-evidence-sits-along-the-slice-axis:
     each label''s strongest single-triplet separation falls in one 10-mm depth bin: MCL and contusion
     in coronal fluid at −10..0 mm, the medial meniscus at +10..+20 mm, ACL in sagittal fluid at −10..0
     mm.'
@@ -78,7 +78,7 @@ ideas:
   - view-orientation-embedding (declined by the user; it adds a new orientation embedding to every acquisition)
     and the big-bets additive 3D patient-position embedding, which went unused at inference. Both add
     new codes; this one corrects the frame of a code the model already uses.
-  - 'docs/research/position-encoding.md (multi-view geometry references such as PETR: express tokens from
+  - 'docs/research/geometry-and-views/position-encoding.md (multi-view geometry references such as PETR: express tokens from
     differently oriented views in one shared metric frame).'
   novelty: 'Nothing in the registry changes an existing positional code. The identity ideas (embedding,
     view bias and their combination) mark or reweight oblique tokens, and mixture pooling and the ACL
@@ -152,12 +152,12 @@ ideas:
     pass equals the reference. The group is known in _prepare_slot from oblique_split; carry it as one
     PreparedSeries field through collate_studies to the model.
   precedents:
-  - docs/validation/results/2026-09-22-oblique-groups-result.md (reference run; per-label localization)
+  - docs/validation/results/sampling/2026-09-22-oblique-groups-result.md (reference run; per-label localization)
   - outputs/analysis/a/acquisition-geometry-20260922/protocol_prior.txt (an oblique flag added after training
     gave -0.0003 to -0.0014, so the gain must come from routing inside the model, not new information)
-  - docs/validation/results/2026-09-14-knee-side-embedding-result.md (a knee-side embedding tied; it marked
+  - docs/validation/results/pooling-and-attention/2026-09-14-knee-side-embedding-result.md (a knee-side embedding tied; it marked
     patient geometry, not acquisition protocol)
-  - docs/backlog/small-changes.md#oblique-embedding (transferred general-backlog entry)
+  - docs/backlog/untried-ideas.md#position-and-knee-side (transferred general-backlog entry)
   - outputs/autoresearch/oblique/experiments/oblique-group-embedding-20260922T115506Z-f5d616dd (retired
     x1 campaign; 0.899287, +0.00176 against the x1 reference, adoption 80% interval [-0.0005, +0.0040],
     rejected; +0.0052 on the 103 split studies)

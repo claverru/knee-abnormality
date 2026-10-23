@@ -77,7 +77,7 @@ in the [campaigns](campaigns/INDEX.md) and the
   entry of the [seed pool](topics/seed-pool.yaml): rejected at −0.0006 but +0.0018, 80%
   [+0.0001, +0.0035] when re-scored on `rebuild_state_v2`, +0.0010 net of the campaign's
   reference shift; weak, one run
-  ([re-scoring](../docs/validation/results/2026-09-28-campaign-rescoring.md)).
+  ([re-scoring](../docs/validation/results/validation-and-ensembles/2026-09-28-campaign-rescoring.md)).
 - **Next campaign:** [RadImageNet](campaigns/radimagenet/INDEX.md), validated 2026-09-28, not started. Start it
   as the loop's first topic while the user is present (`loop-start --campaign radimagenet`), since
   the activation check, topic loop, loop watchdog and range budget have not run live.

@@ -22,7 +22,7 @@ otherwise be zero or negative; measured on the fold-0 token cache this hit 2 of
 when the plane's combined coverage across both fluid-sensitivity slots does not).
 At the adopted 0.867 the realized per-plane mean widths are axial 45.1 mm, coronal 35.9 mm and
 sagittal 39.0 mm
-([result](../../validation/results/2026-09-19-relative-sampler-width-result.md)); at the historical
+([result](../../validation/results/sampling/2026-09-19-relative-sampler-width-result.md)); at the historical
 0.76, which preserved the previous fixed sampler's average width, they measured
 axial 39.5 mm, coronal 31.4 mm, sagittal 34.2 mm
 (4,218 physical pools, fold-0 cache). Each plane splits into two independent
@@ -30,7 +30,7 @@ slots (T1/PD and fluid-sensitive/fat-suppressed) that are sampled separately, so
 slot's own reach is narrower than the plane's two slots combined. This applies only
 to physical pools; local (non-physical) pools stay uniform over their support union,
 unaffected by sigma. Evidence and rationale: [per-plane sampler sigma
-results](../../validation/results/2026-09-18-per-plane-sigma-cache.md) and
+results](../../validation/results/sampling/2026-09-18-per-plane-sigma-cache.md) and
 [cohort-wide center fit and plane extents](../accurate-sampling-centers.md#cohort-wide-center-fit-and-plane-extents).
 
 ## Candidate runs and physical support
@@ -65,7 +65,7 @@ Training draws one uniform percentile inside each probability band, independentl
 at each epoch. All main bands remain represented each epoch. Assignment snaps
 targets to available geometry groups, so actual triplets can repeat across epochs.
 The experimental ten-epoch subregion schedule was
-[reverted after inconclusive confirmation](../../validation/results/2026-09-20-stratified-sampling-promotion.md).
+[reverted after inconclusive confirmation](../../validation/results/sampling/2026-09-20-stratified-sampling-promotion.md).
 Training chooses a covering acquisition uniformly. Evaluation allocates each
 target's fractional supplier entitlement (exact fractions) to the largest
 outstanding deficit and breaks exact ties by the pool's source ranking.

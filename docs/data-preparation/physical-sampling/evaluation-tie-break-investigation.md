@@ -8,7 +8,7 @@ so validation and test scoring depended on the training seed. This investigation
 that sensitivity, audits why the repeated series tie, and designs the deterministic ranking that
 replaced the permutation; training keeps its seeded target, band and supplier draws.
 
-Scripts: [snapshots](../../history/series-and-sampling-sources/README.md#tiebreak-design) (`analyze_sensitivity.py`, `pool_stats.py`,
+Scripts: [snapshots](../../history/sources/series-and-sampling/README.md#tiebreak-design) (`analyze_sensitivity.py`, `pool_stats.py`,
 `metadata_analysis.py`, `analyze_rules.py`, `headers.py`, `simulate_rules.py`; logs not kept),
 fold-0 validation split.
 
@@ -179,7 +179,7 @@ first rather than flagging both older series equally.
 
 ### Verification
 
-CPU, [snapshot scripts](../../history/series-and-sampling-sources/README.md#deterministic-selection) (`index_census.py`, `check_design_orders.py`,
+CPU, [snapshot scripts](../../history/sources/series-and-sampling/README.md#deterministic-selection) (`index_census.py`, `check_design_orders.py`,
 `determinism.py`); outputs in `outputs/analysis/d/deterministic-selection-20260917/`
 (`index_report.json`, `index_slots.parquet`, `determinism.json`).
 
@@ -226,4 +226,5 @@ scores. Paired report-group bootstrap, 2,000 draws.
 - EMA minus the seed-42 control stays +0.00016 (+0.00016 before).
 - These checkpoints were trained with the old seeded order and with every series present, so the
   deltas measure a change of evaluation inputs, not the value of training on the new identity;
-  the seed-42 run on the new identity is pending ([ongoing work](../../ongoing/INDEX.md)).
+  a seed-42 control retrained on the new identity was never run as a separate test (no record of one
+  exists); every later training used the deterministic ranking.

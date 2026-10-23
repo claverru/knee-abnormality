@@ -69,7 +69,7 @@ ideas:
     (3e-4 at RMS 0.314), scaled to this RMS.
   precedents:
   - 'prior-work.md, Cross-D-Conv and Checkpoints.'
-  - 'docs/ongoing/radimagenet-backbone.md, First run: a uniform-scale checkpoint at the median-matched rate overwrote its early layers.'
+  - 'docs/modeling/backbones/resnet-radimagenet-backbones.md, First run: a uniform-scale checkpoint at the median-matched rate overwrote its early layers.'
   - 'contract.md, Build facts: modeling/crossd.py is built and checked against the authors layer; the weights entry exists.'
   novelty: First Cross-D backbone here.
   coverage: All studies and labels.

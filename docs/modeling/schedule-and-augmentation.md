@@ -16,9 +16,9 @@ Per config: `optimizer.lr_decay` picks cosine (default) or linear decay to the s
 the last (1.0 by default, 0.7 for ConvNeXt-Tiny); `optimizer.late_anchor_follows_lr` scales the late
 L2-SP anchor by the backbone rate over its peak (off by default). MambaVision-T uses linear decay
 and the scaled late anchor over twelve epochs
-([recipe](mambavision-backbone.md#recipe)). The peak backbone/head learning rates are
-`2e-4` and `6e-4`, adopted in the training config (then `configs/baseline.yaml`) on 2026-09-12 from
-the [overnight comparison](../validation/results/2026-09-12-overnight-results.md).
+([recipe](backbones/mambavision-backbone.md#recipe)). The peak backbone/head learning rates are
+`2e-4` and `6e-4`, adopted in the training config (then `configs/baseline.yaml` (removed)) on 2026-09-12 from
+the [overnight comparison](../validation/results/campaigns-and-queues/2026-09-12-overnight-results.md).
 
 Augmentation runs in this order, on the GPU, during training only; validation and inference
 neither apply it nor draw its random numbers. Every family is a config block with a
@@ -41,7 +41,7 @@ slice channels.
 Filtering families (5, 6, 8) use the geometric valid region, and padding stays zero. Contrast
 mixing draws from the global generator before the image families; the image families draw in
 table order. The contribution of each family was measured one at a time in the
-[augmentation campaign](../validation/results/2026-09-26-augmentation-campaign.md): gains of about
+[augmentation campaign](../validation/results/campaigns-and-queues/2026-09-26-augmentation-campaign.md): gains of about
 +0.001 each that did not add when stacked; the half stack (3, 6, 8 on top of 5 and 10) was adopted
 on 0.943 public.
 
@@ -82,13 +82,13 @@ The original plan based this contract on the
 and [AAOS anatomy](https://www.orthoinfo.org/diseases--conditions/collateral-ligament-injuries/),
 consulted on 2026-09-13. The completed run selected epoch 9 at **0.890976**
 validation macro AUC and **0.931 public AUC**, the best public result at that
-time. The later [sigma-40 run](../validation/results/2026-09-14-reflection-sigma-40-result.md)
+time. The later [sigma-40 run](../validation/results/sampling/2026-09-14-reflection-sigma-40-result.md)
 selected epoch 7 at **0.892360 validation AUC and 0.936 public AUC**, making
 it the best submitted model at that time. Its recipe without the 3D embedding underlies the maintained
 [training config](../../configs/resnet50.yaml)
 ([current model](current-model.md)).
 The run's saved effective configuration remains the historical source of truth.
-See the [comparison with 3dsampling](../validation/results/2026-09-13-reflection-validation-comparison.md)
+See the [comparison with 3dsampling](../validation/results/sampling/2026-09-13-reflection-validation-comparison.md)
 for the +0.001012 local and +0.001 public gains, target changes and limitations.
 
 Probability is the only training reflection parameter; zero is the control.
@@ -102,16 +102,16 @@ The completed fold-0 run was launched manually with the config then named
 `configs/baseline.yaml`:
 
 ```bash
-rtk proxy uv run --locked just train configs/baseline.yaml --run-id spatial-tokens-reflection --validation.folds '[0]'
+uv run --locked just train configs/baseline.yaml --run-id spatial-tokens-reflection --validation.folds '[0]'
 ```
 
 Keep seed 42, `all_5fold_v3`, Steven v4, ReXNet-200, 224-pixel/140-mm crops,
 physical sampling, 2× validation density, optimizer and ten-epoch budget fixed.
 Use the saved physical-sampling configuration and
-[3dsampling result](../validation/results/2026-09-13-3dsampling-validation-comparison.md)
+[3dsampling result](../validation/results/sampling/2026-09-13-3dsampling-validation-comparison.md)
 as the reference. Full-fold and per-target AUC, the separate gold diagnostic,
 wall time, peak VRAM and checkpoint/config/source identities are recorded in the
-[completed comparison](../validation/results/2026-09-13-reflection-validation-comparison.md).
+[completed comparison](../validation/results/sampling/2026-09-13-reflection-validation-comparison.md).
 The run directory is complete; another launch requires a fresh run ID. No extra
 seeds, baseline reruns or automatic encoding diagnostics were launched.
 See the [preview and bounded profile evidence](../data-preparation/reflection-geometry-and-previews.md#reflection-preview-evidence).

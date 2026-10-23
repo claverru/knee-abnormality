@@ -30,7 +30,7 @@ Evidence:
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/oblique/imports/ideas-20260922T114104Z-341ecb71/report.json (seeded proposals)
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/oblique/baseline/source/src/knee_abnormality/modeling/model.py:126,220-232 (anatomical log-strength bias in _attention_pool)
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/oblique/baseline/source/src/knee_abnormality/data/dataset.py:248-303 (oblique_split, oblique budget, oblique_groups metadata)
-- docs/validation/results/2026-09-22-oblique-groups-result.md (reference 0.897527 vs k_05 0.899042)
+- docs/validation/results/sampling/2026-09-22-oblique-groups-result.md (reference 0.897527 vs k_05 0.899042)
 - autoresearch/campaigns/oblique/prior-work.md (coverage 85–93%, label profile)
 
 ## proposals-20260922T114104Z-5008f358
@@ -51,7 +51,7 @@ Evidence:
 - autoresearch/campaigns/oblique/prior-work.md:53-56 (repeated_series_share topped fold 0 and lost publicly, 0.929 vs 0.933)
 - autoresearch/campaigns/oblique/prior-work.md:60-68 (oblique groups see 85–93% of their windows over ten epochs)
 - autoresearch/campaigns/oblique/contract.md (objective: denser sampling of the same oblique series is not a lead)
-- docs/validation/results/2026-09-17-test-time-allocation.md (removing axial T1/PD cost about 0.008 for MCL and fracture on the confirm half)
+- docs/validation/results/sampling/2026-09-17-test-time-allocation.md (removing axial T1/PD cost about 0.008 for MCL and fracture on the confirm half)
 - outputs/autoresearch/oblique/imports/ideas-20260922T114104Z-5c988b15/report.json
 
 ## review-20260922T115415Z-0dbd5d60
@@ -222,7 +222,7 @@ Evidence:
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/oblique/experiments/oblique-group-embedding-20260922T115506Z-f5d616dd/comparison/comparison.json (macro, per-label, vendor strata only)
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/oblique/experiments/oblique-group-embedding-20260922T115506Z-f5d616dd/training/oof_predictions.csv vs /home/claudio/src/knee-abnormality/outputs/training/oblique/oof_predictions.csv (split-subset deltas computed ad hoc)
 - /home/claudio/src/knee-abnormality/outputs/analysis/a/acquisition-geometry-20260922/oblique_reach.parquet (group=='oblique': 103 fold-0 split studies)
-- /home/claudio/src/knee-abnormality/docs/validation/results/2026-09-22-oblique-groups-result.md:27-37 (same subset, positive counts match; previous ACL gain also sat in unchanged studies)
+- /home/claudio/src/knee-abnormality/docs/validation/results/sampling/2026-09-22-oblique-groups-result.md:27-37 (same subset, positive counts match; previous ACL gain also sat in unchanged studies)
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/oblique/state.json ideas.axial-t1pd-to-oblique-transfer (proposal left unadmitted)
 - /home/claudio/src/knee-abnormality/autoresearch/campaigns/oblique/prior-work.md#sampling-coverage-of-the-oblique-groups
 
@@ -309,8 +309,8 @@ Evidence:
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/oblique/jobs/researcher-20260922T122705Z-20a56bf3/report.json (proposal event)
 - /home/claudio/src/knee-abnormality/outputs/analysis/t/tilted-slot-policies-v2check-20260922/results.csv and tilted-slot-policies-check-20260922/results.csv (frozen additive/tilted/standard/mixture per-label and subset deltas)
 - scripts/adhoc/score_tilted_slot_policies.py (frozen policy scorer)
-- docs/validation/results/2026-09-22-oblique-groups-result.md (reference split-study MCL/PF OA costs)
-- docs/validation/results/2026-09-17-count-normalized-attention-result.md (rejected per-acquisition normalisation, −0.0035)
+- docs/validation/results/sampling/2026-09-22-oblique-groups-result.md (reference split-study MCL/PF OA costs)
+- docs/validation/results/pooling-and-attention/2026-09-17-count-normalized-attention-result.md (rejected per-acquisition normalisation, −0.0035)
 
 ## completion-20260922T125404Z-ccf69e65
 
@@ -347,5 +347,5 @@ Evidence:
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/oblique/experiments/label-view-attention-bias-20260922T120824Z-29aa5863/comparison/comparison.json (keys: per_target, strata=vendor only; no split-slot stratum)
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/oblique/experiments/label-view-attention-bias-20260922T120824Z-29aa5863/comparison/per_label.json
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/oblique/experiments/label-view-attention-bias-20260922T120824Z-29aa5863/training/fold_0/ (best-epoch=08-val_macro_auc=0.89930.ckpt, triplet_accounting.json)
-- /home/claudio/src/knee-abnormality/docs/validation/results/2026-09-22-oblique-groups-result.md:24-38 (divergence magnitude on 802 unchanged studies)
+- /home/claudio/src/knee-abnormality/docs/validation/results/sampling/2026-09-22-oblique-groups-result.md:24-38 (divergence magnitude on 802 unchanged studies)
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/oblique/jobs/orchestrator-20260922T121015Z-2e55d4df/report.json (prior review concerns)

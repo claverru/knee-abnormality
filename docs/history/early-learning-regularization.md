@@ -1,7 +1,7 @@
 # Early-learning regularization on the current recipe
 
 **Closed, 2026-09-25: not adopted.** Ported unchanged (λ 0.075, momentum 0.7) as seed #5 of the
-[near-misses campaign](../validation/results/2026-09-25-near-misses-campaign.md), it scored
+[near-misses campaign](../validation/results/campaigns-and-queues/2026-09-25-near-misses-campaign.md), it scored
 +0.0002 hard and +0.0004 soft ×4 macro against `knee-geometry-merged-2` at seed 638120755. The
 analysis below motivated that run.
 
@@ -9,7 +9,7 @@ analysis below motivated that run.
 
 - **Run:** `early-learning-regularization-20260923T124737Z-7aba30fc`
   (`outputs/autoresearch/noisy-labels/experiments/`), from the
-  [noisy-labels campaign](../validation/results/2026-09-23-noisy-labels-campaign.md).
+  [noisy-labels campaign](../validation/results/labels-and-losses/2026-09-23-noisy-labels-campaign.md).
 - **Recipe:** `k05-clean` (fold 0 of `all_5fold_scanner_v1`, combined labels, k=0.5, seed
   2263738815, cleaned source) plus `trainer.label_noise: {momentum: 0.7, weight: 0.075}`.
 - **Term:** a per-study running average of the model's own predictions, plus the penalty

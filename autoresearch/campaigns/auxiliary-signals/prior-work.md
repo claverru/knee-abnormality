@@ -15,10 +15,10 @@ Where the seeds come from, the measured precedents and the closed directions.
   pooling, an acquisition-physics head and acquisition-conditioned inputs.
 - **Heads design and targets:** [report-attribute heads](../../../docs/modeling/report-attribute-heads.md)
   (pooling, loss, gates, reliability weights, coefficient reasoning) and the
-  [extraction](../../../docs/ongoing/report-attribute-extraction.md) (question set, audits, v3
+  [extraction](../../../docs/public-labels/jevk5-report-attribute-extraction.md) (question set, audits, v3
   analysis).
 - **Seed noise:** re-seeding the adopted smoothing recipe moved ×4 macro AUC by 0.0049
-  ([augmentation result](../../../docs/validation/results/2026-09-26-augmentation-campaign.md#seed-noise));
+  ([augmentation result](../../../docs/validation/results/campaigns-and-queues/2026-09-26-augmentation-campaign.md#seed-noise));
   re-seeding the knee-geometry recipe moved it by −0.0063, with Contusion −0.0205, PF OA −0.0154,
   Fracture −0.0137 and MCL −0.0129. Treat single-label moves of that size in those labels as
   noise.
@@ -29,7 +29,7 @@ Measured runs outside autoresearch; deltas are ×4 macro AUC against the control
 
 | Mechanism | Setting | Run | Δ | Source |
 |---|---|---|---|---|
-| Attribute heads | v3 targets, weight 0.1, fold 1 | `report-attribute-heads` | +0.00075 [95% −0.0015, +0.0031]; public 0.938 vs 0.938 | [result](../../../docs/validation/results/2026-09-25-report-attribute-heads.md) |
+| Attribute heads | v3 targets, weight 0.1, fold 1 | `report-attribute-heads` | +0.00075 [95% −0.0015, +0.0031]; public 0.938 vs 0.938 | [result](../../../docs/validation/results/labels-and-losses/2026-09-25-report-attribute-heads.md) |
 | Attribute heads | target set 3.1 (osteophytes, Hoffa, side dropped; same-meaning options merged; extent and PF surface gated; reliability weights) | `report-attribute-heads-v31` | +0.00105 [95% −0.0012, +0.0035]; public 0.940 vs 0.938; +0.0003 vs v3 | same |
 | Header stacker | protocol signature, post-hoc offset on out-of-fold logits, folds 0–2 | scratch analysis 2026-09-26 | +0.0009 [95% +0.0005, +0.0014]; gold (n=35) −0.006 | [site priors](#site-priors) |
 | Header stacker | site (vendor, model, field strength, software, coil) | same | +0.0005 [95% +0.0001, +0.0009]; gold −0.006 | same |

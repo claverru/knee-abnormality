@@ -4,7 +4,7 @@
 that close the unseen-site gap (about 0.01 macro AUC) on the sites-out split, judged by the
 held-out-site evaluation. Outcome: L2-SP weight anchoring was the only mechanism that reproducibly
 helped held-out sites; it was adopted on main on 2026-09-30 together with removing the inert
-scanner confusion head ([result](../../../docs/validation/results/2026-09-30-rn18-l2sp-no-confusion.md)).
+scanner confusion head ([result](../../../docs/validation/results/validation-and-ensembles/2026-09-30-rn18-l2sp-no-confusion.md)).
 The [mechanism audit](mechanism-audit.md) holds the conclusions.
 
 | Read when | Document |

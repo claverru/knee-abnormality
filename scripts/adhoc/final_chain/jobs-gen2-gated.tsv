@@ -1,0 +1,66 @@
+convnext-rebuild-pretrain	convnext	configs/convnext-rebuild-pretrain.yaml	0	2632230601	pretrain	remote		teacher-decision
+resnet50-rebuild-pretrain	resnet50	configs/resnet50-rebuild-pretrain.yaml	0	1125521643	pretrain	remote		teacher-decision
+nextvit-rebuild-pretrain	nextvit	configs/nextvit-rebuild-pretrain.yaml	0	3197907446	pretrain	remote		teacher-decision
+focalnet-rebuild-pretrain	focalnet	configs/focalnet-rebuild-pretrain.yaml	0	1698999170	pretrain	remote		teacher-decision
+mambavision-rebuild-pretrain	mambavision	configs/mambavision-rebuild-pretrain.yaml	0	752222899	pretrain	remote		teacher-decision
+efficientvit-rebuild-pretrain	efficientvit	configs/efficientvit-rebuild-pretrain.yaml	0	1726674044	pretrain	remote		teacher-decision
+convnext-gen2-fold-0	convnext	configs/convnext-rebuild-gen2.yaml	0	3152221157	finetune	any	--validation.split all_5fold_scanner_v2_r7 --initial-weights @T@/convnext-rebuild-pretrain/fold_0/last.ckpt	convnext-rebuild-pretrain
+resnet50-gen2-fold-0	resnet50	configs/resnet50-rebuild-gen2.yaml	0	1033071310	finetune	any	--validation.split all_5fold_scanner_v2_r8 --initial-weights @T@/resnet50-rebuild-pretrain/fold_0/last.ckpt	resnet50-rebuild-pretrain
+nextvit-gen2-fold-0	nextvit	configs/nextvit-rebuild-gen2.yaml	0	3863205626	finetune	any	--validation.split all_5fold_scanner_v2_r12 --initial-weights @T@/nextvit-rebuild-pretrain/fold_0/last.ckpt	nextvit-rebuild-pretrain
+focalnet-gen2-fold-0	focalnet	configs/focalnet-rebuild-gen2.yaml	0	1555185059	finetune	remote	--validation.split all_5fold_scanner_v2_r10 --initial-weights @T@/focalnet-rebuild-pretrain/fold_0/last.ckpt	focalnet-rebuild-pretrain
+mambavision-gen2-fold-0	mambavision	configs/mambavision-rebuild-gen2.yaml	0	2215153129	finetune	any	--validation.split all_5fold_scanner_v2_r9 --initial-weights @T@/mambavision-rebuild-pretrain/fold_0/last.ckpt	mambavision-rebuild-pretrain
+efficientvit-gen2-fold-0	efficientvit	configs/efficientvit-rebuild-gen2.yaml	0	2214242043	finetune	any	--validation.split all_5fold_scanner_v2_r11 --initial-weights @T@/efficientvit-rebuild-pretrain/fold_0/last.ckpt	efficientvit-rebuild-pretrain
+convnext-gen2-fold-1	convnext	configs/convnext-rebuild-gen2.yaml	1	3172358604	finetune	any	--validation.split all_5fold_scanner_v2_r7 --initial-weights @T@/convnext-rebuild-pretrain/fold_0/last.ckpt	convnext-rebuild-pretrain
+resnet50-gen2-fold-1	resnet50	configs/resnet50-rebuild-gen2.yaml	1	1455433556	finetune	any	--validation.split all_5fold_scanner_v2_r8 --initial-weights @T@/resnet50-rebuild-pretrain/fold_0/last.ckpt	resnet50-rebuild-pretrain
+nextvit-gen2-fold-1	nextvit	configs/nextvit-rebuild-gen2.yaml	1	267518339	finetune	any	--validation.split all_5fold_scanner_v2_r12 --initial-weights @T@/nextvit-rebuild-pretrain/fold_0/last.ckpt	nextvit-rebuild-pretrain
+focalnet-gen2-fold-1	focalnet	configs/focalnet-rebuild-gen2.yaml	1	2694735422	finetune	remote	--validation.split all_5fold_scanner_v2_r10 --initial-weights @T@/focalnet-rebuild-pretrain/fold_0/last.ckpt	focalnet-rebuild-pretrain
+mambavision-gen2-fold-1	mambavision	configs/mambavision-rebuild-gen2.yaml	1	4285635662	finetune	any	--validation.split all_5fold_scanner_v2_r9 --initial-weights @T@/mambavision-rebuild-pretrain/fold_0/last.ckpt	mambavision-rebuild-pretrain
+efficientvit-gen2-fold-1	efficientvit	configs/efficientvit-rebuild-gen2.yaml	1	330420071	finetune	any	--validation.split all_5fold_scanner_v2_r11 --initial-weights @T@/efficientvit-rebuild-pretrain/fold_0/last.ckpt	efficientvit-rebuild-pretrain
+convnext-gen2-fold-2	convnext	configs/convnext-rebuild-gen2.yaml	2	1230813022	finetune	any	--validation.split all_5fold_scanner_v2_r7 --initial-weights @T@/convnext-rebuild-pretrain/fold_0/last.ckpt	convnext-rebuild-pretrain
+resnet50-gen2-fold-2	resnet50	configs/resnet50-rebuild-gen2.yaml	2	2415924681	finetune	any	--validation.split all_5fold_scanner_v2_r8 --initial-weights @T@/resnet50-rebuild-pretrain/fold_0/last.ckpt	resnet50-rebuild-pretrain
+nextvit-gen2-fold-2	nextvit	configs/nextvit-rebuild-gen2.yaml	2	4006944773	finetune	any	--validation.split all_5fold_scanner_v2_r12 --initial-weights @T@/nextvit-rebuild-pretrain/fold_0/last.ckpt	nextvit-rebuild-pretrain
+focalnet-gen2-fold-2	focalnet	configs/focalnet-rebuild-gen2.yaml	2	1139502564	finetune	remote	--validation.split all_5fold_scanner_v2_r10 --initial-weights @T@/focalnet-rebuild-pretrain/fold_0/last.ckpt	focalnet-rebuild-pretrain
+mambavision-gen2-fold-2	mambavision	configs/mambavision-rebuild-gen2.yaml	2	829888471	finetune	any	--validation.split all_5fold_scanner_v2_r9 --initial-weights @T@/mambavision-rebuild-pretrain/fold_0/last.ckpt	mambavision-rebuild-pretrain
+efficientvit-gen2-fold-2	efficientvit	configs/efficientvit-rebuild-gen2.yaml	2	2622109745	finetune	any	--validation.split all_5fold_scanner_v2_r11 --initial-weights @T@/efficientvit-rebuild-pretrain/fold_0/last.ckpt	efficientvit-rebuild-pretrain
+convnext-gen2-fold-3	convnext	configs/convnext-rebuild-gen2.yaml	3	2425512116	finetune	any	--validation.split all_5fold_scanner_v2_r7 --initial-weights @T@/convnext-rebuild-pretrain/fold_0/last.ckpt	convnext-rebuild-pretrain
+resnet50-gen2-fold-3	resnet50	configs/resnet50-rebuild-gen2.yaml	3	1733390516	finetune	any	--validation.split all_5fold_scanner_v2_r8 --initial-weights @T@/resnet50-rebuild-pretrain/fold_0/last.ckpt	resnet50-rebuild-pretrain
+nextvit-gen2-fold-3	nextvit	configs/nextvit-rebuild-gen2.yaml	3	3172211241	finetune	any	--validation.split all_5fold_scanner_v2_r12 --initial-weights @T@/nextvit-rebuild-pretrain/fold_0/last.ckpt	nextvit-rebuild-pretrain
+focalnet-gen2-fold-3	focalnet	configs/focalnet-rebuild-gen2.yaml	3	4187795177	finetune	remote	--validation.split all_5fold_scanner_v2_r10 --initial-weights @T@/focalnet-rebuild-pretrain/fold_0/last.ckpt	focalnet-rebuild-pretrain
+mambavision-gen2-fold-3	mambavision	configs/mambavision-rebuild-gen2.yaml	3	3983979755	finetune	any	--validation.split all_5fold_scanner_v2_r9 --initial-weights @T@/mambavision-rebuild-pretrain/fold_0/last.ckpt	mambavision-rebuild-pretrain
+efficientvit-gen2-fold-3	efficientvit	configs/efficientvit-rebuild-gen2.yaml	3	2411634235	finetune	any	--validation.split all_5fold_scanner_v2_r11 --initial-weights @T@/efficientvit-rebuild-pretrain/fold_0/last.ckpt	efficientvit-rebuild-pretrain
+convnext-gen2-fold-4	convnext	configs/convnext-rebuild-gen2.yaml	4	1765093088	finetune	any	--validation.split all_5fold_scanner_v2_r7 --initial-weights @T@/convnext-rebuild-pretrain/fold_0/last.ckpt	convnext-rebuild-pretrain
+resnet50-gen2-fold-4	resnet50	configs/resnet50-rebuild-gen2.yaml	4	1430810121	finetune	any	--validation.split all_5fold_scanner_v2_r8 --initial-weights @T@/resnet50-rebuild-pretrain/fold_0/last.ckpt	resnet50-rebuild-pretrain
+nextvit-gen2-fold-4	nextvit	configs/nextvit-rebuild-gen2.yaml	4	2382201761	finetune	any	--validation.split all_5fold_scanner_v2_r12 --initial-weights @T@/nextvit-rebuild-pretrain/fold_0/last.ckpt	nextvit-rebuild-pretrain
+focalnet-gen2-fold-4	focalnet	configs/focalnet-rebuild-gen2.yaml	4	654820744	finetune	remote	--validation.split all_5fold_scanner_v2_r10 --initial-weights @T@/focalnet-rebuild-pretrain/fold_0/last.ckpt	focalnet-rebuild-pretrain
+mambavision-gen2-fold-4	mambavision	configs/mambavision-rebuild-gen2.yaml	4	3847336814	finetune	any	--validation.split all_5fold_scanner_v2_r9 --initial-weights @T@/mambavision-rebuild-pretrain/fold_0/last.ckpt	mambavision-rebuild-pretrain
+efficientvit-gen2-fold-4	efficientvit	configs/efficientvit-rebuild-gen2.yaml	4	2261756187	finetune	any	--validation.split all_5fold_scanner_v2_r11 --initial-weights @T@/efficientvit-rebuild-pretrain/fold_0/last.ckpt	efficientvit-rebuild-pretrain
+rsna-convnext-gen2-fold-0	convnext	convnext-gen2-fold-0	0	-	rsna	local		convnext-gen2-fold-0
+rsna-convnext-gen2-fold-1	convnext	convnext-gen2-fold-1	1	-	rsna	local		convnext-gen2-fold-1
+rsna-convnext-gen2-fold-2	convnext	convnext-gen2-fold-2	2	-	rsna	local		convnext-gen2-fold-2
+rsna-convnext-gen2-fold-3	convnext	convnext-gen2-fold-3	3	-	rsna	local		convnext-gen2-fold-3
+rsna-convnext-gen2-fold-4	convnext	convnext-gen2-fold-4	4	-	rsna	local		convnext-gen2-fold-4
+rsna-resnet50-gen2-fold-0	resnet50	resnet50-gen2-fold-0	0	-	rsna	local		resnet50-gen2-fold-0
+rsna-resnet50-gen2-fold-1	resnet50	resnet50-gen2-fold-1	1	-	rsna	local		resnet50-gen2-fold-1
+rsna-resnet50-gen2-fold-2	resnet50	resnet50-gen2-fold-2	2	-	rsna	local		resnet50-gen2-fold-2
+rsna-resnet50-gen2-fold-3	resnet50	resnet50-gen2-fold-3	3	-	rsna	local		resnet50-gen2-fold-3
+rsna-resnet50-gen2-fold-4	resnet50	resnet50-gen2-fold-4	4	-	rsna	local		resnet50-gen2-fold-4
+rsna-nextvit-gen2-fold-0	nextvit	nextvit-gen2-fold-0	0	-	rsna	local		nextvit-gen2-fold-0
+rsna-nextvit-gen2-fold-1	nextvit	nextvit-gen2-fold-1	1	-	rsna	local		nextvit-gen2-fold-1
+rsna-nextvit-gen2-fold-2	nextvit	nextvit-gen2-fold-2	2	-	rsna	local		nextvit-gen2-fold-2
+rsna-nextvit-gen2-fold-3	nextvit	nextvit-gen2-fold-3	3	-	rsna	local		nextvit-gen2-fold-3
+rsna-nextvit-gen2-fold-4	nextvit	nextvit-gen2-fold-4	4	-	rsna	local		nextvit-gen2-fold-4
+rsna-focalnet-gen2-fold-0	focalnet	focalnet-gen2-fold-0	0	-	rsna	local		focalnet-gen2-fold-0
+rsna-focalnet-gen2-fold-1	focalnet	focalnet-gen2-fold-1	1	-	rsna	local		focalnet-gen2-fold-1
+rsna-focalnet-gen2-fold-2	focalnet	focalnet-gen2-fold-2	2	-	rsna	local		focalnet-gen2-fold-2
+rsna-focalnet-gen2-fold-3	focalnet	focalnet-gen2-fold-3	3	-	rsna	local		focalnet-gen2-fold-3
+rsna-focalnet-gen2-fold-4	focalnet	focalnet-gen2-fold-4	4	-	rsna	local		focalnet-gen2-fold-4
+rsna-mambavision-gen2-fold-0	mambavision	mambavision-gen2-fold-0	0	-	rsna	local		mambavision-gen2-fold-0
+rsna-mambavision-gen2-fold-1	mambavision	mambavision-gen2-fold-1	1	-	rsna	local		mambavision-gen2-fold-1
+rsna-mambavision-gen2-fold-2	mambavision	mambavision-gen2-fold-2	2	-	rsna	local		mambavision-gen2-fold-2
+rsna-mambavision-gen2-fold-3	mambavision	mambavision-gen2-fold-3	3	-	rsna	local		mambavision-gen2-fold-3
+rsna-mambavision-gen2-fold-4	mambavision	mambavision-gen2-fold-4	4	-	rsna	local		mambavision-gen2-fold-4
+rsna-efficientvit-gen2-fold-0	efficientvit	efficientvit-gen2-fold-0	0	-	rsna	local		efficientvit-gen2-fold-0
+rsna-efficientvit-gen2-fold-1	efficientvit	efficientvit-gen2-fold-1	1	-	rsna	local		efficientvit-gen2-fold-1
+rsna-efficientvit-gen2-fold-2	efficientvit	efficientvit-gen2-fold-2	2	-	rsna	local		efficientvit-gen2-fold-2
+rsna-efficientvit-gen2-fold-3	efficientvit	efficientvit-gen2-fold-3	3	-	rsna	local		efficientvit-gen2-fold-3
+rsna-efficientvit-gen2-fold-4	efficientvit	efficientvit-gen2-fold-4	4	-	rsna	local		efficientvit-gen2-fold-4

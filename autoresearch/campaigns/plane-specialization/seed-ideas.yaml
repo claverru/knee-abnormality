@@ -67,7 +67,7 @@ ideas:
     each label so studies with more planes gain no extra weight. Validation and inference output
     the present-plane mean. Shared head.
   precedents:
-  - 'Per-view disease classifiers (RSNA 2024 lumbar winner, as auxiliaries): docs/backlog/big-bets.md#auxiliary-loss-campaign.'
+  - 'Per-view disease classifiers (RSNA 2024 lumbar winner, as auxiliaries): docs/backlog/untried-ideas.md#supervision-and-labels.'
   novelty: Dense counterpart of the random partition; isolates the effect of subsampling labels.
   coverage: All studies and labels.
   exploitation: Log each plane's own validation macro AUC and the per-plane loss per epoch.

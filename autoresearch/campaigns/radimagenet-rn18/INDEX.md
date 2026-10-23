@@ -3,7 +3,7 @@
 **Closed on 2026-09-29 by topic rotation after 23 decided runs.** It adopted no series dropout
 (+0.0023) and 36 training triplets (+0.0018). The committed recipe
 `configs/training.yaml` takes only the first; 36 triplets wait for the
-[endgame](../../../docs/backlog/endgame.md#test-time-augmentation).
+[endgame](../../../docs/validation/results/validation-and-ensembles/2026-09-19-ensemble-submissions.md).
 
 | Read when | Document |
 |---|---|

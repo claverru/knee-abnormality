@@ -17,7 +17,7 @@ ideas:
     Question weighting). The heads are worth keeping: +0.00105 x4 at adoption and
     -0.0006 when removed on the ResNet-18 recipe. The same sharing gave the five routed
     targets +0.0090 to +0.0131 against separate classifiers in the fourth and fifth
-    runs (docs/ongoing/side-routed-heads.md).'
+    runs (docs/modeling/side-routed-heads.md).'
   mechanism: 'Five question families get one shared head each (one attention score
     column and one classifier block of options), routed by the model''s routing weights
     exactly as the targets are. The option lists inside each family are identical
@@ -47,7 +47,7 @@ ideas:
     weights, report_attribute_loss, the loss weight and the logged report_attribute_kl_<question>
     per remaining question are unchanged.'
   precedents:
-  - 'docs/ongoing/side-routed-heads.md, Fourth run and Fifth run: the five routed
+  - 'docs/modeling/side-routed-heads.md, Fourth run and Fifth run: the five routed
     targets sum to +0.0131 and +0.0090 against the reference; localisation +0.002
     to +0.013 in the fourth run.'
   - 'docs/modeling/report-attribute-heads.md: adoption at +0.00105 x4 and 0.940 against
@@ -108,7 +108,7 @@ ideas:
     and Medial OA and Lateral OA, which gave up the whole front of their side, fell
     from +0.0030 and +0.0022 (fourth run, front tokens counted for their side) to
     +0.0013 and +0.0003, while PF OA stayed above all 12 sibling runs (+0.0071). The
-    drawings of 2026-10-05 (outputs/analysis/o/octant-sketches-20261005, docs/ongoing/side-routed-heads.md,
+    drawings of 2026-10-05 (outputs/analysis/o/octant-sketches-20261005, docs/modeling/side-routed-heads.md,
     Octant sketches) show why a vertical cut costs them: the fitted centre sits at
     the notch, about 15 mm above the joint line, so the front-and-low region holds
     the front of the tibial plateau, its cartilage and the anterior meniscal horns,
@@ -132,9 +132,9 @@ ideas:
     The frame, its learned rotation, the position prior, the token position code and
     the side head are unchanged; the origin stays the fitted centre with no offset.'
   precedents:
-  - 'docs/ongoing/side-routed-heads.md, Fifth run: nod -5.1 degrees, Medial OA +0.0013
+  - 'docs/modeling/side-routed-heads.md, Fifth run: nod -5.1 degrees, Medial OA +0.0013
     and Lateral OA +0.0003 against +0.0030 and +0.0022 in the fourth run, PF OA +0.0071.'
-  - 'docs/ongoing/side-routed-heads.md, Octant sketches and Third run: the centre
+  - 'docs/modeling/side-routed-heads.md, Octant sketches and Third run: the centre
     about 15 mm above the joint line; prior peaks for PF OA and the OA sides.'
   novelty: First use of the height coordinate for routing; the fifth build routes
     on the midline and the front cut only.
@@ -204,7 +204,7 @@ ideas:
   - 'outputs/autoresearch/fixes-and-removals/experiments: computed-centre-3d-position,
     position-3d-without-oa-detector, position-3d-beside-1d-2d and position-embeddings-off,
     per-target x4 deltas against slab-rule-and-positive-std-requeue.'
-  - docs/ongoing/side-routed-heads.md, Second run (zero-started code unused), Fourth
+  - docs/modeling/side-routed-heads.md, Second run (zero-started code unused), Fourth
     run and Fifth run (own-channel targets with and without the fixed sinusoid).
   novelty: The campaign's learned 3D code has not been run in the knee frame or restricted
     to the own-channel classifiers.
@@ -253,7 +253,7 @@ ideas:
     Question weighting). The heads are worth keeping: +0.00105 x4 at adoption and
     -0.0006 when removed on the ResNet-18 recipe. The same sharing gave the five routed
     targets +0.0090 to +0.0131 against separate classifiers in the fourth and fifth
-    runs (docs/ongoing/side-routed-heads.md).'
+    runs (docs/modeling/side-routed-heads.md).'
   mechanism: 'Five question families get one shared head each (one attention score
     column and one classifier block of options), routed by the model''s routing weights
     exactly as the targets are. The option lists inside each family are identical
@@ -286,7 +286,7 @@ ideas:
     and PF OA as front_up, the cartilage questions use those three routes in place
     of medial_back, lateral_back and front.'
   precedents:
-  - 'docs/ongoing/side-routed-heads.md, Fourth run and Fifth run: the five routed
+  - 'docs/modeling/side-routed-heads.md, Fourth run and Fifth run: the five routed
     targets sum to +0.0131 and +0.0090 against the reference; localisation +0.002
     to +0.013 in the fourth run.'
   - 'docs/modeling/report-attribute-heads.md: adoption at +0.00105 x4 and 0.940 against
@@ -379,7 +379,7 @@ ideas:
     side flip still swaps medial and lateral exactly. The seven own-channel targets
     are unchanged. Nothing else changes.'
   precedents:
-  - 'docs/ongoing/side-routed-heads.md, Fourth run and Fifth run: Medial OA and Lateral
+  - 'docs/modeling/side-routed-heads.md, Fourth run and Fifth run: Medial OA and Lateral
     OA with and without the front of their side; S113 0.953 and S114 0.952.'
   - 'autoresearch/campaigns/side-routing/run-notes.md, front-and-up-region-for-pf-oa:
     per-target and localisation deltas of 2026-10-06.'
@@ -456,7 +456,7 @@ ideas:
     started at zero under torch.random.fork_rng. The seven own-channel targets are
     unchanged. Nothing else changes.'
   precedents:
-  - 'docs/ongoing/side-routed-heads.md, Fourth run and Fifth run: Medial OA and Lateral
+  - 'docs/modeling/side-routed-heads.md, Fourth run and Fifth run: Medial OA and Lateral
     OA with and without the front of their side; S113 0.953 and S114 0.952.'
   - 'autoresearch/campaigns/side-routing/run-notes.md, front-and-up-region-for-pf-oa:
     per-target and localisation deltas of 2026-10-06.'
@@ -532,7 +532,7 @@ ideas:
     -0.0028, the lowest.'
   - 'autoresearch/campaigns/side-routing/run-notes.md, learned-position-code-for-own-channels:
     a learned knee-frame code lowered Fracture by 0.0037 and MCL by 0.0047.'
-  - 'docs/ongoing/side-routed-heads.md, Fourth run and Fifth run: own-channel targets
+  - 'docs/modeling/side-routed-heads.md, Fourth run and Fifth run: own-channel targets
     without a token code and with the fixed knee-frame sinusoid.'
   novelty: The old recipe's two codes have not been run in this design; every run
     of the line used no code or a knee-frame one.
@@ -602,7 +602,7 @@ ideas:
     through epoch 9. Detailed results and source diagnosis are in the linked analysis.'
   - 'Side-routed fifth build: adding fixed position to own channels recovered much
     of the earlier own-channel deficit; removing own-channel position is closed. See
-    /home/claudio/src/knee-abnormality-side-routed-heads/docs/ongoing/side-routed-heads.md#fifth-build-2026-10-05.'
+    /home/claudio/src/knee-abnormality-side-routed-heads/docs/validation/results/pooling-and-attention/side-routed-heads/2026-10-05-fourth-and-fifth-builds.md#fifth-build-2026-10-05.'
   - '[New run analysis](/home/claudio/src/knee-abnormality/outputs/autoresearch/side-routing/jobs/researcher-20261005T232202Z-f286e40a/scratch/routing-analysis/analysis.json)'
   novelty: An anchored residual changes the function class and initialization. It
     preserves the incumbent's spatial representation rather than repeating the unrestricted
@@ -1683,7 +1683,7 @@ ideas:
   - "/home/claudio/src/knee-abnormality/outputs/autoresearch/side-routing/experiments/independent-pf-cut-normals-20261006T024827Z-b4b6b214/side_routing_report.json:\
     \ Baker's delta \u22120.000566 versus sibling deltas [\u22120.000069,+0.004559];\
     \ it newly falls below every sibling."
-  - '/home/claudio/src/knee-abnormality-side-routed-heads/docs/ongoing/side-routed-heads.md#fifth-build-2026-10-05:
+  - '/home/claudio/src/knee-abnormality-side-routed-heads/docs/validation/results/pooling-and-attention/side-routed-heads/2026-10-05-fourth-and-fifth-builds.md#fifth-build-2026-10-05:
     removing position from own classifier tokens weakened Fracture and Baker''s; the
     retained fixed token code has norm 11.2. This proposal preserves those classifier
     inputs.'
@@ -1792,7 +1792,7 @@ ideas:
     \ loss falls 0.6878\u21920.5367; its \xD71 macro reaches 0.9162 at epoch 8 and\
     \ finishes at 0.9161. This is an active structural failure, rather than an absent\
     \ mechanism or a clear need to shorten training."
-  - "[Geometry evidence](/home/claudio/src/knee-abnormality-side-routed-heads/docs/ongoing/side-routed-heads.md#visual-inspection-and-rotation-census)\
+  - "[Geometry evidence](/home/claudio/src/knee-abnormality-side-routed-heads/docs/validation/results/pooling-and-attention/side-routed-heads/2026-10-05-first-to-third-builds.md#visual-inspection-and-rotation-census)\
     \ and [octant drawing](/home/claudio/src/knee-abnormality/outputs/analysis/o/octant-sketches-20261005/octants-002.png):\
     \ the fitted centre lies at the notch and measured front-boundary distances span\
     \ 15\u201339 mm. These support retaining the measured origin and existing partition\
@@ -1908,7 +1908,7 @@ ideas:
     4,407 studies and 24,128 series, with axial/coronal rotation correlation 0.8288.
     Retain measured header alignment; this proposal changes only composition of the
     existing global residual rotation and side assignment.'
-  - '[Octant sketches](/home/claudio/src/knee-abnormality-side-routed-heads/docs/ongoing/side-routed-heads.md#octant-sketches)
+  - '[Octant sketches](/home/claudio/src/knee-abnormality-side-routed-heads/docs/validation/results/pooling-and-attention/side-routed-heads/2026-10-05-fourth-and-fifth-builds.md#octant-sketches)
     and [inspected study drawing](/home/claudio/src/knee-abnormality/outputs/analysis/o/octant-sketches-20261005/octants-002.png)
     locate the centre and existing zero-offset regions on studies. Keep that origin
     and the front-up/rest table. The plotted historical offsets and illustrative tilts
@@ -2240,7 +2240,7 @@ ideas:
     \ axial/coronal rotation correlation 0.8288 and median absolute difference 1.751\
     \ mm-equivalent degrees of angle, specifically 1.751\xB0; the measured header\
     \ alignment remains the geometric starting point."
-  - '[Octant inspection](/home/claudio/src/knee-abnormality-side-routed-heads/docs/ongoing/side-routed-heads.md:526):
+  - '[Octant inspection](/home/claudio/src/knee-abnormality-side-routed-heads/docs/modeling/side-routed-heads.md:526):
     existing loader-only drawings establish the fitted centre and front/up partition.
     This proposal retains that origin and partition topology.'
   - own-channel-token-position is closed after learned, image-frame and residual-code

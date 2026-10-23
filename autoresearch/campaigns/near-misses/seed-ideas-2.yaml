@@ -20,7 +20,7 @@ ideas:
     (x and side both flip), and reflection TTA must give identical q.
   precedents:
   - 'side-normalized-3d-position (knee-geometry, never run): autoresearch/campaigns/knee-geometry/ideas.yaml'
-  - 'token-attention run with 3D RoPE on raw coordinates: outputs/training/token-attention; docs/validation/results/2026-09-23-side-mask-and-token-attention.md'
+  - 'token-attention run with 3D RoPE on raw coordinates: outputs/training/token-attention; docs/validation/results/pooling-and-attention/2026-09-23-side-mask-and-token-attention.md'
   - 'study-anchored-through-plane-position logged zero active studies because it required one frame-of-reference UID across series; every accepted study fit has several. Do not use that gate.'
   - 'claverru/RSNA-lumbar fed side-normalized world coordinates and slice normals as meta inputs.'
   novelty: The replacement alone, without an attention change, on consistent per-knee coordinates.
@@ -49,7 +49,7 @@ ideas:
   precedents:
   - 'Adopted learned anatomical strength: autoresearch/anatomical-attention.md'
   - 'Spatial importance map: docs/data-preparation/peripheral-coverage.md#spatial-importance-map'
-  - 'Retired attention prior: docs/validation/results/2026-09-15-attention-prior-result.md'
+  - 'Retired attention prior: docs/validation/results/pooling-and-attention/2026-09-15-attention-prior-result.md'
   novelty: First anatomical bias on the front-back axis, for the label that the map places most clearly.
   coverage: PF OA only (OA family rule).
   exploitation: Its region can serve #8's patellofemoral readout.
@@ -98,7 +98,7 @@ ideas:
     study-label pair inside the meniscus own-side mask. Evaluation, the backbone pass, image
     budget, anatomical bias and series dropout are unchanged.
   precedents:
-  - 'Spec: docs/backlog/small-changes.md#attention-token-dropout'
+  - 'Spec: docs/backlog/untried-ideas.md#pooling-and-the-attention-head'
   - 'ACMIL, https://arxiv.org/abs/2311.07125'
   novelty: Token-level masking inside retained acquisitions, unlike series dropout.
   coverage: All labels.
@@ -120,7 +120,7 @@ ideas:
     distribution, with the same number removed per study-label as #9. Keep at least one valid
     token inside the meniscus own-side mask.
   precedents:
-  - 'Spec: docs/backlog/small-changes.md#attention-token-dropout'
+  - 'Spec: docs/backlog/untried-ideas.md#pooling-and-the-attention-head'
   - 'Code of this campaign''s attention-token-dropout-random experiment.'
   novelty: The attention-challenging arm of the ACMIL idea.
   coverage: All labels.

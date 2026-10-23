@@ -23,4 +23,4 @@ least level with the incumbent at both ×1 and ×4.
 | Reading the keeper's copies of research proposals, each with the developer-environment paragraph prepended so the developer runs the guardrail check itself and returns prepared (the originals are removed or were parked) | `keeper-copies-<time>-<n>.yaml`, [first requeue](research-requeue-ideas.yaml), [second](research-requeue-2-ideas.yaml) |
 | Reading the keeper's repairs, adoption decisions and each run's per-target details | [Run notes](run-notes.md) |
 | Reading the proposals, the queue and the decision summary once the campaign runs | [Ideas](ideas.yaml), [Backlog](backlog.yaml), [Findings](findings.md) |
-| Reading the design, every run's tables, the drawings and the measurements | [Side-routed shared heads](../../../docs/ongoing/side-routed-heads.md) |
+| Reading the design, every run's tables, the drawings and the measurements | [Side-routed shared heads](../../../docs/modeling/side-routed-heads.md) |

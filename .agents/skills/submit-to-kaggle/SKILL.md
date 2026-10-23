@@ -5,7 +5,7 @@ description: Make a new Kaggle submission from a trained checkpoint (export the 
 
 # Submit to Kaggle
 
-Commands run with `rtk proxy uv run --locked python -m`. Five submissions a day, reset at
+Commands run with `uv run --locked python -m`. Five submissions a day, reset at
 00:00 UTC; at most two GPU notebooks at once.
 
 | Placeholder | Meaning |
@@ -59,7 +59,7 @@ Relaunch when either holds:
 To relaunch:
 
 1. `systemctl --user stop UNIT`.
-2. `rtk proxy uv run --locked kaggle kernels delete -y NOTEBOOK` (or the compile-cache notebook).
+2. `uv run --locked kaggle kernels delete -y NOTEBOOK` (or the compile-cache notebook).
    Deleting the notebook ends its run and frees the slug and title. A bundle that already holds
    `compile-cache.bin` skips the cache build on the next start.
 3. `start` again with the same arguments and a new record path, such as `OUT/records/NAME-r2.json`.

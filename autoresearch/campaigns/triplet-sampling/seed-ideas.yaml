@@ -15,10 +15,10 @@ ideas:
       two sides explicit so acquisition asymmetry does not accidentally dictate
       all exposure. Other planes retain the incumbent policy.
     precedents:
-      - docs/backlog/small-changes.md#asymmetric-coronal-draw
-      - docs/ongoing/peripheral-coverage.md#acquisition-geometry
+      - docs/backlog/untried-ideas.md#augmentation-sampling-and-intensity
+      - docs/data-preparation/peripheral-coverage.md#acquisition-geometry
       - docs/data-preparation/accurate-sampling-centers.md#cohort-wide-center-fit-and-plane-extents
-      - docs/validation/results/2026-09-19-relative-sampler-width-result.md
+      - docs/validation/results/sampling/2026-09-19-relative-sampler-width-result.md
     novelty: >-
       Existing untried proposal adopted into the triplet-sampling campaign at the
       user's request. Ownership of this experiment is now this campaign; the
@@ -65,11 +65,11 @@ ideas:
       and justify one policy from the existing acquisition evidence; do not
       enumerate axial/coronal multipliers as a hyperparameter search.
     precedents:
-      - docs/backlog/small-changes.md#per-plane-width-ratios
-      - docs/ongoing/peripheral-coverage.md#what-is-settled-and-what-is-not
-      - docs/validation/results/2026-09-18-per-plane-sigma-cache.md
-      - docs/validation/results/2026-09-19-relative-sampler-width-result.md#training-versus-drawing
-      - docs/validation/results/2026-09-19-fold-ensembles-and-sigma-sweep.md
+      - docs/backlog/untried-ideas.md#pooling-and-the-attention-head
+      - docs/data-preparation/peripheral-coverage.md#what-is-settled-and-what-is-not
+      - docs/validation/results/sampling/2026-09-18-per-plane-sigma-cache.md
+      - docs/validation/results/sampling/2026-09-19-relative-sampler-width-result.md#training-versus-drawing
+      - docs/validation/results/validation-and-ensembles/2026-09-19-fold-ensembles-and-sigma-sweep.md
     novelty: >-
       Existing untried proposal adopted by this campaign, with its original
       general-backlog entry retained as read-only provenance. Relative plane

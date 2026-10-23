@@ -9,7 +9,7 @@ original RadImageNet DenseNet-121, InceptionV3 and InceptionResNetV2, and measur
 (SSLD 6M) was provisionally adopted (×4 0.938851, ×1 0.934578, blend with the ResNet-50 `resnet50-silver-fold2`
 +0.003267); TinyViT-21M came level at ×4 (+0.003223). RadImageNet-pretrained families all lowered the blend.
 Training bound 1,684 to 4,881 s (raised from 4,092 s by the user on 2026-10-18). Results:
-[run notes](run-notes.md), [2026-10-18 backbone families 2](../../../docs/validation/results/2026-10-18-backbone-families-2.md).
+[run notes](run-notes.md), [2026-10-18 backbone families 2](../../../docs/validation/results/backbones/2026-10-18-backbone-families-2.md).
 
 | Read when | Document |
 |---|---|

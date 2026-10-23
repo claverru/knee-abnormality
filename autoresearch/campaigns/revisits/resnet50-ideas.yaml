@@ -7,7 +7,7 @@ ideas:
   opportunity: 'User decision, 2026-10-01: compare the original RadImageNet ResNet-50 on the current
     incumbent recipe. Its earlier runs used an older recipe: backbone LR 1.23e-3 overwrote the early
     layers and was stopped after epoch 3; 3e-4 finished at x1 0.91223 against 0.924637
-    (docs/ongoing/radimagenet-backbone.md).'
+    (docs/modeling/backbones/resnet-radimagenet-backbones.md).'
   mechanism: 'model.backbone resnet50.tv_in1k with model.pretrained_weights radimagenet;
     optimizer.backbone_lr 5e-5 and every other setting as the incumbent (head_lr 6e-4, L2-SP 0.01 on
     conv1/bn1/layer1 and 0.001 on the rest, plane-contrast readouts, no anatomical bias, augmentation,
@@ -23,7 +23,7 @@ ideas:
     scales to the nine epochs as it does for any epoch count.'
   precedents:
   - 'outputs/training/20260928-180252-radimagenet-resnet50-lr3e-4: about 170 s per epoch at series dropout 0.2.'
-  - 'docs/ongoing/radimagenet-backbone.md: [-1, 1] normalization measured against the checkpoint''s bn1 statistics.'
+  - 'docs/modeling/backbones/resnet-radimagenet-backbones.md: [-1, 1] normalization measured against the checkpoint''s bn1 statistics.'
   novelty: First ResNet-50 run on the current recipe.
   coverage: All studies and labels.
   exploitation: Per-epoch x1 and per-stage drift against the incumbent; training seconds per epoch.

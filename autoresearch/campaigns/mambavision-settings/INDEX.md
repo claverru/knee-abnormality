@@ -7,7 +7,7 @@ that its differences from the ResNet-50 make suspect, on the line of its referen
 the researcher without end. Adoption by the runtime under the shared rule. Training time 0.75 to
 1.3 of the reference's. It runs from the worktree `knee-abnormality-new-backbones`, whose
 environment holds the model code and compiled kernels
-([dependencies](../../../docs/modeling/mambavision-backbone.md#dependencies)).
+([dependencies](../../../docs/modeling/backbones/mambavision-backbone.md#dependencies)).
 
 | Read when | Document |
 |---|---|

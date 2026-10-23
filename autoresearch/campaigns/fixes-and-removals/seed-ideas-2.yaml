@@ -55,8 +55,8 @@ ideas:
     (logits[:, oa_indices] += correction is skipped); the detector's parameters stay in the
     model, unused. Nothing else changes.
   precedents:
-  - 'docs/validation/results/2026-09-25-near-misses-campaign.md #8: the adoption, PF OA +0.0102.'
-  - 'docs/validation/results/2026-10-03-learnable-views-campaign.md: silent with the 3D position.'
+  - 'docs/validation/results/campaigns-and-queues/2026-09-25-near-misses-campaign.md #8: the adoption, PF OA +0.0102.'
+  - 'docs/validation/results/crops-and-views/2026-10-03-learnable-views-campaign.md: silent with the 3D position.'
   novelty: First removal of the detector.
   coverage: The three OA labels of every study.
   exploitation: Per-label deltas on Medial OA, Lateral OA and PF OA; the incumbent's oa_detector_scale as context.
@@ -98,7 +98,7 @@ ideas:
     tie is the likely outcome.
   mechanism: data.noise_augmentation.probability 0. Nothing else changes.
   precedents:
-  - 'docs/validation/results/2026-09-26-augmentation-campaign.md: the stack was built around it without testing it.'
+  - 'docs/validation/results/campaigns-and-queues/2026-09-26-augmentation-campaign.md: the stack was built around it without testing it.'
   novelty: First removal of the noise augmentation.
   coverage: Training only, 15% of acquisitions.
   exploitation: Per-epoch x1 curve and per-label deltas against the incumbent and against seed 1's rerun delta.

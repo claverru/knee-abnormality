@@ -189,7 +189,7 @@ ideas:
     meniscus midpoint''s height. encode_batch returns them. Nothing reads them in
     this seed: the frame is unchanged.'
   precedents:
-  - 'docs/ongoing/side-routed-heads.md: located targets hold on unseen knees (tear
+  - 'docs/modeling/side-routed-heads.md: located targets hold on unseen knees (tear
     place 33% explained, edema by compartment 25%).'
   - 'routing-and-shifts, contusion-reads-the-edema-head-2: Contusion pooled with the
     edema head''s attention, -0.0007 and -0.0011, its scale stayed at 0.'
@@ -1071,7 +1071,7 @@ ideas:
     meniscus midpoint''s height. encode_batch returns them. Nothing reads them in
     this seed: the frame is unchanged.'
   precedents:
-  - 'docs/ongoing/side-routed-heads.md: located targets hold on unseen knees (tear
+  - 'docs/modeling/side-routed-heads.md: located targets hold on unseen knees (tear
     place 33% explained, edema by compartment 25%).'
   - 'routing-and-shifts, contusion-reads-the-edema-head-2: Contusion pooled with the
     edema head''s attention, -0.0007 and -0.0011, its scale stayed at 0.'

@@ -1,10 +1,10 @@
 # Combined labels (`combined_v1`)
 
-**Training and validation labels in force since 2026-09-21.** Steven v4 supplies eight targets.
+**Training and validation labels from 2026-09-21 until `rebuild_state_v2` replaced them on 2026-09-28 ([label tables](label-tables.md)).** Steven v4 supplies eight targets.
 ACL, MCL, PF OA and Fracture instead take the per-study mean of nine independent public report
 extractors. Official gold labels still override every source on the 58 gold studies. On gold, the
 table scores 0.9075 macro AUC against Steven v4's 0.8927. Gold helped choose the four targets, so
-that figure is optimistic, and the image-model effect is untested.
+that figure is optimistic, and the image-model effect was untested when the table was built (first run: [combined-labels first run](../validation/results/labels-and-losses/2026-09-21-combined-labels-first-run.md)).
 
 ## What the table contains
 
@@ -31,7 +31,7 @@ The consensus mean averages whichever of these sources cover a study. At least f
 | Vmohit | not stated, rubric-thresholded | positive 1; absent or below threshold 0; uncertain or unmentioned left out |
 
 The source files and their provenance are in the
-[public label re-screen](2026-09-21-public-label-rescreen.md). The Josh mapping is this project's
+[public label re-screen](audits/2026-09-21-public-label-rescreen.md). The Josh mapping is this project's
 choice, since that release gives a binary annotation with a confidence rather than a probability.
 
 ## How the targets were chosen
@@ -80,8 +80,8 @@ agreement between independent sources are what the choice rests on.
 - **A first pass that included Zaid** showed gains on all twelve targets. Zaid copies gold into its
   gold rows, so that result was an artifact.
 - **Whole-table replacements** remain rejected: see the
-  [re-screen](2026-09-21-public-label-rescreen.md#whole-table-comparison) and the
-  [Tonylin run](../validation/results/2026-09-13-tonylin-label-comparison.md).
+  [re-screen](audits/2026-09-21-public-label-rescreen.md#whole-table-comparison) and the
+  [Tonylin run](../validation/results/labels-and-losses/2026-09-13-tonylin-label-comparison.md).
 
 ## Literature behind the design
 
@@ -107,7 +107,7 @@ the clearest case: every text source misses 14 or more of its 27 gold positives.
 
 ## Reproduction
 
-- Table: `rtk proxy uv run --locked python -m scripts.tools.prepare_combined_labels` writes
+- Table: `uv run --locked python -m scripts.tools.prepare_combined_labels` writes
   `data/labels/prepared/combined-v1/labels.csv` (SHA-256 `1e586b57…be215fb`) and
   [`configs/labels/combined-label-sources.json`](../../configs/labels/combined-label-sources.json).
   with `preparation.json` beside the table. It reads the 2026-09-21 snapshots under
@@ -120,7 +120,7 @@ the clearest case: every text source misses 14 or more of its 27 gold positives.
   output directory and fails if its selection differs from the prepared table:
 
   ```bash
-  rtk proxy uv run --locked python -m scripts.adhoc.analyze_label_combination --output-dir outputs/analysis/label-combination-new
+  uv run --locked python -m scripts.adhoc.analyze_label_combination --output-dir outputs/analysis/label-combination-new
   ```
 - The validation split built on these labels is
-  [`all_5fold_scanner_v1`](../validation/validation-strategy.md).
+  [`all_5fold_scanner_v1`](../validation/validation-splits.md#superseded-splits).

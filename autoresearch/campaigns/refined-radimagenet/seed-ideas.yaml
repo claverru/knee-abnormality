@@ -18,8 +18,8 @@ ideas:
     config values in encode_batch.
   precedents:
   - 'prior-work.md, Pretrained head on our slices: knee-class mass 0.088 against 0.978, label-free.'
-  - 'docs/research/radimagenet-weights.md: the earlier BatchNorm check matched no candidate mean and left normalization resting on the script default.'
-  - 'docs/ongoing/radimagenet-backbone.md: the original RadImageNet ResNet-50 needed [-1, 1] inputs, found the same way.'
+  - 'docs/research/backbones-and-pretraining/radimagenet-weights.md: the earlier BatchNorm check matched no candidate mean and left normalization resting on the script default.'
+  - 'docs/modeling/backbones/resnet-radimagenet-backbones.md: the original RadImageNet ResNet-50 needed [-1, 1] inputs, found the same way.'
   novelty: First run of a Refined-RadImageNet backbone with the normalization it was trained with.
   coverage: All studies and labels.
   exploitation: >-
@@ -59,7 +59,7 @@ ideas:
   precedents:
   - 'outputs/training/20261004-094416-rn10t-view-label-bias: the reference, standard ResNet-10t weights at backbone LR 6e-5.'
   - 'prior-work.md, Checkpoints: file, hash and weight scale; The authors mask method.'
-  - 'docs/modeling/backbone-swaps.md#checkpoint-weight-scale: the rate rule.'
+  - 'docs/modeling/backbones/backbone-swaps.md#checkpoint-weight-scale: the rate rule.'
   novelty: First use of a mask-trained RadImageNet checkpoint in this project.
   coverage: All studies and labels.
   exploitation: >-

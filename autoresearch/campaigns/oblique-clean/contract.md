@@ -12,7 +12,7 @@ retrained on it.
 Make the oblique groups pay off. An oblique group is a coronal series tilted more than 20°, or an
 axial fluid series tilted more than 30°, that shares its slot with a standard series and is
 therefore sampled with its own budget
-([sampler](../../../docs/data-preparation/physical-sampling/implemented-sampler.md#oblique-groups)).
+([oblique groups](../../../docs/history/oblique-groups.md)).
 They are mostly dedicated ACL-oblique protocols and a site's tilted coronals, in about 12% of
 studies (103 on fold 0), and those studies carry about twice the ACL, MCL and lateral meniscus
 rates. Today the model receives their tokens with the slot's plane and contrast embeddings, so it

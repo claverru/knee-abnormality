@@ -5,11 +5,11 @@ sagittal), each seeing only its own plane's images, tested on EfficientNet-B0 in
 plane-specialization campaign and transferred to ReXNet-200. The best structure ties the
 single-ReXNet control publicly (0.945 against 0.946) at about 35% more training time and twice the
 Kaggle inference time. Results, runs and the τ sweep are in the
-[campaign result](../validation/results/2026-09-28-plane-specialization-campaign.md).
+[campaign result](../validation/results/campaigns-and-queues/2026-09-28-plane-specialization-campaign.md).
 
 ## Why it was tried
 
-The [single-plane inference](../validation/results/2026-09-27-single-plane-inference.md) on the
+The [single-plane inference](../validation/results/pooling-and-attention/2026-09-27-single-plane-inference.md) on the
 ReXNet control showed each label leaning on one plane (ACL sagittal, MCL coronal, Effusion and
 Baker's axial) and fusion adding little over the best single plane for most labels. The hypothesis:
 one shared backbone spreads its knowledge across planes, so backbones forced to extract the most
@@ -37,7 +37,7 @@ Nothing entered `main`. The code is in:
 
 ## ResNet-18 and ResNet-10t retake (2026-10-01)
 
-The [revisits campaign](../validation/results/2026-10-01-revisits-campaign.md) rebuilt plane backbones on the RadImageNet ResNet-18 recipe: three
+The [revisits campaign](../validation/results/campaigns-and-queues/2026-10-01-revisits-campaign.md) rebuilt plane backbones on the RadImageNet ResNet-18 recipe: three
 copies of the pretrained backbone, each anchored by L2-SP and with DSU inside it. With the joint pool
 and plane-contrast readouts, three ResNet-18s tied one (×4 +0.0000, 9% more training time) and
 added nothing to a ReXNet-200 blend; three ResNet-10ts gained about +0.0023 over one ResNet-10t but
@@ -48,7 +48,7 @@ stayed 0.0023 below one ResNet-18. Dense per-plane readouts with learned fusion 
 ## What carries forward
 
 - Averaging near-equal runs gained +0.0026 locally, a seed-ensemble effect for the
-  [endgame](../backlog/endgame.md#ensembling).
+  [endgame](../validation/validation-protocol.md#ensembles).
 - τ 0.75 stays optimal on plane models as on the single backbone.
 - The campaign harness gained two fixes kept in `main`: reused idea IDs are rejected at the researcher
   step, and proposed ideas count as covering their family.

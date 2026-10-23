@@ -31,7 +31,7 @@ ideas:
     one scalar per shared channel (meniscus, oa), started at zero under torch.random.fork_rng. The seven
     own-channel targets are unchanged. Nothing else changes.'
   precedents:
-  - 'docs/ongoing/side-routed-heads.md, Fourth run and Fifth run: Medial OA and Lateral OA with and
+  - 'docs/modeling/side-routed-heads.md, Fourth run and Fifth run: Medial OA and Lateral OA with and
     without the front of their side; S113 0.953 and S114 0.952.'
   - 'autoresearch/campaigns/side-routing/run-notes.md, front-and-up-region-for-pf-oa: per-target and
     localisation deltas of 2026-10-06.'

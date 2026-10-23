@@ -3,7 +3,7 @@
 Generate an offline comparison from the example-test DICOMs:
 
 ```bash
-rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/resnet50.yaml --output-dir outputs/previews/triplet-augmentations-new
+uv run --locked python -m scripts.tools.preview_augmentations configs/resnet50.yaml --output-dir outputs/previews/triplet-augmentations-new
 ```
 
 Open the generated `preview.html` in a browser. It embeds its
@@ -43,7 +43,7 @@ Regenerate with a fresh directory and optionally a different seed or number
 of draws. `--study-uid` restricts the source to one UID from the selected split:
 
 ```bash
-rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/resnet50.yaml --seed 100 --variants 6 --output-dir outputs/previews/augmentations-seed100
+uv run --locked python -m scripts.tools.preview_augmentations configs/resnet50.yaml --seed 100 --variants 6 --output-dir outputs/previews/augmentations-seed100
 ```
 
 `--split validation` previews fold-0 validation studies instead and needs the prepared fold
@@ -59,7 +59,7 @@ augmentation-only CUDA timing and peak memory, without a backbone or optimizer; 
 first:
 
 ```bash
-rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/resnet50.yaml --variants 1 --profile-cuda --output-dir outputs/previews/reflection-profile-new
+uv run --locked python -m scripts.tools.preview_augmentations configs/resnet50.yaml --variants 1 --profile-cuda --output-dir outputs/previews/reflection-profile-new
 ```
 
 `manifest.json` records settings, CPU seeds, per-series parameters, sampled
@@ -72,7 +72,7 @@ Historical single-slice preview evidence remains under
 `outputs/previews/augmentations/` and
 `outputs/archive/maintenance/augmentation-preview-20260910T211117Z/`. The
 adjacent-triplet preview generated on 2026-09-11 is
-[available here](../../outputs/previews/triplet-augmentations/preview.html).
+available here (deleted).
 Its three example studies contain thirteen selected series, 69 complete
 triplet inputs and 207 distinct selected slices. All six types are present,
 with no reported preparation conditions. The manifest records input counts

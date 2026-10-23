@@ -28,7 +28,7 @@ ideas:
   precedents:
   - 'site-bias-product-of-experts: approved with the same exception, +0.00040 [80% -0.0011, +0.0019], largest biases on Synovitis and Effusion (this campaign).'
   - 'Clark et al. (arXiv:1909.03683): a bias-only model during training, removed at test time.'
-  - 'v3 analysis of Spanish short reports and not-mentioned answers (docs/ongoing/report-attribute-extraction.md#v3-full-run-analysis-2026-09-25).'
+  - 'v3 analysis of Spanish short reports and not-mentioned answers (docs/public-labels/jevk5-report-attribute-extraction.md#v3-full-run-analysis-2026-09-25).'
   novelty: First label-noise model keyed on how completely a report addressed the knee, measured from the permitted v3 answers.
   coverage: All training studies; largest expected effect on labels most often left unmentioned.
   exploitation: If low-completeness quintiles learn negative biases and the public score holds or rises, combine with the per-site bias.

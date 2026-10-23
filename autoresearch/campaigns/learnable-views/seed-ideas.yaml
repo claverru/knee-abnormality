@@ -265,7 +265,7 @@ ideas:
     as medial_axis is today. The scale embedding of the view stays.'
   precedents:
   - 'near-misses #6, side-normalized 3D position in place of 1D and 2D, computed centre, ReXNet recipe:
-    +0.0008 hard, -0.0006 soft, PF OA +0.0061; rejected (docs/validation/results/2026-09-25-near-misses-campaign.md;
+    +0.0008 hard, -0.0006 soft, PF OA +0.0061; rejected (docs/validation/results/campaigns-and-queues/2026-09-25-near-misses-campaign.md;
     mechanism in autoresearch/campaigns/near-misses/seed-ideas-2.yaml, whose branches and fallbacks
     this seed keeps).'
   - 'near-misses #13, the same with each slice''s normal added: -0.0017 hard, +0.0011 soft, PF OA

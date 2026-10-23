@@ -8,7 +8,7 @@ identity, target/realized depths, source entitlements/counts, run diagnostics an
 placement errors. Historical comparison results remain embedded in the summary.
 
 ```bash
-rtk proxy uv run --locked python -m scripts.adhoc.analyze_physical_sampling --output-dir outputs/analysis/physical-sampling-new/geometry
+uv run --locked python -m scripts.adhoc.analyze_physical_sampling --output-dir outputs/analysis/physical-sampling-new/geometry
 ```
 
 It reads saved metadata only and refuses an existing output directory. The saved
@@ -18,9 +18,9 @@ removed on 2026-09-20 with the repaired DICOMs, the cohort contributes two slice
 that earlier runs skipped.
 
 Final artifacts are in
-[`geometry-verified`](../../../outputs/analysis/p/physical-sampling-implementation-20260913/geometry-verified/summary.json),
-[`preparation-verified`](../../../outputs/analysis/p/physical-sampling-implementation-20260913/preparation-verified/report.json)
-and the [implementation report](../../../outputs/analysis/p/physical-sampling-implementation-20260913/implementation-report.json).
+`geometry-verified` (`outputs/analysis/p/physical-sampling-implementation-20260913/geometry-verified/summary.json`, deleted),
+`preparation-verified` (deleted)
+and the implementation report (`outputs/analysis/p/physical-sampling-implementation-20260913/implementation-report.json`, deleted).
 Both manifests match the final production preprocessing identity and preserve
 source/config/input identities. Earlier directories in this implementation
 folder are intermediate verification passes.

@@ -12,7 +12,7 @@ Apply the repository's `AGENTS.md` throughout. Paths are repository-relative.
 - Start at `scripts/INDEX.md`. The `pipeline/` and `tools/` indexes are generated from each
   script's CLI description; `adhoc/INDEX.md` is written by hand, by topic, with each
   investigation's question and findings doc.
-- `rtk proxy uv run --locked python -m scripts.<role>.<module> --help` gives the purpose and
+- `uv run --locked python -m scripts.<role>.<module> --help` gives the purpose and
   every option. `rg <file stem> docs` finds procedures and findings.
 - Reuse or extend a close match before adding a script.
 
@@ -43,7 +43,7 @@ Apply the repository's `AGENTS.md` throughout. Paths are repository-relative.
 ## Keep the indexes current, in the same change
 
 - After adding, removing, moving or re-describing a pipeline or tools script, run
-  `rtk proxy uv run --locked python -m scripts.tools.script_index write`.
+  `uv run --locked python -m scripts.tools.script_index write`.
 - For an adhoc script, add or edit its row in `scripts/adhoc/INDEX.md`.
 - Finish with `... script_index check`. It runs every maintained script's `--help`, so a
   failure can also mean a tool no longer imports.

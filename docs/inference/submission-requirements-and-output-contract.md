@@ -4,7 +4,7 @@
 
 Reviewed on 2026-09-10, with the indexed official rules, timeline, evaluation
 and data pages rechecked on 2026-09-11. The code-requirements page was read through
-the Kaggle API on 2026-09-15 (see below); recheck it before final submission selection.
+the Kaggle API on 2026-09-15 (see below).
 
 - The [official code requirements](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/overview/code-requirements)
   require notebook submissions, disabled Internet, a maximum of nine hours
@@ -23,7 +23,7 @@ the Kaggle API on 2026-09-15 (see below); recheck it before final submission sel
   the type favoured for competition submissions; `kaggle competitions submit -k` takes a
   kernel slug with no type constraint, its help reading "Name of kernel (notebook)"; and
   our own `kernel_type: script` loading probes ran against this competition's data.
-  Only a test submission would settle it, and none has been made. It buys nothing anyway:
+  Only a test submission would settle it, and none was made. It buys nothing anyway:
   `scripts/pipeline/inference.ipynb` is a three-cell wrapper whose second cell already
   runs `python -m scripts.pipeline.predict` as a subprocess, so a script kernel would save
   one interpreter launch against the 34–56 s of package imports that dominate fixed cost.
@@ -33,7 +33,7 @@ the Kaggle API on 2026-09-15 (see below); recheck it before final submission sel
   the public-label and pretrained-weight source/version records already used
   by training.
 - The [timeline](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/overview/timeline)
-  currently sets entry/team-merger deadlines at October 15, 2026, final
+  set entry/team-merger deadlines at October 15, 2026, final
   submission at October 22, and winners' deliverables at November 5, all at
   23:59 UTC. Winning solutions require code, weights and documentation, with
   additional presentation/public-release obligations described by the host.
@@ -59,7 +59,7 @@ The tiny example-test run displayed on a public notebook page does not measure
 hidden-test runtime. Measure the full path: imports, input discovery, decoding,
 preprocessing, model loading, forward passes, ensembling, and CSV writing.
 Training caches can save repeated experiments but do not predecode unseen
-test studies. See [public runtime evidence](../research/public-research.md#data-access-and-runtime-lessons).
+test studies. See [public runtime evidence](../research/competition-and-prior-art/public-research.md#data-access-and-runtime-lessons).
 
 ## Inputs and output contract
 

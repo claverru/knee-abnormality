@@ -38,7 +38,7 @@ ideas:
   precedents:
   - 'outputs/autoresearch/fixes-and-removals/experiments/position-embeddings-off-20261005T165932Z-7aa8b0ae against its 11 siblings: Fracture +0.0002 against +0.0043 to +0.0117, Baker''s -0.0028, the lowest.'
   - 'autoresearch/campaigns/side-routing/run-notes.md, learned-position-code-for-own-channels: a learned knee-frame code lowered Fracture by 0.0037 and MCL by 0.0047.'
-  - 'docs/ongoing/side-routed-heads.md, Fourth run and Fifth run: own-channel targets without a token code and with the fixed knee-frame sinusoid.'
+  - 'docs/modeling/side-routed-heads.md, Fourth run and Fifth run: own-channel targets without a token code and with the fixed knee-frame sinusoid.'
   novelty: The old recipe's two codes have not been run in this design; every run of the line used no code or a knee-frame one.
   coverage: >-
     Every token, with or without a fitted centre, for the seven own-channel targets and the

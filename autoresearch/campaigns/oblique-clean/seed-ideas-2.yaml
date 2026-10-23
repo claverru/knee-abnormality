@@ -50,9 +50,9 @@ ideas:
     alike. Per-slot, per-study and run totals equal the reference exactly.
   precedents:
   - outputs/analysis/a/acquisition-geometry-20260922/oblique_reach.txt (windows and run coverage per group)
-  - docs/validation/results/2026-09-17-test-time-allocation.md#repeated-series-in-one-slot (second-series
+  - docs/validation/results/sampling/2026-09-17-test-time-allocation.md#repeated-series-in-one-slot (second-series
     triplets help on frozen models)
-  - docs/validation/results/2026-09-18-overnight-results.md (repeated_series_share took triplets from
+  - docs/validation/results/campaigns-and-queues/2026-09-18-overnight-results.md (repeated_series_share took triplets from
     other types and lost publicly; this split stays inside the slot)
   novelty: The first zero-sum split between the two groups of one slot; the reference and repeated_series_share
     both changed slot totals.
@@ -122,7 +122,7 @@ ideas:
     a reference. Here the reference is the study''s own standard series.'
   - 'Li et al. 2016, AdaBN (arXiv:1603.04779), and Chang et al. CVPR 2019, DSBN (arXiv:1906.03950): domain-specific
     normalization statistics for inputs from different domains that share one network.'
-  - 'docs/research/medial-lateral-transfer.md footnote 16 (Zhao et al. ICML 2019): unconditional feature
+  - 'docs/research/geometry-and-views/medial-lateral-transfer.md footnote 16 (Zhao et al. ICML 2019): unconditional feature
     alignment fails under label shift. Per-study alignment is conditioned on the same knee and the same
     labels.'
   - 'Retired ×1 oblique-group-embedding-20260922T115506Z-f5d616dd, the closest mechanism (a constant per-type
@@ -132,9 +132,9 @@ ideas:
     slot pass on frozen k_05 and k_075 lost 0.0044–0.0103 subset AUC (confounded by slab coverage, per
     the oblique-feature-adapter record).'
   - 'oblique-feature-adapter, declined by the user as part of the identity family: a learned low-rank
-    branch. Also docs/backlog/small-changes.md#planecontrast-specific-feature-adapters (all studies, general
+    branch. Also docs/backlog/untried-ideas.md#pooling-and-the-attention-head (all studies, general
     backlog). This idea learns no feature branch.'
-  - 'docs/validation/results/2026-09-16-label-private-crops-result.md: a zero-initialized FiLM stayed
+  - 'docs/validation/results/crops-and-views/2026-09-16-label-private-crops-result.md: a zero-initialized FiLM stayed
     near zero (mean |scale| 0.02). The gate here may do the same.'
   - 'New evidence: outputs/autoresearch/oblique-x4/jobs/researcher-20260922T145144Z-bef067e9/scratch/evidence/{pair_decomposition,shift_by_kind,kind_pairs_x4,kind_net,x1_candidates,tau_pairs}.{py,txt};
     fold-0 series descriptions in researcher-20260922T142228Z-40754723/scratch/evidence/cor0_descriptions.txt.'

@@ -12,9 +12,9 @@ ideas:
     all labels. Average pairs within each label before combining labels; retain BCE
     and define the ranking contribution when no pairs exist.
   precedents:
-  - docs/backlog/small-changes.md#ranking-aware-loss
-  - docs/research/auc_loss_approaches.md
-  - docs/research/per-label-losses.md#ranking-needs-usable-study-pairs
+  - docs/backlog/untried-ideas.md#pooling-and-the-attention-head
+  - docs/research/training-objectives/auc_loss_approaches.md
+  - docs/research/training-objectives/per-label-losses.md#ranking-needs-usable-study-pairs
   novelty: Adopts the existing untrained ranking-hybrid proposal into this campaign.
     The campaign owns its execution; the general backlog remains read-only provenance.
     Unlike the per-label proposal, one formula and scalar mixture apply to all twelve
@@ -84,9 +84,9 @@ ideas:
     a single shared focusing exponent. Retain the baseline class-balancing rule initially,
     and make the exact positive/negative soft-target extension explicit.
   precedents:
-  - docs/research/auc_loss_approaches.md
-  - docs/research/per-label-losses.md#trusted-motivation
-  - docs/research/per-label-losses.md#candidate-losses-and-extensions
+  - docs/research/training-objectives/auc_loss_approaches.md
+  - docs/research/training-objectives/per-label-losses.md#trusted-motivation
+  - docs/research/training-objectives/per-label-losses.md#candidate-losses-and-extensions
   novelty: A shared objective experiment, not the excluded per-label focal/ranking
     selection plan. The current main recipe uses BCE, with no focusing term.
   coverage: Preserve all observed soft targets and class groups with unchanged study
@@ -150,9 +150,9 @@ ideas:
     targets soft and study exposure uniform. Choose one justified shared rule rather
     than a vector of label-specific coefficients.
   precedents:
-  - docs/backlog/small-changes.md#bce-weighting-and-study-sampling
-  - docs/research/auc_loss_approaches.md#weighting-and-sampling-design-space
-  - docs/validation/results/2026-09-19-balanced-bce-result.md
+  - docs/backlog/untried-ideas.md#supervision-and-labels
+  - docs/research/training-objectives/auc_loss_approaches.md#weighting-and-sampling-design-space
+  - docs/validation/results/labels-and-losses/2026-09-19-balanced-bce-result.md
   novelty: Imports only the unimplemented loss-weighting proposal, not the study or
     batch sampling alternatives. Different weights arise from the same formula and
     training counts, not from per-label objective selection.
@@ -217,8 +217,8 @@ ideas:
     combination for all labels on a shared epoch or step schedule. Fit the whole schedule
     inside the original ten epochs; do not append a continuation.
   precedents:
-  - docs/research/per-label-losses.md#candidate-losses-and-extensions
-  - docs/research/auc_loss_approaches.md
+  - docs/research/training-objectives/per-label-losses.md#candidate-losses-and-extensions
+  - docs/research/training-objectives/auc_loss_approaches.md
   - autoresearch/campaigns/losses/seed-ideas.yaml
   novelty: Changes when the shared ranking term contributes, not which labels receive
     it. Distinct from the always-on hybrid and from compositional AUC training with
@@ -275,8 +275,8 @@ ideas:
   - 'Burges et al., ICML 2005 (RankNet): pairwise cross-entropy against a target ordering
     probability P_ij, the exact form used here'
   - 'Gao and Zhou, IJCAI 2015 (arxiv.org/abs/1208.0645): AUC consistency of pairwise
-    logistic loss; cited in docs/research/auc_loss_approaches.md#1-pairwise-logistic-ranking'
-  - docs/research/per-label-losses.md#candidate-losses-and-extensions extension 4
+    logistic loss; cited in docs/research/training-objectives/auc_loss_approaches.md#1-pairwise-logistic-ranking'
+  - docs/research/training-objectives/per-label-losses.md#candidate-losses-and-extensions extension 4
     names probabilistic pair targets as an explicitly different objective, never run
     here
   - 'campaign idea shared-bce-ranking: contrasting arm whose recorded rule is binary
@@ -408,11 +408,11 @@ ideas:
   - 'Wang et al., CVPR 2020, XBM (arxiv.org/abs/1912.06798): queue of past embeddings
     with enqueue/dequeue, justified by a measured slow-drift property; reports large
     gains at negligible extra memory'
-  - 'docs/research/auc_loss_approaches.md#5-roc-star: margin-based pairwise ranking
+  - 'docs/research/training-objectives/auc_loss_approaches.md#5-roc-star: margin-based pairwise ranking
     using sampled predictions from the previous epoch as comparison examples'
   - 'autoresearch/campaigns/losses/prior-work.md: ''training-only memory pools'' named
     as a future direction when evidence justifies them'
-  - 'docs/research/per-label-losses.md#ranking-needs-usable-study-pairs: gradient
+  - 'docs/research/training-objectives/per-label-losses.md#ranking-needs-usable-study-pairs: gradient
     accumulation does not create cross-microbatch pairs; end-to-end ranking needs
     an explicit pair-coverage design'
   - outputs/autoresearch/losses/jobs/researcher-20260920T112958Z-9a7e4a21/scratch/loss-evidence-20260920.md
@@ -491,9 +491,9 @@ ideas:
     weighting with term-wise weighting: ''This differs from pos_weight, which scales
     only the positive term inside BCE, including the positive component of soft negative
     targets such as 0.25'''
-  - 'docs/research/auc_loss_approaches.md#9-positive-weighted-bce and #weighting-and-sampling-design-space
+  - 'docs/research/training-objectives/auc_loss_approaches.md#9-positive-weighted-bce and #weighting-and-sampling-design-space
     (study-target cell weights row)'
-  - 'docs/validation/results/2026-09-19-balanced-bce-result.md: the measured baseline
+  - 'docs/validation/results/labels-and-losses/2026-09-19-balanced-bce-result.md: the measured baseline
     this replaces'
   - outputs/autoresearch/losses/jobs/researcher-20260920T112958Z-9a7e4a21/scratch/loss-evidence-20260920.md
     section 2
@@ -600,14 +600,14 @@ ideas:
     only.
   precedents:
   - 'Kobayashi, CVPR 2023, Two-Way Multi-Label Loss: within-example positive/negative
-    label discrimination plus the per-label direction; catalogued locally as docs/research/auc_loss_approaches.md#14-two-way-multi-label-loss
+    label discrimination plus the per-label direction; catalogued locally as docs/research/training-objectives/auc_loss_approaches.md#14-two-way-multi-label-loss
     and ranked out there on the opinion that ''macro AUC never scores'' cross-label
     ordering, with no local measurement'
   - 'Burges et al., ICML 2005 (RankNet): pairwise cross-entropy against an ordering
     probability, the surrogate reused here on the label axis'
-  - 'docs/research/medial-lateral-transfer.md: the medial/lateral similarity and transfer
+  - 'docs/research/geometry-and-views/medial-lateral-transfer.md: the medial/lateral similarity and transfer
     hypothesis, its six experiments and the attention-contrast analysis'
-  - 'docs/modeling/retired-side-and-compartment-variants.md and docs/validation/results/2026-09-14-meniscus-soft-coupling-result.md:
+  - 'docs/modeling/retired-side-and-compartment-variants.md and docs/validation/results/labels-and-losses/2026-09-14-meniscus-soft-coupling-result.md:
     loss.meniscus_coupling_weight 0.1 penalized classifier-weight distance for one
     label pair and scored 0.890869 against 0.892360; cautionary precedent in parameter
     space and label-specific, unlike this output-space shared rule'
@@ -724,7 +724,7 @@ ideas:
     regret. Log loss is the unbounded extreme of that family: its per-cell gradient
     does not decay when the model is confidently wrong, and the repository has documented
     confidently-wrong supervision (nineteen report-derived OA cells with explicit
-    low-grade findings carrying confident positive training labels, docs/research/medial-lateral-transfer.md).
+    low-grade findings carrying confident positive training labels, docs/research/geometry-and-views/medial-lateral-transfer.md).
     On control B''s epoch-8 predictions the 5.99% of cells with |p - y| > 0.6 carry
     23.7% of the balanced BCE gradient mass against 20.3% under the scaled Brier form,
     and the median per-cell gradient falls from 0.1019 to 0.0542 while the two are
@@ -761,10 +761,10 @@ ideas:
   - 'Brier 1950; Reid and Williamson on composite binary losses: proper losses are
     characterized by a weight function over thresholds, constant for squared and 1/(c(1-c))
     for log loss'
-  - 'docs/research/auc_loss_approaches.md: the local survey lists squared hinge only
+  - 'docs/research/training-objectives/auc_loss_approaches.md: the local survey lists squared hinge only
     as a pairwise ranking option and never lists a pointwise proper-loss replacement,
     so this family is unclaimed by the general backlog'
-  - 'docs/validation/results/2026-09-19-balanced-bce-result.md: the measured control
+  - 'docs/validation/results/labels-and-losses/2026-09-19-balanced-bce-result.md: the measured control
     this replaces'
   - 'campaign idea shared-balanced-focal: contrasting arm, improper and hard-cell-emphasizing,
     whose recorded review concern is exactly the fixed-LR gradient-scale confound
@@ -905,7 +905,7 @@ ideas:
   - 'campaign results shared-bce-ranking (inconclusive) and shared-bernoulli-pair-ranking
     (reject): additive study-axis pair terms at weight 1.0. Contrasting arms, not
     prerequisites.'
-  - 'docs/research/auc_loss_approaches.md: lists pointwise and pairwise surrogates;
+  - 'docs/research/training-objectives/auc_loss_approaches.md: lists pointwise and pairwise surrogates;
     no entry projects a component out of the existing pointwise gradient.'
   - outputs/autoresearch/losses/jobs/researcher-20260920T131338Z-3dc7e308/scratch/gradient-geometry-20260920.md
     sections 1 and 4 (shift.py, gradscale.py).
@@ -1038,9 +1038,9 @@ ideas:
     a study-factor times class-factor form.'
   - 'docs/modeling/supervision.md#fixed-class-balanced-bce: the whole-cell class weighting
     rule this generalizes.'
-  - 'docs/validation/results/2026-09-19-balanced-bce-result.md: the measured gain
+  - 'docs/validation/results/labels-and-losses/2026-09-19-balanced-bce-result.md: the measured gain
     of the current class balancing, whose defining property this fit preserves exactly.'
-  - 'docs/research/auc_loss_approaches.md#weighting-and-sampling-design-space: enumerates
+  - 'docs/research/training-objectives/auc_loss_approaches.md#weighting-and-sampling-design-space: enumerates
     class-axis weighting choices; study-axis influence under a pooled-cell reduction
     is absent from it.'
   - 'campaign ideas shared-tempered-balance and shared-soft-mass-balance: both act
@@ -1169,7 +1169,7 @@ ideas:
     and second moments, with the auxiliary variables equal to the class-conditional
     mean scores at the optimum. https://proceedings.neurips.cc/paper/2016/hash/c52f1bd66cc19d05628bd8bf27af3ad6-Abstract.html'
   - 'Yuan et al., Large-scale Robust Deep AUC Maximization (AUC-M), arXiv:2012.03173
-    and docs/research/auc_loss_approaches.md section 4: within-class variance terms
+    and docs/research/training-objectives/auc_loss_approaches.md section 4: within-class variance terms
     plus a margin. AUC-M needs PESG for its min-max; detaching the centroids removes
     the dual variable so the contract''s fixed optimizer is preserved.'
   - 'Campaign results: shared-bce-ranking (inconclusive, pairs covered ~10/12 labels),
@@ -1178,7 +1178,7 @@ ideas:
   - 'Campaign results shared-balanced-focal (inconclusive, negative point estimate)
     and shared-balanced-brier (inconclusive, negative point estimate): both reshaped
     each cell''s own curve, leaving group-relative geometry untested.'
-  - docs/research/per-label-losses.md#ranking-needs-usable-study-pairs for the microbatch
+  - docs/research/training-objectives/per-label-losses.md#ranking-needs-usable-study-pairs for the microbatch
     pair-coverage calculation this mechanism bypasses.
   - 'jobs/researcher-20260920T141757Z-27ab0eb1/scratch/group-geometry-20260920.md
     with geometry.py, tails.py, tail_composition.py, sizing.py: tail concentration,
@@ -1326,7 +1326,7 @@ ideas:
     (both reject): soft-pair mass and an unweighted cross-label contrast; the latter''s
     harm was attributed to diluting class balancing, which this term avoids by carrying
     the class weights.'
-  - docs/research/auc_loss_approaches.md sections 1-4 for the pairwise and AUCM families
+  - docs/research/training-objectives/auc_loss_approaches.md sections 1-4 for the pairwise and AUCM families
     and their ranking in this project.
   - 'jobs/researcher-20260920T141757Z-27ab0eb1/scratch/group-geometry-20260920.md,
     sizing.py: active-band shares 8.1% / 13.5% / 30.3% at margins 0.5 / 1.0 / 2.0
@@ -2082,7 +2082,7 @@ ideas:
   precedents:
   - 'scratch/draw-noise-20260920.md (this job) sections 1-2: multiplier profiles,
     binormal noise fit, buffer feasibility'
-  - 'docs/validation/results/2026-09-19-relative-sampler-width-result.md#count-multipliers:
+  - 'docs/validation/results/sampling/2026-09-19-relative-sampler-width-result.md#count-multipliers:
     the recorded x1..x4 fold-0 table for both checkpoints'
   - 'shared-target-logit-margin finding: logit-scale change of ~1.35 in mean|logit|
     gave +0.00005, so saturation is not a route to draw-invariance'

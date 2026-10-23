@@ -20,7 +20,7 @@ ideas:
       count.
     precedents:
       - autoresearch/campaigns/triplet-sampling/ideas.yaml (physical-span-standardized-triplets, queued, never trained)
-      - docs/research/input-resolution.md#acquisition-all-24371-train-series
+      - docs/research/geometry-and-views/input-resolution.md#acquisition-all-24371-train-series
       - docs/data-preparation/physical-sampling/implemented-sampler.md
     novelty: >-
       Re-queued by explicit user instruction on 2026-09-21 from the stopped
@@ -74,11 +74,11 @@ ideas:
       image centre whenever the landmark is not found. Placement is deterministic
       per series in validation and inference.
     precedents:
-      - docs/research/input-resolution.md#field-of-view-and-joint-position (joint offsets, tissue width, placement reopened 2026-09-21)
+      - docs/research/geometry-and-views/input-resolution.md#field-of-view-and-joint-position (joint offsets, tissue width, placement reopened 2026-09-21)
       - outputs/analysis/i/input-resolution-research-20260915/images/common.py joint_line heuristic (cross-plane agreement within 10 mm in 96-98% of studies; not validated against ground truth)
       - outputs/analysis/i/input-resolution-research-20260915/images/series_metrics_overhang.parquet (tissue width and offsets per plane)
       - docs/history/crop-selection-investigation.md (learned crop selection dropped 2026-09-16; its anatomical-glimpse option was never run)
-      - docs/validation/results/2026-09-12-140-mm-crop-result.md
+      - docs/validation/results/crops-and-views/2026-09-12-140-mm-crop-result.md
     novelty: >-
       Added by the user on 2026-09-21. Unlike the dropped crop-selection work it
       learns nothing and changes neither resolution nor coverage of slices: one
@@ -180,8 +180,8 @@ ideas:
       stay on the incumbent deterministic selection.
     precedents:
       - docs/history/crop-selection-investigation.md#what-the-runs-established (attention-based selection beat random by only 0.004 there; normalized attention entropy 0.97-0.99)
-      - docs/research/auc_loss_approaches.md#adaptive-allocation
-      - docs/backlog/big-bets.md#adaptive-training-allocation
+      - docs/research/training-objectives/auc_loss_approaches.md#adaptive-allocation
+      - docs/backlog/untried-ideas.md#augmentation-sampling-and-intensity
     novelty: >-
       Added by the user on 2026-09-21. The triplet-sampling campaign allowed
       training feedback but proposed only static geometric mechanisms. Differs from

@@ -1,6 +1,6 @@
 # Fixes-and-removals campaign
 
-**Closed: stopped by the user on 2026-10-05 after 13 decided runs; its incumbent's four changes are on main since 2026-10-06 ([result](../../../docs/validation/results/2026-10-05-fixes-and-removals-campaign.md)); the worktree and branch are removed.** Codex, fourteen forced seeds, of which seven removals never ran. It repaired defects found by the code audits of
+**Closed: stopped by the user on 2026-10-05 after 13 decided runs; its incumbent's four changes are on main since 2026-10-06 ([result](../../../docs/validation/results/campaigns-and-queues/2026-10-05-fixes-and-removals-campaign.md)); the worktree and branch are removed.** Codex, fourteen forced seeds, of which seven removals never ran. It repaired defects found by the code audits of
 2026-10-05 and tested whether mechanisms active in the recipe then were still needed, by
 switching them off one per run on the ResNet-18 recipe. The first seed, the detail-view position fix under reflection (training and TTA), is
 adopted by user decision.

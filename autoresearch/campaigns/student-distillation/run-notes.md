@@ -230,7 +230,7 @@ moved by −0.0006 to −0.0033 with an identical label recipe, so a single labe
   trained: retired in the stopped state, since `remove-idea` refuses a candidate the developer has
   prepared (old state: `state.before-remove-0125.json`; record under `decisions/`).
 - `reranked-fold-teachers` is the queue head. Its implementation is prepared and checked on the
-  label table: [prepared candidate](prepared/reranked-fold-teachers/report.md). The seed's
+  label table: prepared candidate (`prepared/reranked-fold-teachers/report.md`, deleted). The seed's
   implementation text in the state points the developer at it.
 - S134 (share 0.25) and S135 (share 0.75) were submitted at the user's request, ×4, τ 0.9, no TTA.
 

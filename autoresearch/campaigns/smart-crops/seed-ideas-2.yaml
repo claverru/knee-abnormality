@@ -29,10 +29,10 @@ ideas:
   - 'two-stream-paired (mixed-field): every slice at 120 mm (ResNet-18) and 140 mm (ResNet-10t),
     pooled as narrow + tanh(gate) x (joint - narrow) with the gate at zero; the second stream
     never trained and the run was in effect 120 mm alone. 51 inputs per study took 1,736 s
-    (docs/validation/results/2026-10-01-mixed-field-campaign.md).'
+    (docs/validation/results/crops-and-views/2026-10-01-mixed-field-campaign.md).'
   - 'Two views per slice, backlog: both streams must feed the pool from the first step, and the
     activation check must compare the joint score with the narrow-only one
-    (docs/backlog/big-bets.md).'
+    (docs/backlog/untried-ideas.md).'
   - 'rn18-field-120-control against the same recipe at 140 mm: +0.0008 overall, synovitis -0.0044,
     Baker''s cyst -0.0030, medial meniscus -0.0018 (prior-work.md, Precedent table).'
   - 'One ResNet-18 per field lost 0.0017 to the shared-backbone mix; there each backbone saw half
@@ -92,7 +92,7 @@ ideas:
   - 'Acquired resolution at 0.5 mm: coronal T1/PD 35%, sagittal T1/PD 37%, fluid 60% fully
     resolved; at 0.536 mm 18%, 23% and 37-44% (prior-work.md, Acquired resolution).'
   - 'Centred 112 mm crop, September: Baker''s cyst -0.028, the cyst outside 112 mm and inside
-    140 mm in two of three reviewed studies (docs/research/input-resolution.md).'
+    140 mm in two of three reviewed studies (docs/research/geometry-and-views/input-resolution.md).'
   - 'The 120 mm field already cuts more than 10 mm of tissue on a coronal side in 30-31% of series
     and more than 20 mm of popliteal tissue in 34% of sagittal ones (prior-work.md, What the
     120 mm field already cuts).'

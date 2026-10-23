@@ -85,7 +85,7 @@ and carry it when it is not the incumbent.
   and `preprocessing_identity.sources_sha256` as exceptions, removed from both sides of the start,
   sealing and comparison checks. Proof the removed code never ran: the current source reproduces
   `k05-clean`'s saved predictions to 5.5e-5
-  ([sibling masking](../../../docs/validation/results/2026-09-23-sibling-masking.md)).
+  ([sibling masking](../../../docs/validation/results/labels-and-losses/2026-09-23-sibling-masking.md)).
 - Evidence runs: `outputs/training/side-mask` (trained side mask for both families) and
   `outputs/training/token-attention` (global token attention with relative 3D RoPE, 1D and 2D
   embeddings dropped), both on the reference's recipe and seed; see [prior work](prior-work.md).

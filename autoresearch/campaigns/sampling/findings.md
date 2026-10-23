@@ -27,7 +27,7 @@ Evidence:
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/sampling/baseline/source/src/knee_abnormality/data/preprocessing/sampling.py:21-29 (SAMPLING_IDENTITY targets and suppliers strings)
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/sampling/baseline/source/src/knee_abnormality/data/preprocessing/spatial.py:62 (resample_crop, the insertion point for the anatomy offset)
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/sampling/imports/ideas-20260921T215249Z-b680c878/report.json
-- docs/validation/results/2026-09-17-ranked-filtered-result.md (same-seed sampling noise of up to 0.0031)
+- docs/validation/results/sampling/2026-09-17-ranked-filtered-result.md (same-seed sampling noise of up to 0.0031)
 
 ## proposals-20260921T215250Z-f9c94d51
 
@@ -49,7 +49,7 @@ Evidence:
 - /home/claudio/src/knee-abnormality/autoresearch/campaigns/sampling/seed-ideas-2.yaml
 - src/knee_abnormality/training/lightning.py:187-203 (train shuffle=True, val shuffle=False)
 - outputs/autoresearch/triplet-sampling/experiments/epoch-paced-bag-size-20260919T200307Z-0bdb46b8 (inconclusive, fresh seed)
-- docs/validation/results/2026-09-17-ranked-filtered-result.md (same-seed sampling noise up to 0.0031)
+- docs/validation/results/sampling/2026-09-17-ranked-filtered-result.md (same-seed sampling noise up to 0.0031)
 
 ## review-20260921T220856Z-edb9a511
 
@@ -93,7 +93,7 @@ Evidence:
 - candidate source src/knee_abnormality/data/preprocessing/preparation.py:114-131 (distinct middles, consistent-stride check)
 - /home/claudio/src/knee-abnormality/src/knee_abnormality/autoresearch/gates.py:150-184 (post-run exact accounting gate)
 - /home/claudio/src/knee-abnormality/autoresearch/campaigns/sampling/ideas.yaml:3-32 (coverage clause requiring capacity-preserving k)
-- /home/claudio/src/knee-abnormality/docs/research/input-resolution.md:45-46 (spacing median 3.5 mm, 30 slices, 3.6% 3D series)
+- /home/claudio/src/knee-abnormality/docs/research/geometry-and-views/input-resolution.md:45-46 (spacing median 3.5 mm, 30 slices, 3.6% 3D series)
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/sampling/jobs/developer-20260921T221451Z-fcbcf735/report.json
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/sampling/jobs/orchestrator-20260921T220856Z-354bd177/report.json
 
@@ -137,7 +137,7 @@ Evidence:
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/sampling/experiments/physical-span-standardized-triplets-20260921T220931Z-71613a41/comparison/per_label.json
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/sampling/baseline/triplet_accounting.json
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/sampling/jobs/orchestrator-20260921T221636Z-c521d628/report.json
-- docs/validation/results/2026-09-17-ranked-filtered-result.md (same-seed sampling noise ≤0.0031)
+- docs/validation/results/sampling/2026-09-17-ranked-filtered-result.md (same-seed sampling noise ≤0.0031)
 
 ## review-20260921T224801Z-710e4f6f
 
@@ -228,7 +228,7 @@ Evidence:
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/sampling/jobs/researcher-20260921T224526Z-92a4b780/report.json (proposal misfit-steered-study-bag-density)
 - outputs/autoresearch/sampling/baseline/source/src/knee_abnormality/modeling/model.py:243-247 (masked softmax attention pooling)
 - outputs/training/k_05/fold_0/timing.json:9 peak_cuda_allocated_bytes 20999941632
-- docs/backlog/overnight.md#candidates-for-later-queues (fewer-slice training cost −0.0041/−0.0051)
+- docs/validation/run-comparison-and-diagnostics.md#overnight-launcher (fewer-slice training cost −0.0041/−0.0051)
 - outputs/autoresearch/triplet-sampling/jobs/researcher-20260919T183826Z-62f4f17b/report.json item 8 (prior between-study reallocation objection)
 
 ## completion-20260921T231157Z-8a801ac0
@@ -317,7 +317,7 @@ Evidence:
 - outputs/autoresearch/sampling/baseline/source/src/knee_abnormality/data/preprocessing/spatial.py:99-108 (output_to_native construction)
 - outputs/autoresearch/sampling/baseline/source/src/knee_abnormality/data/preprocessing/preparation.py:192-235 (path-keyed cache feeding patient_maps)
 - outputs/autoresearch/sampling/experiments/anatomy-anchored-crop-placement-20260921T221837Z-3b5416fc (single moved window, −0.00095)
-- docs/research/input-resolution.md#field-of-view-and-joint-position
+- docs/research/geometry-and-views/input-resolution.md#field-of-view-and-joint-position
 
 ## completion-20260921T233858Z-d932a52a
 
@@ -384,8 +384,8 @@ Unresolved concerns:
 Evidence:
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/sampling/jobs/researcher-20260921T233929Z-cdc19f71/report.json
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/sampling/jobs/researcher-20260921T233929Z-cdc19f71/scratch/probe/SUMMARY.md (reach table; allocation_global bound; headroom; cohort all_5fold_v3, frozen ranked-filtered seeds 42–44)
-- docs/validation/results/2026-09-17-ranked-filtered-result.md (same-seed sampling noise up to 0.0031)
-- docs/validation/results/2026-09-16-restored-code-hyperparameter-runs.md (fewer slices −0.0041/−0.0051)
+- docs/validation/results/sampling/2026-09-17-ranked-filtered-result.md (same-seed sampling noise up to 0.0031)
+- docs/validation/results/campaigns-and-queues/2026-09-16-restored-code-hyperparameter-runs.md (fewer slices −0.0041/−0.0051)
 
 ## completion-20260922T000556Z-fa36b368
 
@@ -516,7 +516,7 @@ Evidence:
 - baseline/source/src/knee_abnormality/data/preprocessing/sampling.py:471-474 (per-study/type/operation/epoch RNG keying)
 - baseline/source/src/knee_abnormality/autoresearch/accounting.py:28-78 (order-independent sorted selection digests)
 - baseline/source/src/knee_abnormality/training/lightning.py:178-189 (uniform shuffle training loader)
-- docs/validation/results/2026-09-17-ranked-filtered-result.md (same-seed sampling noise up to 0.0031)
+- docs/validation/results/sampling/2026-09-17-ranked-filtered-result.md (same-seed sampling noise up to 0.0031)
 
 ## completion-20260922T003303Z-15bde4f3
 
@@ -588,7 +588,7 @@ Evidence:
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/sampling/jobs/researcher-20260922T003339Z-44ea2746/report.json (proposal, probe figures, exhausted directions)
 - outputs/autoresearch/sampling/baseline/source/src/knee_abnormality/modeling/model.py:220-264 (token interaction only via attention pool; residual readout after pooling)
 - outputs/autoresearch/sampling/baseline/source/src/knee_abnormality/data/preprocessing/preparation.py:103-130 (prepare_series consecutive-slice check that the idea must restrict to own middles)
-- docs/validation/results/2026-09-17-type-contribution.md and 2026-09-17-test-time-allocation.md (fluid efficiency; T1/PD removal cost <=0.002)
+- docs/validation/results/pooling-and-attention/2026-09-17-type-contribution.md and 2026-09-17-test-time-allocation.md (fluid efficiency; T1/PD removal cost <=0.002)
 - autoresearch/campaigns/triplet-sampling findings item 2 (cross-slot middle co-location; no pixel-level registration exploited)
 - outputs/autoresearch/triplet-sampling/state.json: epoch-paced-bag-size-20260919T200307Z-0bdb46b8 inconclusive
 

@@ -5,8 +5,8 @@ the Qwen candidate tied the control and was not submitted.** The worktree and it
 removed on 2026-09-28 after its work reached `main`.
 The worktree is `/home/claudio/src/knee-abnormality-qwen-lateral-labels`, based on
 `d6c2f32`. Main kept `combined_v1` during the pilot and has used `rebuild_state_v2` since
-2026-09-28 ([label rebuild](../public-labels/label-rebuild.md)). This follows the
-[public-label investigation](../public-labels/2026-09-27-public-label-investigation.md), with no image-model training started.
+2026-09-28 ([label rebuild](../public-labels/label-rebuild/INDEX.md)). This follows the
+[public-label investigation](../public-labels/audits/2026-09-27-public-label-investigation.md), with no image-model training started.
 
 ## Implementation
 
@@ -16,7 +16,7 @@ rows and the one missing silver Qwen value retain `combined_v1`. The existing lo
 official gold overrides to training and takes validation targets from the frozen
 `all_5fold_scanner_v1` split. There is no new training flag or blend-weight option.
 
-[Preparation command](../../scripts/tools/prepare_lateral_oa_blend_labels.py) takes a pinned
+[Preparation command](../../scripts/adhoc/prepare_lateral_oa_blend_labels.py) takes a pinned
 public-source input manifest (name, label table, column, file hashes) and validates hashes,
 unique IDs, official coverage, probabilities, unchanged other targets and unchanged gold rows.
 It refuses existing output paths and records input/output hashes and target changes. On Sep 28
@@ -53,7 +53,7 @@ The exponent remains 0.5. The normal training run records its full class-balance
 provenance. A fixed-original-weight sensitivity is not implemented or scheduled.
 
 Local evidence: [preparation report](../../data/labels/prepared/qwen-lateral-v1/preparation.json)
-and [five-fold data audit](../../outputs/analysis/q/qwen-lateral-v1/preflight.json).
+and five-fold data audit (`outputs/analysis/q/qwen-lateral-v1/preflight.json`, deleted).
 Ruff and maintained-script help/index checks passed; no tests were written or run.
 
 ## Preparation and execution
@@ -62,14 +62,14 @@ Dependencies are synced in the worktree's own environment. Prepared labels and t
 already exist. To reproduce them into fresh paths:
 
 ```bash
-rtk proxy uv run --locked python -m scripts.tools.prepare_lateral_oa_blend_labels --input-manifest configs/labels/qwen-label-input.json --output-dir data/labels/prepared/qwen-lateral-reproduced --output-manifest outputs/analysis/qwen-lateral-reproduced-manifest.json
+uv run --locked python -m scripts.adhoc.prepare_lateral_oa_blend_labels --input-manifest configs/labels/qwen-label-input.json --output-dir data/labels/prepared/qwen-lateral-reproduced --output-manifest outputs/analysis/qwen-lateral-reproduced-manifest.json
 ```
 
 For a clean machine, first use the version-pinned download command in the Qwen input manifest
 and provide the existing combined labels and frozen split. Keep datasets out of Git.
 
 The control config, `configs/qwen-lateral-control.yaml` (removed 2026-09-29; in git history),
-snapshotted the main recipe of the time, and the candidate, then `configs/training.yaml`, differed only in experiment name, training-label
+snapshotted the main recipe of the time, and the candidate, then `configs/resnet50.yaml`, differed only in experiment name, training-label
 manifest and source. Both use the same fold, seed, model, augmentation, ten-epoch budget and
 ×4 prediction setting. Output directories are shared with main through the `outputs` symlink.
 
@@ -82,7 +82,7 @@ Reuse this run. The user launched the candidate on Sep 28 at 09:33 CEST as
 control), without the pre-training report review below:
 
 ```bash
-rtk proxy nohup uv run --locked python -u -m scripts.pipeline.train configs/training.yaml --run-id qwen-lateral-candidate > outputs/training/qwen-lateral-candidate.log 2>&1 < /dev/null &
+nohup uv run --locked python -u -m scripts.pipeline.train configs/training.yaml --run-id qwen-lateral-candidate > outputs/training/qwen-lateral-candidate.log 2>&1 < /dev/null &
 ```
 
 Match S73's ×4 and τ 0.75 for the Kaggle comparison.
@@ -109,11 +109,11 @@ selects `data/labels/prepared/bhavesh-lateral-v1/labels.csv`, SHA-256
   target column and every validation target column are identical to the control's.
 
 **Not planned to train (user decision, 2026-09-28):** a one-label change moves macro AUC less
-than run noise. The table is kept; the twelve-target [label rebuild](../public-labels/label-rebuild.md) supersedes
+than run noise. The table is kept; the twelve-target [label rebuild](../public-labels/label-rebuild/INDEX.md) supersedes
 this line. For reference, the launch command would be:
 
 ```bash
-rtk proxy nohup uv run --locked python -u -m scripts.pipeline.train configs/training.yaml --name bhavesh-lateral-labels --paths.label-manifest configs/labels/bhavesh-lateral-label-sources.json --labels.source bhavesh_lateral_v1 --run-id bhavesh-lateral-candidate > outputs/training/bhavesh-lateral-candidate.log 2>&1 < /dev/null &
+nohup uv run --locked python -u -m scripts.pipeline.train configs/training.yaml --name bhavesh-lateral-labels --paths.label-manifest configs/labels/bhavesh-lateral-label-sources.json --labels.source bhavesh_lateral_v1 --run-id bhavesh-lateral-candidate > outputs/training/bhavesh-lateral-candidate.log 2>&1 < /dev/null &
 ```
 
 ## Result: inconclusive, not submitted
@@ -126,7 +126,7 @@ trained away from, while unchanged targets moved by up to ±0.006 (Synovitis +0.
 −0.0047): a single-target label change sits inside run-to-run noise, so a one-label pilot cannot
 be judged locally or on the three-decimal leaderboard. It was not submitted, and the Bhavesh
 single-target run is not planned; label work continues as the all-target
-[label rebuild](../public-labels/label-rebuild.md). Comparison:
+[label rebuild](../public-labels/label-rebuild/INDEX.md). Comparison:
 `outputs/analysis/q/qwen-lateral-v1/compare-x4/comparison.json` (config differences allowed:
 name, label source/manifest, report-attribute manifest path; input identity differences: label
 manifest, source, training/validation row hashes, the latter only through the informational

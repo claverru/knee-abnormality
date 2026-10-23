@@ -27,7 +27,7 @@ Reproduction (CPU only, fresh output directory; folds default to `all_5fold_v3`,
 `--pixel-pairs` sets the 40-pair image shortlist):
 
 ```bash
-rtk proxy env CUDA_VISIBLE_DEVICES= OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.audit_study_overlap --output-dir outputs/analysis/study-overlap-new
+env CUDA_VISIBLE_DEVICES= OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.audit_study_overlap --output-dir outputs/analysis/study-overlap-new
 ```
 
 The shortlist decodes one complete representative series per study and gives
@@ -82,7 +82,7 @@ candidates for corroboration, never directly merge patient groups.
 ## Further evidence that could help
 
 The remaining investigation is tracked in
-[big bets](../backlog/big-bets.md#study-overlap-and-anatomical-matching).
+[big bets](../backlog/untried-ideas.md#inputs-beyond-the-2d-recipe).
 Anatomical matching across physically ordered volumes could detect repeat scans
 whose pixels differ: register the same knee and compare stable bone shape,
 trabecular texture, surgical hardware and other distinctive structural features.

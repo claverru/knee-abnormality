@@ -29,7 +29,7 @@ ideas:
     [80% +0.00003, +0.00015].'
   - 'outputs/analysis/m/midline-vs-centre-20260923/result.md: midline vs fitted x, median
     1.55 mm, p95 8.6 mm, 12.5% above 5 mm; worst cases are off-centre sagittal slabs.'
-  - 'docs/research/series-filtering-signals.md#contralateral-knee: seven bilateral
+  - 'docs/research/data-and-validation/series-filtering-signals/findings-by-case.md#contralateral-knee: seven bilateral
     studies, X sign separates the knees.'
   novelty: The robust centre was measured only at inference, before the bias depended
     on it at training time; per-knee geometry for bilateral studies and the fitted-x
@@ -205,7 +205,7 @@ ideas:
     with the curve density, x4 -0.00057 [80% -0.00120, +0.00008], despite the train-inference
     sampler mismatch; narrow two-peak -0.00153 [-0.00246, -0.00064]; sampling_curve.py
     implements the density.'
-  - 'docs/validation/results/2026-09-18-per-plane-sigma-cache.md: coronal narrower
+  - 'docs/validation/results/sampling/2026-09-18-per-plane-sigma-cache.md: coronal narrower
     than 40 mm gains +0.00135 on frozen checkpoints.'
   novelty: Every sampler so far was a Gaussian around the centre; this shape comes
     from the measured map, with no width to tune.
@@ -276,7 +276,7 @@ ideas:
   - 'outputs/analysis/t/token-attention-vs-k05-clean: dropping 1D/2D with only relative,
     raw-LPS 3D RoPE gave -0.0015 (PF OA -0.0152, Fracture -0.0153; meniscus +0.0027,
     OA +0.0035), confounded with an added attention block.'
-  - 'docs/inference/submissions/2026-09-15-champion-without-3d-at-inference.md: the
+  - 'docs/inference/submissions/early-submission-details.md: the
     additive, non-side-normalized 3D embedding was worth about 0.'
   novelty: Absolute and side-normalized, replacing rather than joining 1D and 2D;
     anterior structures such as the patellofemoral joint stay locatable, unlike the
@@ -604,7 +604,7 @@ ideas:
   - '[Original frame review](/home/claudio/src/knee-abnormality/outputs/autoresearch/knee-geometry/jobs/orchestrator-20260923T225357Z-1bcc3c8a/report.json):
     sagittal prescription is an unverified condylar-axis proxy; its trained outcome
     is unknown at revision 52.'
-  - '[General-backlog ownership](/home/claudio/src/knee-abnormality/docs/backlog/big-bets.md#position-and-knee-side):
+  - '[General-backlog ownership](/home/claudio/src/knee-abnormality/docs/backlog/untried-ideas.md#position-and-knee-side):
     overlaps the common-knee-orientation investigation. Within this campaign it is
     an alternative estimator to sagittal-normal-knee-frame, not a separate general-backlog
     launch.'
@@ -832,7 +832,7 @@ ideas:
     with the curve density, x4 -0.00057 [80% -0.00120, +0.00008], despite the train-inference
     sampler mismatch; narrow two-peak -0.00153 [-0.00246, -0.00064]; sampling_curve.py
     implements the density.'
-  - 'docs/validation/results/2026-09-18-per-plane-sigma-cache.md: coronal narrower
+  - 'docs/validation/results/sampling/2026-09-18-per-plane-sigma-cache.md: coronal narrower
     than 40 mm gains +0.00135 on frozen checkpoints.'
   novelty: Parked unrun to make queue room; it never trained, so this is its first
     test, not a revisit. Every sampler so far was a Gaussian around the centre; this
@@ -880,7 +880,7 @@ ideas:
   - 'outputs/analysis/t/token-attention-vs-k05-clean: dropping 1D/2D with only relative,
     raw-LPS 3D RoPE gave -0.0015 (PF OA -0.0152, Fracture -0.0153; meniscus +0.0027,
     OA +0.0035), confounded with an added attention block.'
-  - 'docs/inference/submissions/2026-09-15-champion-without-3d-at-inference.md: the
+  - 'docs/inference/submissions/early-submission-details.md: the
     additive, non-side-normalized 3D embedding was worth about 0.'
   novelty: Parked unrun to make queue room; it never trained, so this is its first
     test, not a revisit. Absolute and side-normalized, replacing rather than joining
@@ -940,7 +940,7 @@ ideas:
   - '[Ilse et al., 2018](https://proceedings.mlr.press/v80/ilse18a.html) supports
     learning instance aggregation from bag supervision. It does not establish this
     attention-coupled auxiliary or a knee-MRI benefit.'
-  - '[General auxiliary backlog](/home/claudio/src/knee-abnormality/docs/backlog/big-bets.md#auxiliary-loss-campaign)
+  - '[General auxiliary backlog](/home/claudio/src/knee-abnormality/docs/backlog/untried-ideas.md#supervision-and-labels)
     owns generic per-view objectives. This is a refinement of the active geometry-specific
     auxiliary, independent of the developing OA channel and running meniscus classifier
     head.'
@@ -1026,7 +1026,7 @@ ideas:
   - '[Tang et al., 2021](https://arxiv.org/abs/2105.05838) demonstrates an absolute-position
     shortcut in video correspondence learning. This is supporting plausibility from
     another task, not evidence that the knee detector uses such a shortcut.'
-  - '[Position-and-side backlog](/home/claudio/src/knee-abnormality/docs/backlog/big-bets.md#position-and-knee-side)
+  - '[Position-and-side backlog](/home/claudio/src/knee-abnormality/docs/backlog/untried-ideas.md#position-and-knee-side)
     records discarded appearance-only public pooling. This proposal preserves that
     distinction and does not duplicate the proposed replacement of public 1D/2D embeddings
     with side-normalized 3D encoding.'
@@ -1189,7 +1189,7 @@ ideas:
   - '[DICOM Image Plane Module](https://dicom.nema.org/medical/dicom/current/output/chtml/part03/sect_C.7.6.2.html)
     supplies the patient-space position and orientation definitions needed for plane
     distance. It does not establish anatomical accuracy of the fitted centre.'
-  - '[Position and knee side backlog](/home/claudio/src/knee-abnormality/docs/backlog/big-bets.md#position-and-knee-side)
+  - '[Position and knee side backlog](/home/claudio/src/knee-abnormality/docs/backlog/untried-ideas.md#position-and-knee-side)
     owns the broader topic. This narrows the registered 3D replacement and complements
     the developing coronal frame without requiring its acceptance.'
   novelty: Corrects the acquisition-dependent origin and sagittal sign within the
@@ -1375,7 +1375,7 @@ ideas:
     the standard MIL assumption that every instance in a negative bag is negative.
     Applying that assumption separately to anatomical views is the proposed extension,
     not a result established by the paper.'
-  - '[General auxiliary backlog](/home/claudio/src/knee-abnormality/docs/backlog/big-bets.md#auxiliary-loss-campaign)
+  - '[General auxiliary backlog](/home/claudio/src/knee-abnormality/docs/backlog/untried-ideas.md#supervision-and-labels)
     owns generic per-view disease classifiers. This uses the existing meniscus detector
     and geometric half-bags, adds no per-view heads, and does not require every view
     of a positive study to reveal disease.'
@@ -1513,7 +1513,7 @@ ideas:
     Carrying that required correction remains an attribution concern.'
   - '[Earlier membership proposal](/home/claudio/src/knee-abnormality/outputs/autoresearch/knee-geometry/jobs/researcher-20260924T005048Z-35cfe0c6/report.json)
     addresses token footprints across input slices, not disagreement between axes.
-    Broader orientation work belongs to [Position and knee side](/home/claudio/src/knee-abnormality/docs/backlog/big-bets.md#position-and-knee-side).'
+    Broader orientation work belongs to [Position and knee side](/home/claudio/src/knee-abnormality/docs/backlog/untried-ideas.md#position-and-knee-side).'
   novelty: Uses competing geometric prescriptions to qualify discrete decisions instead
     of selecting another replacement axis. Public exclusion becomes conservative while
     auxiliary assignment requires agreement. Unlike footprint-aware membership, it
@@ -1611,7 +1611,7 @@ ideas:
   - '[MOST study](https://pubmed.ncbi.nlm.nih.gov/22956600/) found that co-located
     articular abnormalities predicted local cartilage loss. This supports investigating
     local OA evidence, not this objective or a competition benefit.'
-  - '[General auxiliary backlog](/home/claudio/src/knee-abnormality/docs/backlog/big-bets.md#auxiliary-loss-campaign)
+  - '[General auxiliary backlog](/home/claudio/src/knee-abnormality/docs/backlog/untried-ideas.md#supervision-and-labels)
     owns generic per-view objectives. This campaign-specific proposal uses geometric
     OA half-bags and unchanged disease targets; it adds neither OA attributes nor
     per-view heads.'
@@ -1705,7 +1705,7 @@ ideas:
     normalization provides lightweight feature modulation in multitask models. Their
     BatchNorm experiments support the architectural hypothesis, not this single-layer
     meniscus adaptation.'
-  - '[General ownership](/home/claudio/src/knee-abnormality/docs/backlog/big-bets.md#position-and-knee-side):
+  - '[General ownership](/home/claudio/src/knee-abnormality/docs/backlog/untried-ideas.md#position-and-knee-side):
     compartment representation belongs to this topic. The developing OA auxiliary
     and running detector-ranked pooling remain separate mechanisms; neither outcome
     is assumed.'
@@ -1808,7 +1808,7 @@ ideas:
   - '[Position-free completion](/home/claudio/src/knee-abnormality/outputs/autoresearch/knee-geometry/jobs/orchestrator-20260924T025957Z-e646e95d/report.json)
     gave no meniscus gain from removing explicit auxiliary position. This proposal
     retains position and changes its frame.'
-  - '[General ownership](/home/claudio/src/knee-abnormality/docs/backlog/big-bets.md#position-and-knee-side):
+  - '[General ownership](/home/claudio/src/knee-abnormality/docs/backlog/untried-ideas.md#position-and-knee-side):
     overlaps common knee orientation. Unlike the registered full 3D replacement, this
     retains both embedding modules and acquisition-relative depth; queued axis consensus
     addresses mask membership instead.'
@@ -1950,7 +1950,7 @@ ideas:
   - meniscus-half-knee-mil
   priority_rationale: 'Revision 274 recommendation 1: a focused refinement of a completed
     negative result, with no extra learned capacity or inference computation. Broader
-    ownership is [Position and knee side](/home/claudio/src/knee-abnormality/docs/backlog/big-bets.md#position-and-knee-side).
+    ownership is [Position and knee side](/home/claudio/src/knee-abnormality/docs/backlog/untried-ideas.md#position-and-knee-side).
     It complements the developing normalization and queued public encoding without
     assuming either succeeds.'
   status: completed
@@ -2001,7 +2001,7 @@ ideas:
   - '[Carmichael et al., MICCAI 2022](https://arxiv.org/abs/2206.08885) adds variance
     pooling to MIL to represent heterogeneity in histopathology. This supplies an
     architectural precedent; its cancer-survival results do not establish OA benefit.'
-  - '[General pooling backlog](/home/claudio/src/knee-abnormality/docs/backlog/small-changes.md#attention-pooling)
+  - '[General pooling backlog](/home/claudio/src/knee-abnormality/docs/backlog/untried-ideas.md#pooling-and-the-attention-head)
     owns generic pooling capacity and acquisition-specific readouts. The registered
     OA own-side-plus-knee channel combines first-moment evidence; this proposal adds
     local second moments while retaining the existing whole-knee path.'
@@ -2102,7 +2102,7 @@ ideas:
     \ provides an analogy for integrating finite support instead of evaluating a point;\
     \ neither source establishes this mask\u2019s clinical accuracy or competition\
     \ benefit."
-  - '[General pooling backlog](/home/claudio/src/knee-abnormality/docs/backlog/small-changes.md#attention-pooling)
+  - '[General pooling backlog](/home/claudio/src/knee-abnormality/docs/backlog/untried-ideas.md#pooling-and-the-attention-head)
     owns small readout additions. This campaign-specific mask does not duplicate its
     token dropout or acquisition-specific classifiers.'
   novelty: Replaces pointwise binary exclusion with analytic fractional routing at
@@ -2196,7 +2196,7 @@ ideas:
   - '[Incumbent auxiliary](/home/claudio/src/knee-abnormality/outputs/autoresearch/knee-geometry/experiments/meniscus-half-knee-mil-20260923T231102Z-edeb9f68/source/src/knee_abnormality/training/lightning.py:133)
     pools independent detector logits. [Preparation](/home/claudio/src/knee-abnormality/outputs/autoresearch/knee-geometry/experiments/meniscus-half-knee-mil-20260923T231102Z-edeb9f68/source/src/knee_abnormality/data/preprocessing/preparation.py:278)
     requires distinct middle slices but permits shared source slices between triplets.'
-  - '[Retired token-graph result](/home/claudio/src/knee-abnormality/docs/validation/results/2026-09-14-token-graph-result.md):
+  - '[Retired token-graph result](/home/claudio/src/knee-abnormality/docs/validation/results/pooling-and-attention/2026-09-14-token-graph-result.md):
     learned feature message passing remained largely unused in two historical runs;
     removing it changed macro AUC by only +0.000007/+0.000039. The proposed fixed
     scalar operation has no learned residual gate and affects only locality supervision.'
@@ -2305,7 +2305,7 @@ ideas:
   - '[Krishnamoorthy and Wiens, 2024](https://proceedings.mlr.press/v248/krishnamoorthy24a.html)
     supports retaining absolute positional information in MIL. It does not establish
     this gradient separation or a knee-MRI benefit.'
-  - '[Position and knee-side ownership](/home/claudio/src/knee-abnormality/docs/backlog/big-bets.md#position-and-knee-side):
+  - '[Position and knee-side ownership](/home/claudio/src/knee-abnormality/docs/backlog/untried-ideas.md#position-and-knee-side):
     this is a campaign-specific locality refinement. It changes neither the developing
     public footprint mask nor the queued overlap-smoothing topology.'
   novelty: Separates the auxiliary's parameter-update destinations while preserving
@@ -2404,7 +2404,7 @@ ideas:
   - '[Spatial Pyramid Pooling](https://arxiv.org/abs/1406.4729) demonstrates regional
     pooling from existing feature maps without repeated convolution. It supports the
     computational construction, not these anatomical regions or a knee-AUC gain.'
-  - '[Attention-pooling ownership](/home/claudio/src/knee-abnormality/docs/backlog/small-changes.md#attention-pooling):
+  - '[Attention-pooling ownership](/home/claudio/src/knee-abnormality/docs/backlog/untried-ideas.md#pooling-and-the-attention-head):
     unlike its generic nonlinear head, this exposes a geometry-defined statistic lost
     during pooling. It also differs from the running OA within-acquisition variance
     readout.'
@@ -2502,7 +2502,7 @@ ideas:
     \ inconclusive overall, meniscus \u22120.0075, OA +0.0024, other-eight +0.0009.\
     \ It combined coordinate removal with classifier tying, used an unmatched seed\
     \ and older evaluation, and does not isolate either change."
-  - '[Selection/value separation research](/home/claudio/src/knee-abnormality/docs/research/knee-side-and-location.md#5-separate-attention-inputs-from-pooled-appearance)
+  - '[Selection/value separation research](/home/claudio/src/knee-abnormality/docs/research/geometry-and-views/knee-side-and-location.md#5-separate-attention-inputs-from-pooled-appearance)
     owns the general direction. This proposal retains positional interactions and
     private classifiers instead of implementing its plain appearance-only values.'
   - '[Krishnamoorthy and Wiens, 2024](https://proceedings.mlr.press/v248/krishnamoorthy24a.html)
@@ -2614,7 +2614,7 @@ ideas:
   - '[Lin et al., ICCV 2015](https://www.cv-foundation.org/openaccess/content_iccv_2015/papers/Lin_Bilinear_CNN_Models_ICCV_2015_paper.pdf)
     demonstrates feature interactions through bilinear representations. It supports
     the architectural principle, not this diagonal regional product or an OA benefit.'
-  - '[General attention-pooling backlog](/home/claudio/src/knee-abnormality/docs/backlog/small-changes.md#attention-pooling)
+  - '[General attention-pooling backlog](/home/claudio/src/knee-abnormality/docs/backlog/untried-ideas.md#pooling-and-the-attention-head)
     owns generic nonlinear readouts. The registered OA own-side-plus-knee channel
     adds first-moment evidence; this proposal supplies an interaction between geometrically
     separated regions that is unavailable to a linear pooled readout.'

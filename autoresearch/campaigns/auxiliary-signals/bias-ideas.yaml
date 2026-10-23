@@ -85,7 +85,7 @@ ideas:
     trainer.metadata_heads.completeness_bias: true. Log per epoch the per-quintile mean bias.
   precedents:
   - 'Clark et al. (arXiv:1909.03683): a bias-only model during training, removed at test time.'
-  - 'Vendor label associations (docs/metadata/vendor-label-associations.md) and the v3 analysis of Spanish short reports (docs/ongoing/report-attribute-extraction.md).'
+  - 'Vendor label associations (docs/metadata/vendor-label-associations.md) and the v3 analysis of Spanish short reports (docs/public-labels/jevk5-report-attribute-extraction.md).'
   - 'Noisy-labels campaign: prediction-memory correction rejected (autoresearch/campaigns/noisy-labels/findings.md); a different mechanism.'
   novelty: First label-noise model keyed on a report property.
   coverage: All training studies; largest expected effect on labels most often left unmentioned.

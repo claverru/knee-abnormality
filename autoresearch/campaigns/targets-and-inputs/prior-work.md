@@ -9,7 +9,7 @@ main at `0bd598f` (the soft-tissue line, the sagittal fluid detail view, aligned
 labels `rebuild_state_v2`, teacher share 0). **×1 0.928460 (epoch 10 of 10), ×4 0.937000, 2,691 s
 of training** (about 267 s per epoch), 82 s of ×4 prediction, peak GPU memory 16.2 GB. The same
 run holds folds 0 and 1 (×4 0.940906 and 0.933392)
-([result](../../../docs/validation/results/2026-10-12-dense-bag-pooling-on-the-resnet-50.md)).
+([result](../../../docs/validation/results/pooling-and-attention/2026-10-12-dense-bag-pooling-on-the-resnet-50.md)).
 
 Per label at ×4, weakest first, with the validation positives of the 875 studies:
 
@@ -64,22 +64,22 @@ the mean of calibrated source families). Gold studies train on the official labe
 
 | Mechanism | Setting | Run | Macro delta | Source |
 |---|---|---|---|---|
-| Class-balanced BCE | ReXNet-200, fold 0 | exponent 1 against none | about +0.008 | [balanced BCE](../../../docs/validation/results/2026-09-19-balanced-bce-result.md) |
-| Exponent 0.5 and no weighting against exponent 1 | ReXNet-200, fold 0 | two runs | lost locally, won publicly | [exponent](../../../docs/validation/results/2026-09-21-class-balance-exponent.md) |
-| Exponent ramped from 1 to 0 | ReXNet-200 | one run | tie; 0.941 public against 0.942 | [noisy labels](../../../docs/validation/results/2026-09-23-noisy-labels-campaign.md) |
+| Class-balanced BCE | ReXNet-200, fold 0 | exponent 1 against none | about +0.008 | [balanced BCE](../../../docs/validation/results/labels-and-losses/2026-09-19-balanced-bce-result.md) |
+| Exponent 0.5 and no weighting against exponent 1 | ReXNet-200, fold 0 | two runs | lost locally, won publicly | [exponent](../../../docs/validation/results/labels-and-losses/2026-09-21-class-balance-exponent.md) |
+| Exponent ramped from 1 to 0 | ReXNet-200 | one run | tie; 0.941 public against 0.942 | [noisy labels](../../../docs/validation/results/labels-and-losses/2026-09-23-noisy-labels-campaign.md) |
 | Soft-mass weighting, prior offset | ReXNet-200, losses campaign | two runs | −0.0092, −0.0119 (other loss semantics changed too) | [losses findings](../losses/findings.md) |
 | Binary mask of low-evidence cells | early recipe | one run | rejected | [label masking](../../../docs/history/sharing/2026-09-13-label-masking-result.md) |
 | Shared balanced focal (hard cells up-weighted) | ReXNet-200 | one run | −0.0026 | [losses findings](../losses/findings.md) |
 | In-batch ranking term, always on | ReXNet-200 | one run | +0.0007, interval spanning zero | [losses findings](../losses/findings.md) |
-| Quantile levels 0.001/0.999 and 0.01/0.99 | ReXNet-200 | two runs | −0.0003, −0.0021 | [overnight](../../../docs/validation/results/2026-09-17-overnight-results.md) |
+| Quantile levels 0.001/0.999 and 0.01/0.99 | ReXNet-200 | two runs | −0.0003, −0.0021 | [overnight](../../../docs/validation/results/campaigns-and-queues/2026-09-17-overnight-results.md) |
 | Intensity preprocessing variants | ResNet-18, `mri-signal-preservation` | 8 runs | no adoption, most over the time ceiling | [campaign](../mri-signal-preservation/INDEX.md) |
-| Bright-end clipping per series, type, slice and plane | ResNet-10t, `pretraining-input` | 32 runs | nothing adopted | [result](../../../docs/validation/results/2026-10-05-pretraining-input-campaign.md) |
-| Augmentation families on and off | ReXNet-200, augmentation campaign | 13 seeds | smoothing and DSU adopted, half stack kept | [result](../../../docs/validation/results/2026-09-26-augmentation-campaign.md) |
-| Contrast mixing off | ResNet-18 | one run | −0.0025 | [fixes and removals](../../../docs/validation/results/2026-10-05-fixes-and-removals-campaign.md) |
-| Anatomy map and posed crops | ResNet-50 | S126 against S119 | +0.0001 at ×4, +0.0017 at ×1, +0.002 public | [state](../../../docs/ongoing/state.md#recipe-in-force) |
+| Bright-end clipping per series, type, slice and plane | ResNet-10t, `pretraining-input` | 32 runs | nothing adopted | [result](../../../docs/validation/results/campaigns-and-queues/2026-10-05-pretraining-input-campaign.md) |
+| Augmentation families on and off | ReXNet-200, augmentation campaign | 13 seeds | smoothing and DSU adopted, half stack kept | [result](../../../docs/validation/results/campaigns-and-queues/2026-09-26-augmentation-campaign.md) |
+| Contrast mixing off | ResNet-18 | one run | −0.0025 | [fixes and removals](../../../docs/validation/results/campaigns-and-queues/2026-10-05-fixes-and-removals-campaign.md) |
+| Anatomy map and posed crops | ResNet-50 | S126 against S119 | +0.0001 at ×4, +0.0017 at ×1, +0.002 public | [state](../../../docs/final-solution.md#model-and-per-family-recipes) |
 | Report-attribute heads off | ResNet-18, anatomy recipe | one run | adopted | [anatomy recipe](../anatomy-recipe/INDEX.md) |
-| Type-specific readouts after pooling | ReXNet-200, near misses | one run | −0.0006 | [near misses](../../../docs/validation/results/2026-09-25-near-misses-campaign.md) |
-| Plane-contrast readouts | ResNet-18, revisits | one run | adopted (Lateral OA +0.0054) | [revisits](../../../docs/validation/results/2026-10-01-revisits-campaign.md) |
+| Type-specific readouts after pooling | ReXNet-200, near misses | one run | −0.0006 | [near misses](../../../docs/validation/results/campaigns-and-queues/2026-09-25-near-misses-campaign.md) |
+| Plane-contrast readouts | ResNet-18, revisits | one run | adopted (Lateral OA +0.0054) | [revisits](../../../docs/validation/results/campaigns-and-queues/2026-10-01-revisits-campaign.md) |
 
 - **Clipping-bound stability (measured 2026-09-20, 40 studies, six epochs):** the high bound of
   a series moves 0.072 at the median and 0.245 at the 90th percentile between draws, against
@@ -102,6 +102,6 @@ the pixel values.
 ## Dropped before the campaign
 
 - **PF OA trained on the official-threshold rule:** needs a label variant and the label gate
-  opened ([backlog](../../../docs/backlog/big-bets.md#patellofemoral-oa-evidence)).
+  opened ([backlog](../../../docs/backlog/untried-ideas.md#patellofemoral-oa)).
 - **Bone masks for every training knee:** needs offline segmentation of about 3,100 knees
-  ([backlog](../../../docs/backlog/big-bets.md#anatomy-masks-what-is-left-untried)).
+  ([backlog](../../../docs/backlog/untried-ideas.md#anatomy-masks)).

@@ -33,7 +33,7 @@ ideas:
   precedents:
   - 'revisits, ema-0999-buffer-average (RadImageNet ResNet-18 recipe, existing option, BatchNorm statistics
     averaged with the weights, no refresh): -0.0004 at decay 0.999 and -0.0032 at 0.9995, both rejected
-    (docs/validation/results/2026-10-01-revisits-campaign.md). The four earlier EMA runs with a BatchNorm
+    (docs/validation/results/campaigns-and-queues/2026-10-01-revisits-campaign.md). The four earlier EMA runs with a BatchNorm
     refresh were invalid on runtime; no refresh here.'
   - 'src/knee_abnormality/training/lightning.py: on_train_batch_end, validation_step, on_save_checkpoint,
     on_load_checkpoint and _share_loader_state (existing EMA path and loader-state hand-off).'

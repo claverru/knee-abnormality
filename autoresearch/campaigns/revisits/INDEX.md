@@ -6,7 +6,7 @@ RadImageNet ResNet-18 recipe the ideas whose verdict changed when past compariso
 backbones the user forced in. Outcome: plane-contrast readouts and removal of the anatomical bias
 accepted (×4 0.929835 against 0.928062); the Refined-RadImageNet ResNet-50 +0.0046, kept as a
 measurement; one backbone per plane ties; nothing else passed
-([result](../../../docs/validation/results/2026-10-01-revisits-campaign.md)).
+([result](../../../docs/validation/results/campaigns-and-queues/2026-10-01-revisits-campaign.md)).
 
 | Read when | Document |
 |---|---|

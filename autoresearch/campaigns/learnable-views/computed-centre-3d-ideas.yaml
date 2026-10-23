@@ -30,7 +30,7 @@ ideas:
     at the last epoch; rejected. Its frozen source holds the encoder: outputs/autoresearch/learnable-views/experiments/knee-frame-3d-position-20261002T204955Z-1592c25c/source,
     modeling/spatial_tokens.py and modeling/model.py.'
   - 'near-misses #6, side-normalized 3D position in place of 1D and 2D, computed centre, ReXNet recipe:
-    +0.0008 hard, -0.0006 soft, PF OA +0.0061; rejected (docs/validation/results/2026-09-25-near-misses-campaign.md).'
+    +0.0008 hard, -0.0006 soft, PF OA +0.0061; rejected (docs/validation/results/campaigns-and-queues/2026-09-25-near-misses-campaign.md).'
   - 'near-misses #13, the same with each slice''s normal added: -0.0017 hard, +0.0011 soft, PF OA
     +0.0156.'
   - The September champion's additive 3D embedding on raw centred coordinates was worth about zero

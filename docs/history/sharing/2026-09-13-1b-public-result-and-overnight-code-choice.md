@@ -65,7 +65,7 @@ archived separately from the seven-run launcher at `ea19772`.
 The user-launched queue `outputs/training/overnight-20260913T214822Z-74udtekr` was already
 training `01-higher-lr` during this audit. Its source archive records
 `spatial_tokens_disease_compartment_attention_v1`: **it is a 1C search**.
-`configs/baseline.yaml` being named `spatial-tokens-reflection` does not select
+`configs/baseline.yaml` (removed) being named `spatial-tokens-reflection` does not select
 an architecture. The launcher starts each experiment from current repository
 source and saves that run's snapshot; preparation freezes configurations only.
 Changing source under the active launcher could mix architectures within one
@@ -82,9 +82,9 @@ their effect; reflection remains the public benchmark. A full 1C search is an
 exploration of an unsubmitted architecture, whereas reflection is the choice
 supported by the best observed public result.
 
-The [audit artifact](../../../outputs/analysis/0-9/1b-public-result-20260913/analysis.json)
+The audit artifact (`outputs/analysis/0-9/1b-public-result-20260913/analysis.json`, deleted)
 pins submissions, bundle/checkpoint/source hashes, configurations, per-target
 deltas and the active queue's first-run identity. It also extends the
-[local/public comparison](../../validation/results/2026-09-13-local-and-public-agreement-after-the-split-change.md)
+[local/public comparison](../../validation/results/validation-and-ensembles/2026-09-13-local-and-public-agreement-after-the-split-change.md)
 to nine fixed-label checkpoints. Only saved files and process metadata were
 read; no GPU queries, inference, training or tests were run.

@@ -11,6 +11,11 @@ settings are:
 | Coronal | 84 mm; 0.375000 mm/px | 93.333 mm; 0.416667 mm/px |
 | Sagittal | 84 mm; 0.375000 mm/px | 93.333 mm; 0.416667 mm/px |
 
+This is the table the review measured on 2026-10-02. The final configs (`configs/convnext.yaml`,
+`configs/resnet50.yaml`, `configs/nextvit.yaml`) swapped the sagittal pair on 2026-10-10: sagittal T1/PD
+at 93.33 mm and sagittal fluid at 84 mm, plus a 64 mm sagittal fluid detail view ([view
+sizes](../validation/results/crops-and-views/2026-10-10-view-sizes.md)).
+
 **Outcome of the axial comparisons (2026-10-02): axial stays at 120 mm.** The image review and
 population tissue measurements supported 130 mm / 0.580357 mm/px as a coverage-resolution
 compromise. The two
@@ -19,7 +24,7 @@ both axial types, did not confirm it: 130 mm tied the 84/93.33/120 mm recipe (�
 [−0.0006, +0.0005]) and 140 mm lost 0.0006, and the axial tokens alone read Baker's cyst
 equally at 120, 130 and 140 mm (0.935 to 0.936 at ×1). The Baker's cyst cost of the recipe
 comes from the sagittal fluid zoom, not from the axial field
-([result](../validation/results/2026-10-02-smart-crops-campaign.md)). The contrast-specific
+([result](../validation/results/crops-and-views/2026-10-02-smart-crops-campaign.md)). The contrast-specific
 variant (axial non-fluid 120 mm, axial fluid 130 mm) was therefore not run.
 
 This establishes the best measured configuration, not a global
@@ -108,11 +113,11 @@ For 4,588 usable **axial-fluid middle slices**:
 | 140 mm | 7.3% | 0.5% | 1.5% |
 
 130 mm reduces large posterior clipping substantially for 8.3% coarser pixels than 120 mm.
-140 mm buys another 5 mm per side for a further 7.7% coarsening; it is a legitimate already-queued
-comparison, not an established improvement. Axial fluid carries 47.4% of Baker's attention in
+140 mm buys another 5 mm per side for a further 7.7% coarsening; it was a candidate comparison, not
+an established improvement (axial stayed at 120 mm, see the outcome below). Axial fluid carries 47.4% of Baker's attention in
 the older 140 mm probe, and 70.5% on positive studies, versus 1.7% / 0.5% for axial non-fluid.
 Attention supports choosing the series type to investigate; it is not lesion localization and
-has not been remeasured on S93.
+was not remeasured on S93.
 
 The sagittal rule deliberately spends field on the anterior joint: at 93.33 mm, the median
 posterior skin-to-window cut is 35.1 mm and 97.1% exceed 20 mm. This is not a 97.1% cyst-loss

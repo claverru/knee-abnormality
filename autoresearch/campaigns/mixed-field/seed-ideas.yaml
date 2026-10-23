@@ -13,7 +13,7 @@ ideas:
     else changes.
   precedents:
   - '150 to 140 mm at 224 px gained +0.003 local and +0.007 public on ReXNet-200, confounded with
-    the sharper spacing (docs/research/input-resolution.md).'
+    the sharper spacing (docs/research/geometry-and-views/input-resolution.md).'
   - 'Learned zoom read every slice at 0.875 mm and lost 0.0228, almost all on detail labels;
     effusion gained 0.006 (docs/history/crop-selection-investigation.md).'
   novelty: First field change on ResNet-18, rebuild_state_v2 and all_5fold_scanner_v2.
@@ -46,7 +46,7 @@ ideas:
   - 'Per-label crops, 112 mm at 0.5 mm on 75% of slices: -0.0011 overall, ACL +0.0111, lateral
     meniscus -0.0102, fracture -0.0085 (docs/history/crop-selection-investigation.md).'
   - '130 mm at 224 px tied overall and lost on MCL, Baker''s cyst, effusion and medial meniscus
-    (docs/research/input-resolution.md).'
+    (docs/research/geometry-and-views/input-resolution.md).'
   novelty: Resolution finer than 0.625 mm on every slice has never been run at any field.
   coverage: All studies and labels; expected to help ACL, menisci and cartilage labels and to cost
     Baker's cyst, MCL and fracture.
@@ -81,7 +81,7 @@ ideas:
   precedents:
   - 'Scale augmentation by resampling is standard in multi-scale training of detectors; here the
     wider draws add real anatomy instead of padding.'
-  - 'docs/research/input-resolution.md: the stored field of view is 160 mm at the median, so the
+  - 'docs/research/geometry-and-views/input-resolution.md: the stored field of view is 160 mm at the median, so the
     ring holds real pixels in about half the series.'
   novelty: No run has varied the decoded field during training.
   coverage: All studies and labels; inference inputs are unchanged.
@@ -148,7 +148,7 @@ ideas:
     (docs/history/crop-selection-investigation.md).'
   - 'What 120 mm cuts, measured 2026-10-01: the central joint stays inside; more than 20 mm of
     popliteal tissue is cut in 34% of sagittal series
-    (docs/research/input-resolution.md#what-a-narrow-field-cuts).'
+    (docs/research/geometry-and-views/input-resolution.md#what-a-narrow-field-cuts).'
   novelty: No run has paired a field narrower than 140 mm with a wider one.
   coverage: All studies and labels; slices decoded at 120 mm carry no periphery, so Baker's cyst,
     MCL and fracture rest on the 160 mm slices of each series.

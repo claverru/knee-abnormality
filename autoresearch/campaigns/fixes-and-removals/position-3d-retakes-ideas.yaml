@@ -24,7 +24,7 @@ ideas:
     those studies.
   precedents:
   - 'run-notes.md, 6: the parent, its curve, training loss, per-label deltas and branch shares.'
-  - 'docs/research/efficientnet-training.md: the September spatial tokens declared a 3D-position dropout of 0.10.'
+  - 'docs/research/backbones-and-pretraining/efficientnet-training.md: the September spatial tokens declared a 3D-position dropout of 0.10.'
   novelty: First 3D position on this recipe with the position dropped per study.
   coverage: Every token; 15% of studies per training batch without position.
   exploitation: >-
@@ -87,7 +87,7 @@ ideas:
     the position network is linear 30 to 64. The unknown-side vector has 10 entries.
   precedents:
   - 'run-notes.md, 6: the parent.'
-  - 'docs/validation/results/2026-10-05-code-audit-measurements.md, F05: the centre-fit residuals.'
+  - 'docs/validation/results/campaigns-and-queues/2026-10-05-code-audit-measurements.md, F05: the centre-fit residuals.'
   novelty: First 3D position without sub-centimetre wavelengths.
   coverage: Every token of every study.
   exploitation: Training loss against the parent's; x1 curve from epoch 4 on; per-label deltas against the parent's.

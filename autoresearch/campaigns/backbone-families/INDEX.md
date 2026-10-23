@@ -3,7 +3,7 @@
 **Ran 2026-10-15 18:11 to 2026-10-16 15:12 CEST with Codex, stopped by the user.** FocalNet-T SRF
 became the incumbent (×4 0.938816) and EfficientViT-B2 with stochastic depth 0.2 came level
 (0.938773); both are merged as `configs/focalnet.yaml` and `configs/efficientvit.yaml`
-([result](../../../docs/validation/results/2026-10-16-backbone-families.md)). Brings in backbone families different in kind from those
+([result](../../../docs/validation/results/backbones/2026-10-16-backbone-families.md)). Brings in backbone families different in kind from those
 tried (SAM2.1 Hiera-T, HRNet-W18, PVTv2-b2, FocalNet-T SRF, RDNet-T, and DINOv3 ConvNeXt-T, DaViT-T, EdgeNeXt-B, EfficientViT-B2 and WTConvNeXt-T added at the user's request), each with starting settings
 set from its own weight scale and layers, against the decoder-free MambaVision-T reference
 `mamba-silver-fold-2` (fold 2, ×4 0.935160, ×1 0.930081). Ten forced seeds, then the researcher.

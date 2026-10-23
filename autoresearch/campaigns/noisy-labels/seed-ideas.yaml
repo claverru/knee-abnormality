@@ -17,9 +17,9 @@ ideas:
   precedents:
   - 'Reed et al. 2014, soft bootstrapping (arXiv 1412.6596): beta * y + (1 - beta) * p improved
     robustness to label noise on MNIST and detection benchmarks.'
-  - 'docs/validation/results/2026-09-23-image-blend-labels-result.md: offline 0.5/0.5 blend, gold
+  - 'docs/validation/results/labels-and-losses/2026-09-23-image-blend-labels-result.md: offline 0.5/0.5 blend, gold
     agreement +0.020 [95% +0.006, +0.036], fold 0 +0.0035 hard and +0.0065 soft (leaky), public tie.'
-  - 'docs/research/public-research.md: a top participant reports mixing image predictions into
+  - 'docs/research/competition-and-prior-art/public-research.md: a top participant reports mixing image predictions into
     extracted labels beat replacing and masking.'
   novelty: >-
     No campaign has used the model's own predictions in the target. The losses campaign changed
@@ -59,7 +59,7 @@ ideas:
   - 'Laine and Aila 2017, temporal ensembling (arXiv 1610.02242): an exponential average of past
     predictions as a target.'
   - 'Plant Pathology 2020 first place: 0.7 truth + 0.3 out-of-fold prediction.'
-  - 'docs/validation/results/2026-09-23-image-blend-labels-result.md: the teacher alone did not beat
+  - 'docs/validation/results/labels-and-losses/2026-09-23-image-blend-labels-result.md: the teacher alone did not beat
     the labels on gold (-0.0015) while the blend did (+0.020), so a blend rather than a replacement.'
   novelty: >-
     Uses predictions averaged over draws and epochs, unlike the instantaneous bootstrap; no extra
@@ -94,7 +94,7 @@ ideas:
   precedents:
   - 'Liu et al. NeurIPS 2020, early-learning regularization (arXiv 2007.00151): state of the art on
     CIFAR with synthetic noise and on Clothing1M and WebVision with real noise.'
-  - 'docs/validation/results/2026-09-21-class-balance-exponent.md: fold-0 hard AUC rises with
+  - 'docs/validation/results/labels-and-losses/2026-09-21-class-balance-exponent.md: fold-0 hard AUC rises with
     weighting strength while the public score falls past k=0.5.'
   novelty: >-
     A regularizer rather than a target change: the labels stay intact and the pull toward the
@@ -167,7 +167,7 @@ ideas:
     fixed 0.5, from the same saved training-fold prevalences and with the same mean-weight-one
     normalization. The average exponent over the run is 0.5, matching the current recipe.
   precedents:
-  - 'docs/validation/results/2026-09-21-class-balance-exponent.md: public 0.943, 0.944, 0.945, 0.942,
+  - 'docs/validation/results/labels-and-losses/2026-09-21-class-balance-exponent.md: public 0.943, 0.944, 0.945, 0.942,
     0.940 for k = 0, 0.25, 0.5, 0.75, 1.'
   - 'Kang et al. 2020 (arXiv 1910.09217) and Cao et al. 2019 (arXiv 1906.07413): balance-strength
     schedules beat fixed balancing in long-tail vision, though in the opposite direction (0 to 1).'

@@ -4,7 +4,7 @@ Code and configs built during the fastMRI/OAI teacher-student line (2026-10-12 t
 that the final recipe did not adopt, removed on 2026-10-23 before the branch was committed. The
 adopted recipe is pretraining on fastMRI + OAI pseudo-labels, then Kaggle-only students
 (gen2, gen3, gen4) for ConvNeXt-T, ResNet-50 and NextViT-S with v2 and v3 labels; its log is
-[fastMRI joint training](../ongoing/fastmri-joint-training.md).
+[fastMRI joint training](../validation/results/teacher-student/INDEX.md).
 
 **Recovering the code:** the removed code was never committed. The full uncommitted state just
 before the removal is in the main checkout at
@@ -53,7 +53,7 @@ equal weights. Every later ensemble used equal weights.
 |---|---|---|
 | `{convnext,resnet50,mambavision}-silver15-{pretrain,joint,joint-oai-soft-tissue}` | First external round (2026-10-14/15): 15 silver teachers label fastMRI + OAI, pretraining, then joint with a fade | Joint training dropped; superseded by the teachers2 round and the rebuild chain |
 | `{convnext,resnet50,mambavision,efficientvit}-teachers2-{pretrain,joint}`, `nextvit-teachers2-pretrain` | Second round on the selected teachers' labels | Superseded by the rebuild chain (pretraining, then Kaggle-only gen2/gen3) |
-| `{efficientvit,focalnet,mambavision}-rebuild-{pretrain,gen2,gen3}` | The rebuild chain for three more families | Not in the final ensemble: the default families are ConvNeXt, ResNet-50 and NextViT. MambaVision with ConvNeXt (S162, 0.963) lost a step to the three-family S161 (0.964); adding five FocalNet students (S166, 0.963) lost to S163 (0.964). See [FocalNet and EfficientViT](../modeling/focalnet-and-efficientvit-backbones.md) and [MambaVision](../modeling/mambavision-backbone.md) |
+| `{efficientvit,focalnet,mambavision}-rebuild-{pretrain,gen2,gen3}` | The rebuild chain for three more families | Not in the final ensemble: the default families are ConvNeXt, ResNet-50 and NextViT. MambaVision with ConvNeXt (S162, 0.963) lost a step to the three-family S161 (0.964); adding five FocalNet students (S166, 0.963) lost to S163 (0.964). See [FocalNet and EfficientViT](../modeling/backbones/focalnet-and-efficientvit-backbones.md) and [MambaVision](../modeling/backbones/mambavision-backbone.md) |
 | `convnext-tiny-tuned`, `convnext-tiny-tuned-fastmri-only`, `resnet50-joint`, `nextvit-gen3mixed-finetune` | Early fastMRI probes and a one-off gen3 fine-tune | Superseded by the rebuild chain |
 | `convnext-tiny-distilled-student`, `rn50-distilled-student` | Earlier single-model students | Superseded by the `*-s188-student` configs |
-| `configs/labels/rebuild-state-v3-1-label-sources.json` | The v3.1 silver label table | No kept config used it; v3 stayed the label table of the final recipe |
+| `configs/labels/rebuild-state-v3-1-label-sources.json` (removed) | The v3.1 silver label table | No kept config used it; v3 stayed the label table of the final recipe |

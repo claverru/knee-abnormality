@@ -55,7 +55,7 @@ are the ones the seeds and the exclusions rest on.
 
 Learned widths drifted to about 110 mm from any start; the size menu chose coronal 93 to 120,
 coronal fluid 105, sagittal T1/PD 93 to 105 and sagittal fluid 120 mm
-([learnable views](../../../docs/validation/results/2026-10-03-learnable-views-campaign.md)).
+([learnable views](../../../docs/validation/results/crops-and-views/2026-10-03-learnable-views-campaign.md)).
 
 ### Single-type widenings
 
@@ -104,7 +104,7 @@ Refined-RadImageNet ResNet-10t (`resnet10t.c3_in1k`, `refined_radimagenet_resnet
 
 ## Coverage
 
-Measured on 150 fold-1 knees ([view-pose studies](../../../docs/research/view-pose-studies.md#1-knee-size-and-per-knee-scale-back)):
+Measured on 150 fold-1 knees ([view-pose studies](../../../docs/research/geometry-and-views/view-pose-studies/knee-size-and-scale.md)):
 share of series with the structure fully inside.
 
 | View | Structure | Today | Per-knee scale | Wider for all |

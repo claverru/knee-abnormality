@@ -23,10 +23,10 @@ ideas:
   precedents:
   - 'plane-specialization campaign: dense-plane-readouts +0.0047 (re-scored +0.0032,
     80% [+0.0010, +0.0053]) and dense-readouts-learned-fusion +0.0009 on top, on three
-    EfficientNet-B0s (docs/validation/results/2026-09-28-plane-specialization-campaign.md).'
+    EfficientNet-B0s (docs/validation/results/campaigns-and-queues/2026-09-28-plane-specialization-campaign.md).'
   - 'Code: frozen sources of outputs/autoresearch/plane-specialization/experiments/dense-readouts-learned-fusion-20260927T231847Z-33417f97/source/
     (modeling/planes/, trainer.plane_pooling, model.plane_pooling).'
-  - 'Single-plane inference: docs/validation/results/2026-09-27-single-plane-inference.md.'
+  - 'Single-plane inference: docs/validation/results/pooling-and-attention/2026-09-27-single-plane-inference.md.'
   novelty: First dense per-plane readout on the shared backbone; the plane-backbone
     runs changed the backbone at the same time.
   coverage: All studies and labels.
@@ -66,7 +66,7 @@ ideas:
   precedents:
   - near-misses run plane-contrast-readouts-20260925T020628Z-2efb517d (frozen source
     under outputs/autoresearch/near-misses/experiments/).
-  - 'Re-scoring: docs/validation/results/2026-09-28-campaign-rescoring.md.'
+  - 'Re-scoring: docs/validation/results/validation-and-ensembles/2026-09-28-campaign-rescoring.md.'
   novelty: First run on ResNet-18 and the current labels.
   coverage: All labels.
   exploitation: Log the divergence of each w_cq from its initialization per epoch;
@@ -93,7 +93,7 @@ ideas:
     series dropout, gained +0.0023.
   mechanism: model.feature_statistics_augmentation.probability 0.
   precedents:
-  - 'Re-scoring, main adoptions: docs/validation/results/2026-09-28-campaign-rescoring.md#main-adoptions.'
+  - 'Re-scoring, main adoptions: docs/validation/results/validation-and-ensembles/2026-09-28-campaign-rescoring.md#main-adoptions.'
   - 'radimagenet-rn18: rn18-lighter-dsu +0.00005; rn18-no-series-dropout +0.0023.'
   novelty: First removal on ResNet-18.
   coverage: All studies and labels.
@@ -122,8 +122,8 @@ ideas:
     / 20) term and no anatomical_log_strength parameters. The meniscus side mask,
     the half-knee loss and the three-compartment OA detector stay unchanged.'
   precedents:
-  - docs/validation/results/2026-09-21-anatomical-attention-result.md.
-  - 'Re-scoring: docs/validation/results/2026-09-28-campaign-rescoring.md#main-adoptions.'
+  - docs/validation/results/pooling-and-attention/2026-09-21-anatomical-attention-result.md.
+  - 'Re-scoring: docs/validation/results/validation-and-ensembles/2026-09-28-campaign-rescoring.md#main-adoptions.'
   novelty: First removal since adoption; the recipe has since gained the side mask
     and OA detector.
   coverage: The four compartment labels directly; all labels through shared training.
@@ -153,8 +153,8 @@ ideas:
     dropout.
   mechanism: data.smoothing_augmentation.probability 0.
   precedents:
-  - 'Re-scoring: docs/validation/results/2026-09-28-campaign-rescoring.md.'
-  - 'Augmentation campaign: docs/validation/results/2026-09-26-augmentation-campaign.md.'
+  - 'Re-scoring: docs/validation/results/validation-and-ensembles/2026-09-28-campaign-rescoring.md.'
+  - 'Augmentation campaign: docs/validation/results/campaigns-and-queues/2026-09-26-augmentation-campaign.md.'
   novelty: First removal on ResNet-18.
   coverage: All studies and labels.
   exploitation: Training loss and per-label AUC against the incumbent.
@@ -181,7 +181,7 @@ ideas:
     underfits and gained from removing series dropout (+0.0023).'
   mechanism: data.resolution_augmentation.probability 0.
   precedents:
-  - 'Half stack adoption: docs/validation/results/2026-09-26-augmentation-campaign.md.'
+  - 'Half stack adoption: docs/validation/results/campaigns-and-queues/2026-09-26-augmentation-campaign.md.'
   - radimagenet-rn18 and site-generalization findings for the other half-stack members.
   novelty: First removal on ResNet-18.
   coverage: All studies and labels.
@@ -213,8 +213,8 @@ ideas:
     type (six types), D_q 256 to 32, U_q 32 to 256 and zero-initialized so the candidate
     starts as the incumbent. The adapted tokens feed scoring, pooling and every head.
   precedents:
-  - docs/backlog/small-changes.md#planecontrast-specific-feature-adapters.
-  - docs/research/pretraining-and-external-data.md#adapting-2d-foundation-models-to-volumes.
+  - docs/backlog/untried-ideas.md#pooling-and-the-attention-head.
+  - docs/research/backbones-and-pretraining/pretraining-and-external-data.md#adapting-2d-foundation-models-to-volumes.
   novelty: Untested; the pre-pooling sibling of plane-contrast readouts.
   coverage: All studies and labels; types missing from a study add nothing.
   exploitation: Log each type's adapter output RMS relative to h per epoch; per-label
@@ -314,9 +314,9 @@ ideas:
     its BatchNorm statistics before each validation, and the averaged weights are
     validated, selected and scored at x4.'
   precedents:
-  - 'docs/validation/results/2026-09-17-overnight-results.md: 03-ema-0.999, +0.0001
+  - 'docs/validation/results/campaigns-and-queues/2026-09-17-overnight-results.md: 03-ema-0.999, +0.0001
     on the older recipe.'
-  - 'docs/validation/results/2026-09-23-noisy-labels-campaign.md: EMA trails the live
+  - 'docs/validation/results/labels-and-losses/2026-09-23-noisy-labels-campaign.md: EMA trails the live
     model until epochs 8-9.'
   novelty: First EMA run on ResNet-18, L2-SP and rebuild_state_v2.
   coverage: All studies and labels.
@@ -1723,7 +1723,7 @@ ideas:
     readouts, no anatomical bias, augmentation, 26 triplets and 10 epochs.
   precedents:
   - outputs/training/20260928-183517-radimagenet-resnet10t (older recipe, x4 0.922579).
-  - 'docs/ongoing/radimagenet-backbone.md: RadImageNet ResNet backbones and the weight-RMS
+  - 'docs/modeling/backbones/resnet-radimagenet-backbones.md: RadImageNet ResNet backbones and the weight-RMS
     rule.'
   novelty: First ResNet-10t run on the current recipe.
   coverage: All studies and labels.
@@ -1764,7 +1764,7 @@ ideas:
   mechanism: model.backbone resnet10t.c3_in1k, RadImageNet weights, optimizer.backbone_lr
     6e-5; every other setting exactly as the incumbent.
   precedents:
-  - 'docs/ongoing/radimagenet-backbone.md: weight-RMS rule, 5e-5 (RMS 0.0124) and
+  - 'docs/modeling/backbones/resnet-radimagenet-backbones.md: weight-RMS rule, 5e-5 (RMS 0.0124) and
     6e-5 (RMS 0.0158).'
   novelty: First ResNet-10t run on the current recipe at its own scaled rate.
   coverage: All studies and labels.
@@ -2001,7 +2001,7 @@ ideas:
   opportunity: 'User decision, 2026-10-01: compare the original RadImageNet ResNet-50
     on the current incumbent recipe. Its earlier runs used an older recipe: backbone
     LR 1.23e-3 overwrote the early layers and was stopped after epoch 3; 3e-4 finished
-    at x1 0.91223 against 0.924637 (docs/ongoing/radimagenet-backbone.md).'
+    at x1 0.91223 against 0.924637 (docs/modeling/backbones/resnet-radimagenet-backbones.md).'
   mechanism: 'model.backbone resnet50.tv_in1k with model.pretrained_weights radimagenet;
     optimizer.backbone_lr 5e-5 and every other setting as the incumbent (head_lr 6e-4,
     L2-SP 0.01 on conv1/bn1/layer1 and 0.001 on the rest, plane-contrast readouts,
@@ -2019,7 +2019,7 @@ ideas:
   precedents:
   - 'outputs/training/20260928-180252-radimagenet-resnet50-lr3e-4: about 170 s per
     epoch at series dropout 0.2.'
-  - 'docs/ongoing/radimagenet-backbone.md: [-1, 1] normalization measured against
+  - 'docs/modeling/backbones/resnet-radimagenet-backbones.md: [-1, 1] normalization measured against
     the checkpoint''s bn1 statistics.'
   novelty: First ResNet-50 run on the current recipe.
   coverage: All studies and labels.
@@ -2094,7 +2094,7 @@ ideas:
     recipe, SGD lr 0.1, 90 epochs, AutoAugment imagenet, CutMix 1.0); model keys carry
     the _orig_mod. prefix and load strictly into timm resnet50 with num_classes 165
     (checked 2026-10-01). Median convolution RMS 0.0136.'
-  - docs/research/radimagenet-weights.md#refined-radimagenet-resnets.
+  - docs/research/backbones-and-pretraining/radimagenet-weights.md#refined-radimagenet-resnets.
   - 'outputs/training/20260928-180252-radimagenet-resnet50-lr3e-4: about 170 s per
     epoch for ResNet-50.'
   novelty: First Refined-RadImageNet ResNet-50 run.
@@ -2133,7 +2133,7 @@ ideas:
   precedents:
   - 'refined-resnet50-ideas.yaml: checkpoint hash, inspection and median convolution
     RMS 0.0136.'
-  - 'docs/ongoing/radimagenet-backbone.md: the weight-RMS rule (ResNet-18 5e-5 at
+  - 'docs/modeling/backbones/resnet-radimagenet-backbones.md: the weight-RMS rule (ResNet-18 5e-5 at
     RMS 0.0124).'
   novelty: First Refined-RadImageNet ResNet-50 run at its own scaled rate.
   coverage: All studies and labels.
@@ -2179,7 +2179,7 @@ ideas:
   - 'outputs/autoresearch/plane-specialization/experiments/dense-readouts-learned-fusion-20260927T231847Z-33417f97
     (modeling/planes/ in its frozen code): the plane-backbone routing and per-plane
     DSU.'
-  - docs/history/plane-backbones.md and docs/validation/results/2026-09-28-plane-specialization-campaign.md.
+  - docs/history/plane-backbones.md and docs/validation/results/campaigns-and-queues/2026-09-28-plane-specialization-campaign.md.
   novelty: First plane-backbone run on the current recipe at ten epochs, with the
     readout unchanged.
   coverage: All studies and labels.
@@ -2320,7 +2320,7 @@ ideas:
     term are all absent. Everything else exactly as the incumbent at this seed''s
     turn.'
   precedents:
-  - docs/modeling/report-attribute-heads.md and docs/validation/results/2026-09-25-report-attribute-heads.md.
+  - docs/modeling/report-attribute-heads.md and docs/validation/results/labels-and-losses/2026-09-25-report-attribute-heads.md.
   - 'revisits: rn18-report-attributes-005 (weight 0.05, -0.0004).'
   novelty: First removal of the attribute heads on ResNet-18.
   coverage: All studies and labels.

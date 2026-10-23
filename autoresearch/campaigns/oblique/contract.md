@@ -3,7 +3,7 @@
 Defined and run 2026-09-22; **retired** the same day when the shared evaluation moved to ×4
 predictions, after two rejected experiments and one trained but uncompared; its topic continues in
 the [x4 oblique campaign](../oblique-x4/INDEX.md). It followed the
-[oblique-groups run](../../../docs/validation/results/2026-09-22-oblique-groups-result.md),
+[oblique-groups run](../../../docs/validation/results/sampling/2026-09-22-oblique-groups-result.md),
 which gave tilted coronal and axial fluid series their own slot budget and did not measurably
 help. The user kept that recipe as the reference and opened this campaign to find what else the
 mechanism needs.
@@ -13,7 +13,7 @@ mechanism needs.
 Make the oblique groups pay off. An oblique group is a coronal series tilted more than 20°, or an
 axial fluid series tilted more than 30°, that shares its slot with a standard series and is
 therefore sampled with its own budget
-([sampler](../../../docs/data-preparation/physical-sampling/implemented-sampler.md#oblique-groups)).
+([oblique groups](../../../docs/history/oblique-groups.md)).
 They are mostly dedicated ACL-oblique protocols and a site's tilted coronals, in about 12% of
 studies (103 on fold 0), and those studies carry about twice the ACL, MCL and lateral meniscus
 rates. Today the model receives their tokens with the slot's plane and contrast embeddings, so it

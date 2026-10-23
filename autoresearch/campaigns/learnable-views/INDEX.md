@@ -2,7 +2,7 @@
 
 **Closed: stopped by the user on 2026-10-03 23:40 CEST after 47 scored runs, none adopted by
 rule.** Outcome and every run:
-[2026-10-03 learnable-views campaign](../../../docs/validation/results/2026-10-03-learnable-views-campaign.md).
+[2026-10-03 learnable-views campaign](../../../docs/validation/results/crops-and-views/2026-10-03-learnable-views-campaign.md).
 It started on 2026-10-02 21:27 CEST on Codex with the goal of improving the learnable recipe
 (user, 2026-10-02): the RadImageNet ResNet-18 that learns each series type's view width and
 shift, a per-view label bias and the slice budget by gradient, starting from the 120 mm centre
@@ -110,4 +110,4 @@ hand-set, frozen views were not candidates, until the user made one the referenc
   branch's worktree.
 - **Checkpoints:** the selected checkpoint of ten runs is kept, every other one deleted on
   2026-10-04
-  ([pruning record](../../../docs/architecture/configs-and-experiment-artifacts.md#checkpoint-pruning)).
+  ([pruning record](../../../docs/architecture/disk-cleanup-log.md)).

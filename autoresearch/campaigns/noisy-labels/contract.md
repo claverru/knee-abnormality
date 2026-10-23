@@ -7,7 +7,7 @@ Defined 2026-09-23; not started.
 Make training robust to wrong training labels. The labels are extracted from radiology reports,
 and they are measurably noisy against the radiologists' image labels: on the 58 gold studies about
 a third of cells with targets in [0.3, 0.5) are positive, and about a quarter of cells above 0.9
-are not ([soft AUC evidence](../../../docs/validation/results/2026-09-23-validation-auc-variants.md#why-soft-targets-are-closer-to-the-truth)).
+are not ([soft AUC evidence](../../../docs/validation/results/labels-and-losses/2026-09-23-validation-auc-variants.md#why-soft-targets-are-closer-to-the-truth)).
 Two measured results say label noise, rather than image evidence, now limits the score. Changing
 only the class-balance strength moved the public score from 0.940 to 0.945. Blending an image
 teacher's predictions into the labels raised their gold agreement by +0.020.
@@ -43,7 +43,7 @@ which contain the errors this campaign targets. A mechanism that correctly stops
 labels can lose on it. The class-balance curve already shows this: fold-0 hard AUC rose with the
 exponent while the public score peaked at 0.5. Soft macro AUC orders past submissions closer to
 the leaderboard, and it follows that curve
-([validation AUC variants](../../../docs/validation/results/2026-09-23-validation-auc-variants.md)).
+([validation AUC variants](../../../docs/validation/results/labels-and-losses/2026-09-23-validation-auc-variants.md)).
 Every completion therefore reports, against the reference and on the selected checkpoint's ×4
 predictions:
 

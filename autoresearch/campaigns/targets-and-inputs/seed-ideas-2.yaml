@@ -13,7 +13,7 @@ ideas:
     In configs/training.yaml, data.intensity_augmentation.probability becomes 0 (it is 0.5). The
     gamma_range and contrast_range lines stay. Nothing else changes.
   precedents:
-  - 'docs/backlog/overnight.md, next queue: the entry this seed runs.'
+  - 'docs/validation/run-comparison-and-diagnostics.md#overnight-launcher, next queue: the entry this seed runs.'
   - 'prior-work.md, precedents: the augmentation campaign on ReXNet-200; contrast mixing off lost 0.0025 on the ResNet-18.'
   novelty: First removal of this family on a RadImageNet backbone.
   coverage: Half of the training images.
@@ -42,7 +42,7 @@ ideas:
     In configs/training.yaml, data.noise_augmentation.probability becomes 0 (it is 0.15). The
     std_range line stays. Nothing else changes.
   precedents:
-  - 'docs/backlog/overnight.md, next queue: the entry this seed runs.'
+  - 'docs/validation/run-comparison-and-diagnostics.md#overnight-launcher, next queue: the entry this seed runs.'
   novelty: First removal of this family on a RadImageNet backbone.
   coverage: 15% of the training images.
   exploitation: >-
@@ -77,7 +77,7 @@ ideas:
     their soft targets and all have weight one. The average is over the kept observed cells. Studies,
     images and the other labels of a dropped cell's study are unchanged.
   precedents:
-  - 'docs/backlog/small-changes.md, report-label supervision, balance each target column through training masks: the entry this seed implements, with the mask drawn per step instead of per epoch.'
+  - 'docs/backlog/untried-ideas.md, report-label supervision, balance each target column through training masks: the entry this seed implements, with the mask drawn per step instead of per epoch.'
   - 'prior-work.md, precedents: class-balanced BCE about +0.008 over none; the binary evidence mask rejected.'
   novelty: First run that balances by selection instead of by weight.
   coverage: Per step MCL keeps about 10% of its cells, Fracture 13%, Medial Meniscus 77%.
@@ -125,7 +125,7 @@ ideas:
     positive-negative pairs of that label inside the batch (same 0.75 and 0.25 rule). Validation and
     prediction are unchanged.
   precedents:
-  - 'docs/backlog/big-bets.md, hard-pair mining phase: the entry this seed implements.'
+  - 'docs/backlog/untried-ideas.md, hard-pair mining phase: the entry this seed implements.'
   - 'prior-work.md, precedents: the always-on in-batch ranking term +0.0007; shared balanced focal -0.0026.'
   novelty: First mined-pair batches; first pair term on a RadImageNet backbone.
   coverage: The last 30% of the optimizer steps; at most 2,400 mined pairs per epoch, fewer after studies shared between pairs are placed once.
@@ -166,7 +166,7 @@ ideas:
     every token's evidence with one linear head per channel (the else branch of _attention_pool and of
     _soft_tissue_pool in modeling/model.py) instead of one head per series type. Nothing else changes.
   precedents:
-  - 'docs/backlog/small-changes.md, removals of active mechanisms: the entry this seed runs.'
+  - 'docs/backlog/untried-ideas.md, removals of active mechanisms: the entry this seed runs.'
   - 'prior-work.md, precedents: plane-contrast readouts adopted in the revisits campaign (Lateral OA +0.0054).'
   novelty: First removal on the current recipe and on the ResNet-50.
   coverage: Every label's evidence head, main and soft-tissue.

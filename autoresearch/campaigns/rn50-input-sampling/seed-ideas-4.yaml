@@ -26,7 +26,7 @@ ideas:
     against the frozen source of the 257 px candidate (outputs/autoresearch/rn50-input-sampling/experiments/centred-token-grid-at-257-px-20261011T202734Z-5b8edc1d/source);
     take that candidate''s odd-size handling from its changes.diff and this diff''s copies, with 225 in
     place of 257.'
-  - 'docs/validation/results/2026-10-08-token-grid-alignment.md: the 225 px run on the ResNet-18.'
+  - 'docs/validation/results/crops-and-views/2026-10-08-token-grid-alignment.md: the 225 px run on the ResNet-18.'
   novelty: First run with both grids centred and exact copies between them, at the reference's cost.
   coverage: Every image; all labels.
   exploitation: 'Read the macro and all labels against the incumbent at both multipliers. Activation: the logged

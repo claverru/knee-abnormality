@@ -23,7 +23,7 @@ without a run are label-free checks made on 2026-10-04.
 ## Checkpoints
 
 All in the torch hub cache, hashed in `PRETRAINED_WEIGHTS`. Overall convolution-weight RMS is
-the quantity of the [weight-scale rule](../../../docs/modeling/backbone-swaps.md#checkpoint-weight-scale).
+the quantity of the [weight-scale rule](../../../docs/modeling/backbones/backbone-swaps.md#checkpoint-weight-scale).
 
 | Weights | Backbone | What it is | Conv RMS |
 |---|---|---|---:|
@@ -56,7 +56,7 @@ of the first 320 fold-0 validation studies (8,615 slices), CPU, no training:
 
 Under ImageNet normalization the top class is `US__thyroid` (0.387 of the mass). The earlier
 note that normalization "rests on the recipe" assumed the script's ImageNet default
-([weights](../../../docs/research/radimagenet-weights.md#refined-radimagenet-resnets)); the
+([weights](../../../docs/research/backbones-and-pretraining/radimagenet-weights.md#refined-radimagenet-resnets)); the
 authors' presets set their own values. Our prepared slices have mean 0.335 and std 0.252.
 
 Zero-shot signal under the checkpoint's normalization, study mean of the slice logit of the
@@ -104,7 +104,7 @@ From the [code](https://github.com/convergedmachine/Cross-D-Conv) and the checkp
   `conv1.rotation_params.*`, `layerX.Y.convZ.*`, `layerX.0.downsample.0.*`, `fc.*`.
 - Its weights are 15× the incumbent's scale and uniform across depth, like the original
   RadImageNet ResNet-50, whose first run at the rule's rate overwrote its early layers
-  ([first run](../../../docs/ongoing/radimagenet-backbone.md#first-run-learning-rate-too-high-2026-09-28)).
+  ([first run](../../../docs/modeling/backbones/resnet-radimagenet-backbones.md)).
 
 ## Runs
 

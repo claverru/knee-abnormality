@@ -208,7 +208,7 @@ contract's: at least the incumbent at both ×1 and ×4. Incumbent at the start: 
 - The spread of the meniscus-spot midpoint left over after the shift barely fell: superior 6.7 to
   6.4 mm, anterior 5.0 to 4.6, left-right 2.5 to 2.1. The locator predicts a small part of the
   midpoint's variation; the spots themselves are uncertain by 4 to 6 mm per knee
-  (docs/ongoing/side-routed-heads.md, attention spots), so most of the target is noise in the
+  (docs/modeling/side-routed-heads.md, attention spots), so most of the target is noise in the
   spots, and knees are moved by millimetres without ending up more alike.
 - Per target: Lateral OA +0.0035, MCL +0.0030, Medial Meniscus +0.0018 (2.6 sibling SDs), Medial OA
   +0.0016 (2.0), Effusion +0.0008, PF OA +0.0007, Baker's −0.0001, ACL −0.0002, Synovitis −0.0020,

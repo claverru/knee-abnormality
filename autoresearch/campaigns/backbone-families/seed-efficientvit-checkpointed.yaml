@@ -30,7 +30,7 @@ ideas:
     the running buffers. Outputs, gradients and running statistics then equal the uncheckpointed model''s. In eval mode the
     stages run directly. The feature-statistics augmentation stays outside the checkpointed stages.'
   precedents:
-  - 'MaViT-S: BatchNorm with depthwise convolutions cost 8 s per new image count unpadded (docs/modeling/mambavision-backbone.md).'
+  - 'MaViT-S: BatchNorm with depthwise convolutions cost 8 s per new image count unpadded (docs/modeling/backbones/mambavision-backbone.md).'
   - 'PVTv2-b2 (weights 0.045 to 0.056) and RadioDINO-S/16: the recipe''s rate held.'
   - 'efficientvit-b2 (2026-10-16): the preflight ran out of memory at its 52nd training batch under the 22.5 GiB cap (22.29
     GiB allocated), so it never trained; blocked after its one repair.'

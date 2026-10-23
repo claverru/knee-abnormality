@@ -45,7 +45,7 @@ that every uncertainty-weighting approach fails. The 11-study gold diagnostic
 is especially small. No new training, inference or public submission was run
 for this comparison.
 
-Evidence: [comparison JSON](../../../outputs/analysis/m/masking-vs-reflection-20260913/comparison.json)
+Evidence: comparison JSON (`outputs/analysis/m/masking-vs-reflection-20260913/comparison.json`, deleted)
 contains full metrics, per-target deltas, configurations, input identities and
 artifact SHA-256 hashes. The selected masked checkpoint is
 `outputs/training/masked-labels/fold_0/best-epoch=08-val_macro_auc=0.87952.ckpt` (deleted on 2026-09-16);

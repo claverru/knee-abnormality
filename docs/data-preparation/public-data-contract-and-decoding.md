@@ -66,5 +66,5 @@ the hidden test set is still handled, by the generic decode-failure path that
 drops the candidate series and records the failure, not by a UID list.
 
 For physical ordering, adjacent-triplet selection and cache tradeoffs, see the
-[public geometry evidence](../research/public-research.md#geometry-sampling-encoders-and-losses)
-and [runtime lessons](../research/public-research.md#data-access-and-runtime-lessons).
+[public geometry evidence](../research/competition-and-prior-art/public-research.md#geometry-sampling-encoders-and-losses)
+and [runtime lessons](../research/competition-and-prior-art/public-research.md#data-access-and-runtime-lessons).

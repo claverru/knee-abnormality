@@ -19,9 +19,9 @@ ideas:
   precedents:
   - 'prior-work.md, Pretrained head on our slices: knee-class mass 0.088 against 0.978,
     label-free.'
-  - 'docs/research/radimagenet-weights.md: the earlier BatchNorm check matched no
+  - 'docs/research/backbones-and-pretraining/radimagenet-weights.md: the earlier BatchNorm check matched no
     candidate mean and left normalization resting on the script default.'
-  - 'docs/ongoing/radimagenet-backbone.md: the original RadImageNet ResNet-50 needed
+  - 'docs/modeling/backbones/resnet-radimagenet-backbones.md: the original RadImageNet ResNet-50 needed
     [-1, 1] inputs, found the same way.'
   novelty: First run of a Refined-RadImageNet backbone with the normalization it was
     trained with.
@@ -69,7 +69,7 @@ ideas:
   - 'outputs/training/20261004-094416-rn10t-view-label-bias: the reference, standard
     ResNet-10t weights at backbone LR 6e-5.'
   - 'prior-work.md, Checkpoints: file, hash and weight scale; The authors mask method.'
-  - 'docs/modeling/backbone-swaps.md#checkpoint-weight-scale: the rate rule.'
+  - 'docs/modeling/backbones/backbone-swaps.md#checkpoint-weight-scale: the rate rule.'
   novelty: First use of a mask-trained RadImageNet checkpoint in this project.
   coverage: All studies and labels.
   exploitation: x4 and x1 against rn10t-view-label-bias (the comparison of interest)
@@ -607,7 +607,7 @@ ideas:
     at RMS 0.314), scaled to this RMS.'
   precedents:
   - prior-work.md, Cross-D-Conv and Checkpoints.
-  - 'docs/ongoing/radimagenet-backbone.md, First run: a uniform-scale checkpoint at
+  - 'docs/modeling/backbones/resnet-radimagenet-backbones.md, First run: a uniform-scale checkpoint at
     the median-matched rate overwrote its early layers.'
   - 'contract.md, Build facts: modeling/crossd.py is built and checked against the
     authors layer; the weights entry exists.'

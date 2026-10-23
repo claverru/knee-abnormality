@@ -118,7 +118,7 @@ ideas:
     the noisy-labels run. Nothing else changes.
   precedents:
   - 'early-learning-regularization (noisy-labels): outputs/autoresearch/noisy-labels/experiments/early-learning-regularization-20260923T124737Z-7aba30fc/changes.diff'
-  - 'Per-label analysis: docs/ongoing/early-learning-regularization.md'
+  - 'Per-label analysis: docs/history/early-learning-regularization.md'
   - 'Combined with the class-balance schedule it lost Lateral OA -0.0086 and PF OA -0.0075, an interaction risk with other loss terms.'
   novelty: First run on the knee-geometry recipe, which adds the half-knee loss the term may interact with.
   coverage: All twelve labels.

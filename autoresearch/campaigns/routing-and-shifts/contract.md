@@ -5,7 +5,7 @@
 Improve the side-routed model on two topics at once:
 
 1. **Side routing:** the division of the knee into regions and which targets read which, on the
-   design of [the plan and runs](../../../docs/ongoing/side-routed-heads.md).
+   design of [the plan and runs](../../../docs/modeling/side-routed-heads.md).
 2. **Learned shifts:** where each view's crop is cut, learned instead of set by hand, with the
    size of every crop fixed.
 

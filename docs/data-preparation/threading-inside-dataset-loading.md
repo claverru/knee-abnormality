@@ -44,14 +44,14 @@ The profiler is historical since the 2026-09-22 row-trimmed reads: its threaded 
 unchanged. `--decode-threads` threads whole `decode_slice` calls, which is more than the shipped
 change; `--read-threads` is the shipped form, prefetching payloads on a pool with `read_frame`'s
 validation and decoding serially (the 2026-09-18 cold comparison is in
-[closed loading changes](../backlog/loading-speedup/closed.md#threading-loses-when-there-is-no-latency-to-hide)).
+[closed loading changes](../inference/profiling/loading-changes-rejected.md#threading-loses-when-there-is-no-latency-to-hide)).
 Use a fresh output directory:
 
 ```bash
-rtk proxy env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/resnet50.yaml --mode loader --workers 8 --decode-threads 1 --samples 512 --warmup-batches 16 --output-dir outputs/profiling/threading-loader-new
-rtk proxy env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/resnet50.yaml --mode loader --workers 16 --decode-threads 1 --read-threads 4 --samples 256 --warmup-batches 1 --passes 2 --output-dir outputs/profiling/frames-cold-readthreads-new
-rtk proxy uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/resnet50.yaml --mode audit --samples 8 --output-dir outputs/profiling/threading-audit-new
-rtk proxy uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/resnet50.yaml --mode gpu --workers 8 --decode-threads 1 --samples 256 --output-dir outputs/profiling/threading-gpu-new
+env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/resnet50.yaml --mode loader --workers 8 --decode-threads 1 --samples 512 --warmup-batches 16 --output-dir outputs/profiling/threading-loader-new
+env OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/resnet50.yaml --mode loader --workers 16 --decode-threads 1 --read-threads 4 --samples 256 --warmup-batches 1 --passes 2 --output-dir outputs/profiling/frames-cold-readthreads-new
+uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/resnet50.yaml --mode audit --samples 8 --output-dir outputs/profiling/threading-audit-new
+uv run --locked python -m scripts.adhoc.profile_threaded_loading configs/resnet50.yaml --mode gpu --workers 8 --decode-threads 1 --samples 256 --output-dir outputs/profiling/threading-gpu-new
 ```
 
 Warmup batches are excluded from `studies_per_second`. For a cold run, drop the page cache first,
@@ -93,7 +93,7 @@ initial apparent 17.9% threading advantage is not a robust improvement.
 These are bounded timings, not confidence intervals or full-epoch projections;
 OS cache state and scheduling were not controlled. All seven loader runs
 have identical source snapshots, label provenance, study order and per-batch
-selected slice counts. The [machine-readable summary](../../outputs/profiling/threading_20260910/summary.json)
+selected slice counts. The machine-readable summary (deleted)
 links each configuration to its recorded timings. No production source changed.
 
 Two completed, separate GPU profiles used the then-current repeated-RGB

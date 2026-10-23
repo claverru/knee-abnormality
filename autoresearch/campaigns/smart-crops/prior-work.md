@@ -2,10 +2,10 @@
 
 Crop, resolution and multi-view evidence the seeds build on. Sources: the
 [crop-selection investigation](../../../docs/history/crop-selection-investigation.md),
-[input resolution](../../../docs/research/input-resolution.md),
-[learned crop selection](../../../docs/research/learned-crop-selection.md), the
-[multi-scale review](../../../docs/research/multiscale-features-knee-mri.md), the
-[mixed-field campaign and the 120 mm adoption](../../../docs/validation/results/2026-10-01-mixed-field-campaign.md),
+[input resolution](../../../docs/research/geometry-and-views/input-resolution.md),
+[learned crop selection](../../../docs/research/geometry-and-views/learned-crop-selection.md), the
+[multi-scale review](../../../docs/research/geometry-and-views/multiscale-features-knee-mri.md), the
+[mixed-field campaign and the 120 mm adoption](../../../docs/validation/results/crops-and-views/2026-10-01-mixed-field-campaign.md),
 two probes of the 140 mm control and a literature review, both of 2026-10-01.
 
 ## Precedent table
@@ -52,7 +52,7 @@ that spacing. The wide view's 0.536 mm resolves about a fifth of them.
 
 ## What the 120 mm field already cuts
 
-From [input resolution](../../../docs/research/input-resolution.md#what-a-narrow-field-cuts)
+From [input resolution](../../../docs/research/geometry-and-views/input-resolution.md#what-a-narrow-field-cuts)
 (292 series, middle slice):
 
 - **Coronal:** more than 10 mm of tissue is cut on a side in 30–31% of series.
@@ -128,7 +128,7 @@ been measured on a 120 mm model.
 
 Reviewed 2026-10-01; natural images and video unless marked. Earlier coverage (GMIC, attention
 sampling, differentiable top-k, GLNet, RSNA winners) is in
-[learned crop selection](../../../docs/research/learned-crop-selection.md).
+[learned crop selection](../../../docs/research/geometry-and-views/learned-crop-selection.md).
 
 - **Placement trained only by the final loss is about as good as random:** NTS-Net without its
   ranking loss scores below its baseline (83.3 against 84.5); regressed crops match random in
@@ -220,7 +220,7 @@ known about each.
 - **Follow-ups the measurements point to:** a 93 mm detail view at 0.4167 mm beside the wide view
   on sagittal fluid series, the series the detail labels use most; a 224 × 160 px window;
   train-time crops distilled into the one-pass model (TASN), which removes their inference cost.
-- **Related backlog:** [two views per slice](../../../docs/backlog/big-bets.md#two-views-per-slice)
+- **Related backlog:** [two views per slice](../../../docs/backlog/untried-ideas.md#views-and-fields)
   (every slice at 120 and 140 mm) is the wide-context counterpart of these crops and shares their
   design constraint: both views feed the pool from the first step, with no gate.
 - **Untried:** a ranking-trained locator (several crops per slice in training); crops that follow

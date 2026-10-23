@@ -13,7 +13,7 @@
 | Reading the last four forced seeds: reranked fold teachers, recalibrated fold teachers, a share from plane agreement, a target per plane | [Seeds 2](seed-ideas-2.yaml) |
 | Reading the two share seeds requeued after the comparison repair of 2026-10-10: 0.25 and 0.75 again | [Rerun seeds](seed-ideas-reruns.yaml) |
 | Reading the share seed the keeper added after 0.25 was adopted: 0.125 | [Low share seed](seed-ideas-share-low.yaml) |
-| Applying the candidate the keeper prepared for `reranked-fold-teachers`: its diff, activation signature and label-table report | [Prepared reranked candidate](prepared/reranked-fold-teachers/report.md) |
+| Applying the candidate the keeper prepared for `reranked-fold-teachers`: its diff, activation signature and label-table report | Prepared reranked candidate (`prepared/reranked-fold-teachers/report.md`, deleted) |
 | Reading the recalibration seed requeued after the abort of 2026-10-10 12:57 | [Rerun seeds 2](seed-ideas-reruns-2.yaml) |
 | Reading the reranking seed requeued after its run was stopped for time on 2026-10-10 | [Rerun seeds 3](seed-ideas-reruns-3.yaml) |
 | Reading the seed the user asked for from the monitor page on 2026-10-10: the teacher only where it disagrees with silver beyond its repeat noise | [Gate seed](seed-ideas-gate.yaml) |

@@ -22,7 +22,7 @@ ideas:
     (schedule; exponent logged from 0.95 to 0.05, maximum weight ratio 17.4 to 1.35).'
   - 'outputs/autoresearch/noisy-labels/experiments/early-learning-regularization-20260923T124737Z-7aba30fc/changes.diff
     (regularizer; term about -0.07 to -0.11 against a BCE of 0.61 to 0.43).'
-  - 'docs/validation/results/2026-09-21-class-balance-exponent.md: the public exponent curve.'
+  - 'docs/validation/results/labels-and-losses/2026-09-21-class-balance-exponent.md: the public exponent curve.'
   novelty: >-
     The two mechanisms act on different terms: the schedule reweights the BCE, the regularizer adds
     a separate prediction-anchored term. Neither single run tested them together.

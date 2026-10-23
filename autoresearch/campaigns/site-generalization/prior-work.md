@@ -9,7 +9,7 @@ Where the campaign comes from, the measured precedents and the closed directions
 - **Measured cost:** two runs of the recipe without the five held-out sites, on Kaggle and
   locally, put the unseen-site cost at −0.0092 and −0.0099 macro AUC. The 23% smaller training
   set cost −0.0009 and −0.0016 on seen sites
-  ([sites-out diagnostic](../../../docs/validation/results/2026-09-29-sites-out-diagnostic.md)).
+  ([sites-out diagnostic](../../../docs/validation/results/validation-and-ensembles/2026-09-29-sites-out-diagnostic.md)).
 - **Held-out cohort:**
   - Bulgarian (Sofia, Philips Ingenia 3T, 220 studies);
   - German (Würzburg, Siemens Avanto fit, 262);
@@ -23,7 +23,7 @@ Where the campaign comes from, the measured precedents and the closed directions
   conventions, which the test's image-derived labels do not share.
 - **Scanner signal in the features:** the scanner confusion head's detached classifier reached
   0.314 accuracy on the 8 scanner groups (majority 0.263) from the pooled tokens, and 0.324 before
-  normalization ([bias-free training](../../../bias_free.md)). A competitor reports features that
+  normalization ([bias-free training](../../../docs/modeling/site-bias.md)). A competitor reports features that
   predict the manufacturer at 82.8% (chance 37.9%).
 
 ## Noise yardstick
@@ -97,7 +97,7 @@ Measured runs outside this campaign, fold 3 of `all_5fold_scanner_v1` against
 
 | Mechanism | Setting | Δ ×4 | Public | Source |
 |---|---|---|---|---|
-| Gradient reversal | scanner-group head, weight 0.1 | −0.0060 | – | [auxiliary-signals campaign](../../../docs/validation/results/2026-09-27-auxiliary-signals-campaign.md) |
+| Gradient reversal | scanner-group head, weight 0.1 | −0.0060 | – | [auxiliary-signals campaign](../../../docs/validation/results/campaigns-and-queues/2026-09-27-auxiliary-signals-campaign.md) |
 | Gradient reversal | head at full strength | −0.0042 | – | same |
 | Scanner confusion (bounded KL, detached head) | 8 scanner groups, weight 0.1 | −0.0008 | 0.948 against 0.947 (adopted) | same |
 | Stronger confusion head | two-layer head, doubled rate | −0.0033 | 0.943 | same |
@@ -105,8 +105,8 @@ Measured runs outside this campaign, fold 3 of `all_5fold_scanner_v1` against
 | Confusion before normalization | backbone features | invalid (hand −0.0016) | – | same |
 | Per-site logit bias | 8 × 12, training only | +0.0004 | 0.947 | same |
 | Per-model logit bias | 31 × 12, training only | −0.0028 | – | same |
-| Post-hoc per-site centering | output logits | full −0.0075 to −0.0111; half −0.0016 to −0.0031 | – | [bias-free training](../../../bias_free.md) |
-| DSU feature statistics | stride 8, generic | adopted on ReXNet; in the recipe | – | [augmentation campaign](../../../docs/validation/results/2026-09-26-augmentation-campaign.md) |
+| Post-hoc per-site centering | output logits | full −0.0075 to −0.0111; half −0.0016 to −0.0031 | – | [bias-free training](../../../docs/modeling/site-bias.md) |
+| DSU feature statistics | stride 8, generic | adopted on ReXNet; in the recipe | – | [augmentation campaign](../../../docs/validation/results/campaigns-and-queues/2026-09-26-augmentation-campaign.md) |
 
 ## Closed directions
 

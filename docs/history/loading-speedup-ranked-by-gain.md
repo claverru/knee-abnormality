@@ -3,24 +3,24 @@
 **Superseded 2026-09-22.** Every ranked row has since been shipped, superseded or rejected on
 Kaggle: ranks 1, 5 and 6 shipped on 2026-09-19 and bought nothing measurable; rank 2 was rejected;
 rank 3 shipped bit-exactly as GPU preparation; rank 7 was profiled and rank 8 shipped as a CUDA
-graph ([profile](../inference/2026-09-22-kaggle-x4-startup-and-gpu-preparation.md),
-[closed](../backlog/loading-speedup/closed.md#closed-2026-09-22)). The ranking below is kept for its reasoning, and the two
+graph ([profile](../inference/profiling/2026-09-22-kaggle-x4-startup-and-gpu-preparation.md),
+[closed](../inference/profiling/loading-changes-rejected.md#closed-2026-09-22)). The ranking below is kept for its reasoning, and the two
 measurement sections as the bit-exact evidence for ranks 1 and 5.
 
 What each open candidate is worth against the **371.4 s full inference command**, so the next change
 is chosen by end-to-end effect rather than by the size of the stage it touches. What each one costs
-to ship, and what it has to audit, stays in [candidates](../backlog/loading-speedup/candidates.md); this document only ranks
+to ship, and what it has to audit, stays in [candidates](../backlog/untried-ideas.md#inference-loading); this document only ranks
 them.
 
 Produced 2026-09-19 from an external optimization review of revision `f4c340b`, reconciled against
-the [post-cluster profile](../inference/2026-09-18-kaggle-x4-profile-after-cpu-cluster.md) and two
+the [post-cluster profile](../inference/profiling/2026-09-18-kaggle-x4-profile-after-cpu-cluster.md) and two
 local measurements recorded below.
 
 ## The conversion, and why it closes
 
 **1 cold-100 CPU-second = 13 probe-units per 1,300-study run × 1.56 contention = 20.3 run CPU-seconds
 ÷ 3.5 effective cores = 5.8 s of wall = 1.56% of the 371.4 s command**
-([the model](../backlog/loading-speedup/attribution.md#the-model-that-replaces-the-old-ranking)).
+([the model](../inference/profiling/loading-cost-attribution.md#the-model-that-replaces-the-old-ranking)).
 
 The arithmetic closes on the measured run: the cold pass costs 48.11 CPU-seconds per 100 studies,
 and 48.11 × 20.3 = **976 CPU-seconds against the 990.6 measured in the sixteen loader workers**. The
@@ -30,21 +30,21 @@ of it.
 ## The ranking
 
 Stage CPU is the "CPU after" column of the
-[cold loading stages](../inference/2026-09-18-kaggle-x4-profile-after-cpu-cluster.md#cold-loading-stages-100-studies).
+[cold loading stages](../inference/profiling/2026-09-18-kaggle-x4-profile-after-cpu-cluster.md#cold-loading-stages-100-studies).
 
 | Rank | Candidate | Stage it touches (cold-100 CPU) | Speedup assumed | Expected | Ceiling | Conf | Effort |
 |---|---|---|---|---:|---:|---|---|
-| 1 | [Support-limited native-to-float32 conversion](../backlog/loading-speedup/candidates.md#bit-exact-batch-into-the-retrain) | frame reads 12.23 + resample 11.21 | **2.01x, measured** | **6–12%** | 17% | med | M |
-| 2 | [glibc allocator config](../backlog/loading-speedup/candidates.md#ship-without-a-retrain) — size thresholds plus the arena cap, *implemented, awaiting a run* | the same allocation cost, with no retrain | — | **~8%** | 4.7–12.5% | med | **free** |
-| 3 | [GPU resample, quantiles and normalize](../inference/2026-09-22-kaggle-x4-startup-and-gpu-preparation.md#gpu-preparation) | resample 11.21 + quantiles 6.47 + normalize 1.90 = 19.6 s | most of it leaves the CPU | **~6%** | 24% | low | L |
+| 1 | [Support-limited native-to-float32 conversion](../backlog/untried-ideas.md#inference-loading) | frame reads 12.23 + resample 11.21 | **2.01x, measured** | **6–12%** | 17% | med | M |
+| 2 | [glibc allocator config](../backlog/untried-ideas.md#inference-loading) — size thresholds plus the arena cap, *implemented, awaiting a run* | the same allocation cost, with no retrain | — | **~8%** | 4.7–12.5% | med | **free** |
+| 3 | [GPU resample, quantiles and normalize](../inference/profiling/2026-09-22-kaggle-x4-startup-and-gpu-preparation.md#gpu-preparation) | resample 11.21 + quantiles 6.47 + normalize 1.90 = 19.6 s | most of it leaves the CPU | **~6%** | 24% | low | L |
 | 4 | Ahead-of-time kernel fusing conversion with interpolation | resample 11.21 + part of frame reads 12.23 s | 2–3x | **~4%** | 12–19% | low | XL |
-| 5 | [Exact quantiles by single-rank partitions](../backlog/loading-speedup/candidates.md#bit-exact-batch-into-the-retrain) | quantiles 6.47 s | **1.44–1.63x, measured** | **3.1–3.9%** | 3.9% | **high** | S |
-| 6 | [Direct shared-storage collation](../backlog/loading-speedup/candidates.md#bit-exact-batch-into-the-retrain) | absent from the probe — see below | 0.40 ms/MiB over 26.9 GiB | **1.3–2.1%** | 2.1% | med | S |
-| 7 | [Cut model load](../inference/2026-09-22-kaggle-x4-startup-and-gpu-preparation.md#startup) | 18.4 s of setup, floored by indexing at 7.6 s | — | **~1%** | 2.9% | — | ? |
+| 5 | [Exact quantiles by single-rank partitions](../backlog/untried-ideas.md#inference-loading) | quantiles 6.47 s | **1.44–1.63x, measured** | **3.1–3.9%** | 3.9% | **high** | S |
+| 6 | [Direct shared-storage collation](../backlog/untried-ideas.md#inference-loading) | absent from the probe — see below | 0.40 ms/MiB over 26.9 GiB | **1.3–2.1%** | 2.1% | med | S |
+| 7 | [Cut model load](../inference/profiling/2026-09-22-kaggle-x4-startup-and-gpu-preparation.md#startup) | 18.4 s of setup, floored by indexing at 7.6 s | — | **~1%** | 2.9% | — | ? |
 | 8 | CUDA Graph around the fixed 64-image backbone chunk | main-process CPU 122.3 s | part of the launch cost | **~1%** | 3% | low | L |
 | 9 | `gc.freeze()` before fork, with per-worker RSS tracking | — | — | **~0%** | — | — | free |
 
-Ranks 4, 8 and 9 have no row in [candidates](../backlog/loading-speedup/candidates.md) yet; they are carried here until one of
+Ranks 4, 8 and 9 have no row in [candidates](../backlog/untried-ideas.md#inference-loading) yet; they are carried here until one of
 them earns a probe.
 
 ## Run rank 2 first, even though rank 1 is larger
@@ -136,4 +136,4 @@ NumPy 2.0.2 entering its SIMD quickselect dispatch only for a single requested r
 control behaved inconsistently, so the measurement is the evidence and the dispatch argument is not.
 
 This result contradicts the reason the quantile line was closed; see
-[closed](../backlog/loading-speedup/closed.md#closed-as-measured-regressions).
+[closed](../inference/profiling/loading-changes-rejected.md#closed-as-measured-regressions).

@@ -14,10 +14,10 @@ ideas:
     asymmetry does not accidentally dictate all exposure. Other planes retain the
     incumbent policy.
   precedents:
-  - docs/backlog/small-changes.md#asymmetric-coronal-draw
-  - docs/ongoing/peripheral-coverage.md#acquisition-geometry
+  - docs/backlog/untried-ideas.md#augmentation-sampling-and-intensity
+  - docs/data-preparation/peripheral-coverage.md#acquisition-geometry
   - docs/data-preparation/accurate-sampling-centers.md#cohort-wide-center-fit-and-plane-extents
-  - docs/validation/results/2026-09-19-relative-sampler-width-result.md
+  - docs/validation/results/sampling/2026-09-19-relative-sampler-width-result.md
   novelty: Existing untried proposal adopted into the triplet-sampling campaign at
     the user's request. Ownership of this experiment is now this campaign; the general-backlog
     entry remains a read-only provenance link, not a second scheduling location. Changes
@@ -157,11 +157,11 @@ ideas:
     one policy from the existing acquisition evidence; do not enumerate axial/coronal
     multipliers as a hyperparameter search.
   precedents:
-  - docs/backlog/small-changes.md#per-plane-width-ratios
-  - docs/ongoing/peripheral-coverage.md#what-is-settled-and-what-is-not
-  - docs/validation/results/2026-09-18-per-plane-sigma-cache.md
-  - docs/validation/results/2026-09-19-relative-sampler-width-result.md#training-versus-drawing
-  - docs/validation/results/2026-09-19-fold-ensembles-and-sigma-sweep.md
+  - docs/backlog/untried-ideas.md#pooling-and-the-attention-head
+  - docs/data-preparation/peripheral-coverage.md#what-is-settled-and-what-is-not
+  - docs/validation/results/sampling/2026-09-18-per-plane-sigma-cache.md
+  - docs/validation/results/sampling/2026-09-19-relative-sampler-width-result.md#training-versus-drawing
+  - docs/validation/results/validation-and-ensembles/2026-09-19-fold-ensembles-and-sigma-sweep.md
   novelty: Existing untried proposal adopted by this campaign, with its original general-backlog
     entry retained as read-only provenance. Relative plane shape is distinct from
     the trained common-factor sigma sweep. The campaign owns its execution; do not
@@ -325,7 +325,7 @@ ideas:
   - docs/data-preparation/physical-sampling/implemented-sampler.md
   - docs/data-preparation/physical-sampling/sampling-analysis-coverage-and-exposure.md
   - docs/history/triplet-budget-allocation.md
-  - docs/validation/results/2026-09-17-type-contribution.md
+  - docs/validation/results/pooling-and-attention/2026-09-17-type-contribution.md
   novelty: 'Every prior and queued sampling change acts inside one pool: widths (`sampling_sigma_fraction`
     sweeps), per-side widths (`coronal-side-relative-draw`), per-plane widths (`geometry-informed-plane-widths`),
     centres, or budgets. Nothing in the repository couples two pools. It is not an
@@ -498,9 +498,9 @@ ideas:
     sampling-without-replacement.'
   precedents:
   - docs/data-preparation/physical-sampling/implemented-sampler.md
-  - docs/ongoing/peripheral-coverage.md
+  - docs/data-preparation/peripheral-coverage.md
   - docs/data-preparation/physical-sampling/sampling-analysis-coverage-and-exposure.md
-  - docs/validation/results/2026-09-19-relative-sampler-width-result.md
+  - docs/validation/results/sampling/2026-09-19-relative-sampler-width-result.md
   novelty: 'The campaign names evolution across training as an axis and nothing in
     the repository touches it: the epoch enters the sampler only as a seed ingredient
     in `operation_seed` (sampling.py:65-69). Every prior sampler experiment changed
@@ -711,8 +711,8 @@ ideas:
     through-plane context at the same channel count.'
   precedents:
   - docs/data-preparation/physical-sampling/implemented-sampler.md
-  - docs/backlog/small-changes.md#augmentation-families
-  - docs/research/input-resolution.md
+  - docs/backlog/untried-ideas.md#augmentation-sampling-and-intensity
+  - docs/research/geometry-and-views/input-resolution.md
   - docs/data-preparation/current-preparation.md
   novelty: Every prior and queued experiment varies where triplets are placed; none
     varies what a triplet is. The closest repository precedent is the untried augmentation
@@ -996,11 +996,11 @@ ideas:
     choice by the existing `source_ranking` order so ties favour originals and newer
     retakes, as validation already does.'
   precedents:
-  - docs/backlog/small-changes.md#superseded-same-protocol-retakes
+  - docs/backlog/untried-ideas.md#augmentation-sampling-and-intensity
   - docs/history/triplet-budget-allocation.md
   - docs/data-preparation/physical-sampling/evaluation-tie-break-investigation.md
   - docs/data-preparation/physical-sampling/sampling-analysis-coverage-and-exposure.md
-  - docs/validation/results/2026-09-19-relative-sampler-width-result.md
+  - docs/validation/results/sampling/2026-09-19-relative-sampler-width-result.md
   novelty: This supplies the design that the closed budget-allocation investigation
     explicitly left open ("whether splitting a slot's own budget more evenly between
     its own series helps... Untested, no design yet"). It is not the rejected `repeated_series_share`,
@@ -1168,7 +1168,7 @@ ideas:
   precedents:
   - outputs/analysis/t/token-cache-20260917/README.md
   - docs/data-preparation/physical-sampling/implemented-sampler.md
-  - docs/validation/results/2026-09-19-relative-sampler-width-result.md
+  - docs/validation/results/sampling/2026-09-19-relative-sampler-width-result.md
   - docs/history/triplet-budget-allocation.md
   - Cranley and Patterson 1976, randomization of lattice rules as a shared shift u_i
     + r mod 1
@@ -1441,7 +1441,7 @@ ideas:
   precedents:
   - docs/history/triplet-budget-allocation.md
   - outputs/analysis/t/token-cache-20260917/README.md (scaled-allocation smoke table)
-  - docs/validation/results/2026-09-17-test-time-allocation.md
+  - docs/validation/results/sampling/2026-09-17-test-time-allocation.md
   - 'In-Context Multiple Instance Learning (arXiv 2606.06458): three-stage bag-size
     curriculum from [2,8] to [6,20] instances, with difficulty rising in bag size'
   - Bengio et al. 2009, curriculum learning
@@ -1952,7 +1952,7 @@ ideas:
   - cross-slot-band-interleaving (completed, inconclusive, delta -0.0017) - the same
     axis driven in the opposite direction; its completion finding 2 records complementarity
     as the favoured reading
-  - docs/validation/results/2026-09-19-relative-sampler-width-result.md - each model
+  - docs/validation/results/sampling/2026-09-19-relative-sampler-width-result.md - each model
     prefers the sampler it was trained under by about 0.0006, the matched-condition
     effect this exploits
   - run-level-stratified-jitter (accepted) - supplies the strata stream that must

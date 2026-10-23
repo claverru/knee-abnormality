@@ -2,12 +2,12 @@
 
 **Closed 2026-09-28, not worth it (user decision): a full training run on Kaggle took over three
 hours, about six times the local time, for the same result.** Tried from 2026-09-24 on branch `kaggle-training`
-to reproduce the `configs/training.yaml` fold-0 run of the time (`knee-geometry-merged-2`, ×4
+to reproduce the `configs/resnet50.yaml` fold-0 run of the time (`knee-geometry-merged-2`, ×4
 0.900955) on a Kaggle 2×T4 notebook without the local GPU.
 
 ## Setup
 
-A `scripts/pipeline/kaggle_train.py` launcher packaged the code, split, series image counts and
+A `scripts/pipeline/kaggle_train.py` (removed) launcher packaged the code, split, series image counts and
 label table into the private dataset `claverru/knee-kaggle-training` and pushed the notebook
 `claverru/knee-train-kaggle`. Only hardware settings changed from the local config: two T4s with
 DDP, batch 4 per device (same effective batch of 8), `16-mixed` precision (T4s have no BF16),
@@ -35,7 +35,7 @@ preparation on the GPU (four vCPUs) and 4 loader workers per rank.
   22 locally. Loading does not explain it (0.145 s per cold study on one local core, 0.083 s with a
   precomputed series index). Before the fixes, FP16 cuDNN setup for every new backbone batch shape
   (about 3.4 s per shape,
-  [measured for inference](../inference/2026-09-15-kaggle-inference-profiling.md#why-fp16-is-slower))
+  [measured for inference](../inference/profiling/2026-09-15-kaggle-inference-profiling.md#why-fp16-is-slower))
   was the likely cost, since MIL batches change shape almost every step; the completed run disabled
   cuDNN, so its speed is that of PyTorch's native convolution kernels on two T4s.
 

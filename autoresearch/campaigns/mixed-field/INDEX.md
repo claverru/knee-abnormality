@@ -7,7 +7,7 @@ instruction; no researcher idea was added.** Thirteen decided runs, one accepted
 `two-stream-paired`, finished inside the budget on its third build but its 140 mm stream stayed
 switched off, so it does not test paired views ([note](#two-stream-result)). Adopted on main
 after the public check: 120 mm on every series and middle-slice augmentation, not the contrast
-split ([result](../../../docs/validation/results/2026-10-01-mixed-field-campaign.md)). Feeds the model a wide 160 mm view beside a narrow one
+split ([result](../../../docs/validation/results/crops-and-views/2026-10-01-mixed-field-campaign.md)). Feeds the model a wide 160 mm view beside a narrow one
 (120 mm, or the incumbent's 140 mm) at the fixed 224 px input: ten forced seeds from
 configuration-only single-field yardsticks to two backbones reading every slice at both fields,
 then researcher follow-ups on whichever mechanisms helped.
@@ -40,7 +40,7 @@ then researcher follow-ups on whichever mechanisms helped.
 - **Monitor page:** `scripts.tools.serve_campaign_monitor --campaign mixed-field` on port 8765,
   served from `outputs/analysis/campaign-monitor/mixed-field`.
 - **Narrow field:** 120 mm for every seed, from the
-  [narrow-field check](../../../docs/research/input-resolution.md#what-a-narrow-field-cuts).
+  [narrow-field check](../../../docs/research/geometry-and-views/input-resolution.md#what-a-narrow-field-cuts).
 - **Not adopted elsewhere:** the `revisits` campaign's provisional adoptions (plane-contrast
   readouts, no anatomical bias) are not on `main` and are not part of this reference.
 

@@ -64,7 +64,7 @@ Stochastic depth stays 0 (the MambaVision-T and RadioDINO runs with 0.1 were not
 ## Varying image counts
 
 cuDNN plans depthwise convolutions once per unseen image count: ConvNeXt-T paid 4.3 s per new count
-until image counts were padded to multiples of 16 ([MambaVision backbone](../../../docs/modeling/mambavision-backbone.md#new-batch-sizes)).
+until image counts were padded to multiples of 16 ([MambaVision backbone](../../../docs/modeling/backbones/mambavision-backbone.md#new-batch-sizes)).
 PVTv2, FocalNet and RDNet have depthwise convolutions and no BatchNorm, so they pad the same way.
 Hiera has neither; HRNet has BatchNorm, so it is never zero-padded (the padded rows would enter its
 batch statistics).
@@ -74,9 +74,9 @@ batch statistics).
 Added at the user's request on 2026-10-15, after the start. `convnext_tiny.dinov3_lvd1689m`: 27.8M
 parameters, 96, 192, 384 and 768 channels at strides 4, 8, 16 and 32, LayerNorm only, depthwise
 convolutions, ImageNet mean and std, licence `dinov3-license`. Distilled from the DINOv3 7B teacher on
-LVD-1689M; second of 34 in the [backbone search](../../../docs/modeling/backbone-search.md) (0.904386),
+LVD-1689M; second of 34 in the [backbone search](../../../docs/modeling/backbones/backbone-search.md) (0.904386),
 and ×4 0.927235 at best on fold 0 on the older ReXNet-style recipe on 2026-10-03
-([backbone swaps](../../../docs/modeling/backbone-swaps.md)). Weight RMS (matrices and kernels): stem 0.0096,
+([backbone swaps](../../../docs/modeling/backbones/backbone-swaps.md)). Weight RMS (matrices and kernels): stem 0.0096,
 stages 0.0179, 0.0142, 0.0153 and 0.0159, flat but about 0.6 of the in12k ConvNeXt-T's (0.0208 stem,
 0.025 to 0.028); layer-scale gammas 0.49 in the first block to 3.06 in the last (0.78 to 2.52 in12k).
 
@@ -162,6 +162,6 @@ twelve-epoch incumbent (×4 0.938154 against 0.938816, 80% interval −0.0022 to
 |---|---|---:|---|
 | ResNet-50 | targets-and-inputs run 27 | 0.939634 | targets-and-inputs campaign |
 | MambaVision-T with the mask decoder | mambavision-t-combined-12-epochs | 0.937801 | MambaVision settings campaign |
-| Swin-T on the MambaVision recipe | 2026-10-14 | 0.937176 | docs/validation/results/2026-10-14-swin-t.md |
+| Swin-T on the MambaVision recipe | 2026-10-14 | 0.937176 | docs/validation/results/backbones/2026-10-14-swin-t.md |
 | MambaVision-T without the mask decoder | mamba-silver-fold-2 | 0.935160 | this campaign's reference |
 | RadioDINO-S/16, best | radiodino-settings, top-down warm-up | 0.929641 | radiodino-settings campaign |

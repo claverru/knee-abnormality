@@ -13,7 +13,7 @@ The reference and starting incumbent is `rn18-l2sp-no-confusion`
 ×4 0.928062, 0.943 public as S86), the `configs/training.yaml` recipe since 2026-09-30.
 
 This reopens the 2026-09-21 decision against a field-of-view change
-([input resolution](../../../docs/research/input-resolution.md#field-of-view-and-joint-position);
+([input resolution](../../../docs/research/geometry-and-views/input-resolution.md#field-of-view-and-joint-position);
 user, 2026-10-01). The fields were chosen from measured extent, not from a score sweep
 ([prior work](prior-work.md#geometry)).
 

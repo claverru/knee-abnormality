@@ -1,7 +1,7 @@
 # fastMRI joint training campaign: prior work
 
 Fold 3 of `all_5fold_scanner_v2`, seed 1110484336, one run per design. Setup and the full record
-of the first run: [fastMRI joint training](../../../docs/ongoing/fastmri-joint-training.md).
+of the first run: [fastMRI joint training](../../../docs/validation/results/teacher-student/INDEX.md).
 
 ## The reference
 
@@ -74,7 +74,7 @@ series, fields of 140 to 150 mm, and a second part that is 93% 1.5 T without sid
 ## L2-SP
 
 Adopted on 2026-09-30 on the ResNet-18 for unseen sites
-([result](../../../docs/validation/results/2026-09-30-rn18-l2sp-no-confusion.md),
+([result](../../../docs/validation/results/validation-and-ensembles/2026-09-30-rn18-l2sp-no-confusion.md),
 [campaign](../site-generalization/findings.md)): held-out sites +0.0009 to +0.0023 at ×4 over
 four measurements, seen sites and fold validation between −0.0010 and +0.0003; public 0.943
 against 0.941 on the sites-out split and 0.943 against 0.943 on full data. Halving either

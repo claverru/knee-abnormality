@@ -1,7 +1,7 @@
 # Triplet-sampling prior work
 
 Current reference: learned-strength-20260921, selected by the user on 2026-09-21;
-the campaign remains stopped. See [checkpoint closure](../../checkpoint-closure.md)
+the campaign remains stopped. See checkpoint closure (`autoresearch/checkpoint-closure.md`, removed)
 for source pins and state. Reference selections below retain historical provenance.
 
 Read the relevant source before proposing a related experiment. This is an evidence
@@ -17,23 +17,23 @@ deterministic validation draws. Nominal per-type budgets are 6/6/5/5/5/5, with a
 study-total floor of 26. Neither the floor nor the nominal sum establishes the
 realized cohort average. See the
 [implemented sampler](../../../docs/data-preparation/physical-sampling/implemented-sampler.md)
-and [recipe](../../../configs/training.yaml).
+and recipe (`configs/resnet50.yaml`, renamed from `configs/training.yaml` on 2026-10-14).
 
 Some older paragraphs still quote fraction 0.76. Use the current recipe and the
-[adopted result](../../../docs/validation/results/2026-09-19-relative-sampler-width-result.md)
+[adopted result](../../../docs/validation/results/sampling/2026-09-19-relative-sampler-width-result.md)
 for the starting implementation; retain older measurements under their actual setup.
 
 ## Evidence and previous ideas
 
 | Direction | Evidence status and implication | Source |
 |---|---|---|
-| Relative width and common-factor sigma sweeps | Implemented and trained; another scalar sweep needs a new reason. This does not settle distribution shape. | [Relative width](../../../docs/validation/results/2026-09-19-relative-sampler-width-result.md), [sweep](../../../docs/validation/results/2026-09-19-fold-ensembles-and-sigma-sweep.md) |
+| Relative width and common-factor sigma sweeps | Implemented and trained; another scalar sweep needs a new reason. This does not settle distribution shape. | [Relative width](../../../docs/validation/results/sampling/2026-09-19-relative-sampler-width-result.md), [sweep](../../../docs/validation/results/validation-and-ensembles/2026-09-19-fold-ensembles-and-sigma-sweep.md) |
 | Peripheral evidence and acquisition asymmetry | Diagnostic evidence; tied to historical samplers and observational caches. | [Peripheral coverage](../../../docs/data-preparation/peripheral-coverage.md) |
 | Per-type centre offsets | Rejected from the importance-map analysis without a training run; do not describe as a trained negative. | [Spatial importance map](../../../docs/data-preparation/peripheral-coverage.md#spatial-importance-map) |
-| Per-plane width effects | Cache-only inference results; these did not predict the training-versus-drawing decomposition. | [Cache result](../../../docs/validation/results/2026-09-18-per-plane-sigma-cache.md) |
+| Per-plane width effects | Cache-only inference results; these did not predict the training-versus-drawing decomposition. | [Cache result](../../../docs/validation/results/sampling/2026-09-18-per-plane-sigma-cache.md) |
 | Fixed-total reallocations, random type allocation, repeated-series share | Previous negative or tied implementations; inspect the exact allocation and recipe before revisiting. | [Closed allocation investigation](../../../docs/history/triplet-budget-allocation.md) |
 | Per-plane ratios and asymmetric coronal draw | Imported into this campaign as `geometry-informed-plane-widths` and `coronal-side-relative-draw`; both trained 2026-09-19 and inconclusive (+0.00041 and −0.00130). This campaign owns their execution. The general backlog no longer carries them, and the repository now records the outcome in the sampler-shape document. Use one justified plane policy, not a multiplier sweep. | [Sampler shape](../../../docs/data-preparation/peripheral-coverage.md#what-is-settled-and-what-is-not), [geometry](../../../docs/data-preparation/peripheral-coverage.md#acquisition-geometry) |
-| Side-conditioned sagittal sampling | Existing blocked proposal: the importance map needs a mirrored re-export and laterality plumbing. | [Position and knee side](../../../docs/backlog/big-bets.md#position-and-knee-side) |
+| Side-conditioned sagittal sampling | Existing blocked proposal: the importance map needs a mirrored re-export and laterality plumbing. | [Position and knee side](../../../docs/backlog/untried-ideas.md#position-and-knee-side) |
 | Run-level stratified jitter | Rejected for adoption on 2026-09-20 after inconclusive confirmation; original provisional acceptance withdrawn. Do not repeat unchanged. | [Decision and evidence below](#run-level-stratified-jitter-rejected-for-adoption) |
 
 ## Run-level stratified jitter: rejected for adoption
@@ -85,7 +85,7 @@ state snapshot and the parked follow-ups. The corresponding entry in
 [campaign findings](findings.md#user-reject-run-level-stratified-jitter-20260920t093252z-093b47be)
 supersedes earlier adoption guidance without deleting it. Full model and bootstrap
 evidence remains in the
-[experiment result](../../../docs/validation/results/2026-09-20-stratified-sampling-promotion.md).
+[experiment result](../../../docs/validation/results/sampling/2026-09-20-stratified-sampling-promotion.md).
 
 ## Preparation scope amendment
 
@@ -138,7 +138,7 @@ They differ in source as well as seed, so their difference is not a pure seed-no
 estimate. The older run also required prediction and timing handling in its saved
 comparison; do not silently treat its artifacts as interchangeable.
 
-The [queue result](../../../docs/validation/results/2026-09-19-untried-hyperparameter-queue.md)
+The [queue result](../../../docs/validation/results/campaigns-and-queues/2026-09-19-untried-hyperparameter-queue.md)
 records those limitations and the paired bootstrap comparisons. Its mixed-variant
 spread is not a measured training-seed variance. Its discussion of more epochs does
 not authorize increasing this campaign's compute budget.

@@ -15,7 +15,7 @@ Unresolved concerns:
 Evidence:
 - outputs/analysis/r/robust-center-rescore-20260923/result.json: rescued-study count and inference-only macro deltas and intervals.
 - outputs/analysis/m/midline-vs-centre-20260923/result.md, ‘all’ and ‘fold 0’: fitted-centre versus current midline measurements.
-- docs/research/series-filtering-signals.md:122-165: bilateral series audit, reports, and unresolved study-level label assignment.
+- docs/research/data-and-validation/series-filtering-signals/INDEX.md:122-165: bilateral series audit, reports, and unresolved study-level label assignment.
 - outputs/analysis/s/side-mask-vs-k05-clean/comparison.json, paired_report_group_bootstrap.intervals: meniscus, OA and other-eight deltas.
 - outputs/analysis/k/knee-rotation-survey-20260923/result.md, ‘Distribution’ and ‘mm translation’: measured rotation and its prescription caveat.
 - outputs/analysis/t/two-peak-sagittal-gate-20260923/result.md: curve-density method, reproduction check and ×4 gate.

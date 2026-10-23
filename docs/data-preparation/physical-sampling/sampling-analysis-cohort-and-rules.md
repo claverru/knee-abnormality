@@ -37,7 +37,7 @@ The protocol command remains active. Reproduce the original geometric comparison
 only inside its archived source/runtime with its recorded original configuration:
 
 ```bash
-rtk proxy uv run --locked python -m scripts.adhoc.audit_sampling_protocols --output-dir outputs/analysis/physical-sampling-new/protocols
+uv run --locked python -m scripts.adhoc.audit_sampling_protocols --output-dir outputs/analysis/physical-sampling-new/protocols
 ```
 
 The protocol command refuses an existing output directory.

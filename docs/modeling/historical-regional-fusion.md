@@ -6,9 +6,9 @@ epoch 8 at 0.88635162 AUC. Its regional tokens received 4.94% mean final attenti
 and omitting them reduced AUC by 0.00069668 on 904 validation studies. Its
 independently trained advantage over `crop140mm` was only 0.00022998 AUC;
 these single-fold results do not establish repeatability. See the
-[recorded diagnosis](../validation/results/2026-09-13-per-plane-fusion-usage-diagnosis.md),
-[earlier runtime rejection](../validation/results/2026-09-12-spatial-fusion-engineering-result.md)
-and [archived sources](../history/regional-sources/README.md).
+[recorded diagnosis](../validation/results/pooling-and-attention/2026-09-13-per-plane-fusion-usage-diagnosis.md),
+[earlier runtime rejection](../validation/results/sampling/2026-09-12-spatial-fusion-engineering-result.md)
+and [archived sources](../history/sources/regional/README.md).
 The max-pooling comparison selected 0.87907846 AUC versus 0.88416888 for its
 average-pooling reference; it did not justify promoting max pooling. Regional
 bandwidth, finer regional grids and adaptive queries are retired.
@@ -35,7 +35,7 @@ all sampled regional queries; plane coverage is 89.90% axial, 88.95% coronal
 and 92.51% sagittal, counting rejected centers as uncovered. These describe
 this pre-augmentation sample, not training-wide coverage or model accuracy.
 
-The [measurement record](../../outputs/analysis/f/fusion-coverage-20260913/results.json)
+The measurement record (`outputs/analysis/f/fusion-coverage-20260913/results.json`, deleted)
 preserves the effective config, split/label provenance, input and source hashes,
 and quantiles. Its sibling `inputs.json`, `nearest_anchors.parquet` and `source/`
 preserve selected paths, geometry hashes, per-query distances and executable
@@ -44,5 +44,5 @@ sources. Training membership SHA-256 is
 Reproduction requires the original analysis source bundle and configuration.
 The coverage source snapshot (`f076a09:docs/history/regional-sources/measure_fusion_coverage.py.txt`)
 is historical; its 18-mm radius has no role in the current spatial-token model.
-The [regional usage results](../validation/results/2026-09-13-per-plane-fusion-usage-diagnosis.md)
+The [regional usage results](../validation/results/pooling-and-attention/2026-09-13-per-plane-fusion-usage-diagnosis.md)
 remain historical evidence, with repeatability and deployment cost unresolved.

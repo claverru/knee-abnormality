@@ -15,8 +15,8 @@ ideas:
       T1/PD with fewer than one triplet or any group above its capacity. Study and run
       totals equal the reference exactly.
     precedents:
-      - docs/validation/results/2026-09-17-test-time-allocation.md (axial T1/PD removal cost nothing on macro, but dropping it entirely cost MCL and fracture about 0.008 on the confirm half)
-      - docs/validation/results/2026-09-18-overnight-results.md (repeated_series_share moved triplets from other types into repeated slots, topped fold 0 and lost publicly)
+      - docs/validation/results/sampling/2026-09-17-test-time-allocation.md (axial T1/PD removal cost nothing on macro, but dropping it entirely cost MCL and fracture about 0.008 on the confirm half)
+      - docs/validation/results/campaigns-and-queues/2026-09-18-overnight-results.md (repeated_series_share moved triplets from other types into repeated slots, topped fold 0 and lost publicly)
     novelty: >-
       A zero-sum transfer from one measured low-value type into the oblique groups only,
       unlike repeated_series_share's reallocation from all types into any repeated series.

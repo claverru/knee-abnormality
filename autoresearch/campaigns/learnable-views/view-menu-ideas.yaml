@@ -47,7 +47,7 @@ ideas:
     (the frozen-view path and its label-bias logging).'
   - 'two-views-every-type, sagittal-fluid-ordered-view-widths and sagittal-fluid-evidence-conditioned-routing
     (this campaign): two views per type with slices split 3 + 2; frozen sources under outputs/autoresearch/learnable-views/experiments.'
-  - 'smart-crops campaign (docs/validation/results/2026-10-02-smart-crops-campaign.md): 84 mm T1/PD
+  - 'smart-crops campaign (docs/validation/results/crops-and-views/2026-10-02-smart-crops-campaign.md): 84 mm T1/PD
     and 93.33 mm fluid adopted over 120 mm, one run each.'
   novelty: First run that trains every size equally and reads the preferred sizes from the label bias
     instead of learning or hand-picking a width.

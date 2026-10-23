@@ -1,7 +1,7 @@
 # Shared-loss prior work
 
 Current reference: learned-strength-20260921, selected by the user on 2026-09-21;
-the campaign remains stopped. See [checkpoint closure](../../checkpoint-closure.md)
+the campaign remains stopped. See checkpoint closure (`autoresearch/checkpoint-closure.md`, removed)
 for source pins and state. Reference selections below retain historical provenance.
 
 Campaign prepared on 2026-09-20; no loss candidate has been implemented or trained
@@ -16,7 +16,7 @@ counts multiply each observed BCE cell according to the target's `>= 0.5` group;
 the target itself remains soft. The current implementation is in
 [lightning.py](../../../src/knee_abnormality/training/lightning.py); the measured
 baseline and its limitations are recorded in the
-[balanced-BCE result](../../../docs/validation/results/2026-09-19-balanced-bce-result.md).
+[balanced-BCE result](../../../docs/validation/results/labels-and-losses/2026-09-19-balanced-bce-result.md).
 Use that stronger objective as the control, not historical ordinary BCE.
 
 The initial reference is control B from
@@ -39,15 +39,15 @@ campaign's original 1,785-second ceiling or its state.
 
 | Direction | Evidence and campaign treatment | Repository source |
 |---|---|---|
-| Fixed class-balanced BCE | Already adopted; start here. Its measured gain does not establish that stronger weighting is always better. | [Balanced-BCE result](../../../docs/validation/results/2026-09-19-balanced-bce-result.md) |
+| Fixed class-balanced BCE | Already adopted; start here. Its measured gain does not establish that stronger weighting is always better. | [Balanced-BCE result](../../../docs/validation/results/labels-and-losses/2026-09-19-balanced-bce-result.md) |
 | Shared BCE plus ranking | Imported as `shared-bce-ranking`; the completed comparison was inconclusive. This campaign owns its execution and result. | [Ranking-aware loss](findings.md#completion-20260920t121537z-5b39b418) |
-| Shared focal objective | Proposed here as `shared-balanced-focal`. External ACL/MCL results motivate objective exploration but do not establish a macro gain or the winning shared loss. | [Per-label research motivation](../../../docs/research/per-label-losses.md#trusted-motivation) |
-| Tempered class weights | Import only the objective-weighting portion as `shared-tempered-balance`. Study sampling and batch composition remain outside this campaign. | [Weighting and sampling](../../../docs/backlog/small-changes.md#bce-weighting-and-study-sampling) |
-| Loss schedule | `shared-delayed-ranking` applies the same within-run schedule to all labels. It is not the proposed frozen-head screen, checkpoint continuation, or compositional AUC algorithm. | [Loss extensions](../../../docs/research/per-label-losses.md#candidate-losses-and-extensions) |
-| Per-label selection, classifier banks and mixtures | Explicitly excluded. Do not import the per-label big bet, create twelve variants, or recover it through label-specific coefficients. Its existing plan is not owned by this campaign. | [Per-label plan](../../../docs/backlog/big-bets.md#per-label-loss-selection-and-learned-mixtures) |
-| Asymmetric loss | The survey records a poor external result, not a local matched-control measurement. Revisit only with a material change or new evidence; do not seed it merely to fill the queue. | [Objective survey](../../../docs/research/auc_loss_approaches.md) |
+| Shared focal objective | Proposed here as `shared-balanced-focal`. External ACL/MCL results motivate objective exploration but do not establish a macro gain or the winning shared loss. | [Per-label research motivation](../../../docs/research/training-objectives/per-label-losses.md#trusted-motivation) |
+| Tempered class weights | Import only the objective-weighting portion as `shared-tempered-balance`. Study sampling and batch composition remain outside this campaign. | [Weighting and sampling](../../../docs/backlog/untried-ideas.md#supervision-and-labels) |
+| Loss schedule | `shared-delayed-ranking` applies the same within-run schedule to all labels. It is not the proposed frozen-head screen, checkpoint continuation, or compositional AUC algorithm. | [Loss extensions](../../../docs/research/training-objectives/per-label-losses.md#candidate-losses-and-extensions) |
+| Per-label selection, classifier banks and mixtures | Explicitly excluded. Do not import the per-label big bet, create twelve variants, or recover it through label-specific coefficients. Its existing plan is not owned by this campaign. | [Per-label plan](../../../docs/backlog/untried-ideas.md#supervision-and-labels) |
+| Asymmetric loss | The survey records a poor external result, not a local matched-control measurement. Revisit only with a material change or new evidence; do not seed it merely to fill the queue. | [Objective survey](../../../docs/research/training-objectives/auc_loss_approaches.md) |
 
-The [objective survey](../../../docs/research/auc_loss_approaches.md) is the main
+The [objective survey](../../../docs/research/training-objectives/auc_loss_approaches.md) is the main
 research map. Its historical priority order is not an experimental result. Future
 ideas may include other shared ranking surrogates or training-only memory pools
 when the evidence justifies them. Dedicated optimizer replacements, extra data
@@ -59,7 +59,7 @@ mixture coefficients with the same weighted loss is not evidence of better AUC.
 ## Pair coverage and interpretation
 
 Microbatches contain eight studies. The existing
-[pair calculation](../../../docs/research/per-label-losses.md#ranking-needs-usable-study-pairs)
+[pair calculation](../../../docs/research/training-objectives/per-label-losses.md#ranking-needs-usable-study-pairs)
 estimates no binary positive/negative pair in 15.2% of ACL batches, 26.3% of MCL
 batches, and 55.0% of fracture batches under uniform study sampling. These are
 analytical expectations from saved training counts, not observed frequencies.

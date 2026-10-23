@@ -124,7 +124,7 @@ features: 0.035 to 0.040, against 0.014 on the ResNet-50.
 |---|---|---|---:|---|
 | Backbone rate | ConvNeXt-Tiny 2e-4 flat with stochastic depth 0.1, 16 epochs | fold 0, 2026-10-04 | −0.0048 against 1e-4 | ConvNeXt line notes |
 | Stage-wise rate decay | ConvNeXt-Tiny 1e-4 with 0.7 per stage, stochastic depth 0.1, late anchor 0.0001 | fold 3 joint, 2026-10-13 | ×4 0.933246 against the ResNet-50 joint 0.930745 | fastMRI worktree, `configs/convnext-tiny-tuned.yaml` |
-| Rerun distance | ResNet-50 recipe twice on fold 2 | targets-and-inputs | 0.0010 at ×4, 0.0013 at ×1 | `docs/validation/results/2026-10-13-targets-and-inputs-campaign.md` |
+| Rerun distance | ResNet-50 recipe twice on fold 2 | targets-and-inputs | 0.0010 at ×4, 0.0013 at ×1 | `docs/validation/results/campaigns-and-queues/2026-10-13-targets-and-inputs-campaign.md` |
 | Authors' fine-tuning rate | MambaVision detection and segmentation at 1e-4 | none here | | recalled from the paper, not rechecked |
 
 The ConvNeXt-Tiny rows are another model and, for the second, another fold and training set: they

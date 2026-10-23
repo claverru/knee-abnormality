@@ -1,7 +1,7 @@
 # RadImageNet ResNet-18 prior work
 
 Fold 0 of `all_5fold_scanner_v2`, `rebuild_state_v2` labels, seed 1533697213 unless noted. Code:
-branch `radimagenet` ([ongoing doc](../../../docs/ongoing/radimagenet-backbone.md) once merged).
+branch `radimagenet` ([ongoing doc](../../../docs/modeling/backbones/resnet-radimagenet-backbones.md) once merged).
 
 ## Precedent table
 

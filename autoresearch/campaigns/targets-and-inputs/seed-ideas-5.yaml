@@ -16,7 +16,7 @@ ideas:
     slices (the shared_slice_view buffer is all false), so the gates that open that view to the
     menisci, the OA labels and ACL have nothing to act on.
   precedents:
-  - 'docs/validation/results/2026-10-12-soft-tissue-reads-and-rn50-input-sampling.md: the view on both backbones.'
+  - 'docs/validation/results/campaigns-and-queues/2026-10-12-soft-tissue-reads-and-rn50-input-sampling.md: the view on both backbones.'
   - 'autoresearch/campaigns/soft-tissue-reads/run-notes.md, ResNet-18 against ResNet-50: the cell read and detail view, +0.0013 against +0.00004.'
   novelty: First removal of the view alone on the ResNet-50.
   coverage: Every study with a sagittal fluid series; the menisci, the OA labels and ACL read it.
@@ -54,7 +54,7 @@ ideas:
     else reads it.
   precedents:
   - 'autoresearch/campaigns/fixes-and-removals/seed-ideas-3.yaml, detail-view-embedding-off: the seed that never ran.'
-  - 'docs/validation/results/2026-10-02-smart-crops-campaign.md: the views adopted with the embedding in place.'
+  - 'docs/validation/results/crops-and-views/2026-10-02-smart-crops-campaign.md: the views adopted with the embedding in place.'
   novelty: First removal of the embedding.
   coverage: The tokens of every coronal and sagittal view.
   exploitation: >-
@@ -83,7 +83,7 @@ ideas:
     In configs/training.yaml, data.gin_augmentation.probability becomes 0.0 (it is 0.3). Nothing
     else changes.
   precedents:
-  - 'docs/validation/results/2026-09-26-augmentation-campaign.md: the half stack adopted as a bundle.'
+  - 'docs/validation/results/campaigns-and-queues/2026-09-26-augmentation-campaign.md: the half stack adopted as a bundle.'
   - 'The seeds intensity-augmentation-off and noise-augmentation-off of this campaign: the same question for two older parts.'
   novelty: First removal of GIN alone.
   coverage: 30% of training images.
@@ -111,7 +111,7 @@ ideas:
     In configs/training.yaml, data.resolution_augmentation.probability becomes 0.0 (it is 0.25).
     Nothing else changes.
   precedents:
-  - 'docs/validation/results/2026-09-26-augmentation-campaign.md: the half stack adopted as a bundle.'
+  - 'docs/validation/results/campaigns-and-queues/2026-09-26-augmentation-campaign.md: the half stack adopted as a bundle.'
   novelty: First removal of the degradation alone.
   coverage: 25% of training images.
   exploitation: >-

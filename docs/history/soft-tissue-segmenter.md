@@ -9,7 +9,7 @@ studies on fold 2). Worktree `knee-abnormality-soft-tissue-segmenter`, branch
 `scripts/adhoc/soft_tissue_segmenter/` (archived), run with the
 segmenter environment under `~/.cache/knee-segmenters` (`headers.py` and `sample_groups.py` with
 the repository's). Earlier segmenter benchmarks: [view-pose studies, soft-tissue
-segmenters](../research/view-pose-studies.md#3-soft-tissue-segmenters-back).
+segmenters](../research/geometry-and-views/view-pose-studies/INDEX.md).
 
 ## Status
 
@@ -48,7 +48,7 @@ Zero-padding is a no-op: nnU-Net crops zero borders before its whole-volume z-sc
 **What separates the paired cases is the pulse sequence.** PD TSE FS at TE 9 and 35 to 36 ms:
 menisci Dice 0.28 to 0.71; PD FS at TE 42 to 44 ms: 0.00 to 0.09; T2 TIRM (STIR, TE 74 to 79 ms,
 9 of the 19) and T2 FS BLADE: 0. The TE 9 ms case matches the DESS masks closely
-([drawing](../../outputs/analysis/s/soft-tissue-segmenters/2d-vs-dess/tissues_pd_fs_te9.png);
+(drawing (`outputs/analysis/s/soft-tissue-segmenters/2d-vs-dess/tissues_pd_fs_te9.png`, deleted);
 side-by-side images: `dess_vs_2d_sagittal_fs.png` in the same folder). The DESS site is
 unrepresentative: STIR is 15 of 4,667 sagittal FS series overall.
 

@@ -2,10 +2,10 @@
 
 | Read when | Document |
 |---|---|
-| Checking series exclusions, crop preparation, overlapping triplets and retries | [Current preparation and overlapping triplets](current-preparation.md) |
+| Checking the final preparation recipe (120 mm field, per-type views, middle-slice channels), series exclusions, overlapping triplets and retries | [Final preparation and overlapping triplets](current-preparation.md) |
 | Downloading and extracting competition images | [Downloading and extracting the images](downloading-and-extracting-images.md) |
 | Checking the DICOM data contract and decoding issues | [Public data contract and decoding](public-data-contract-and-decoding.md) |
-| Reviewing unverified preprocessing ideas | [Unverified preprocessing notes and open questions](unverified-preprocessing-notes.md) |
+| Reading what competitors reported about preprocessing (unverified) and how this pipeline answers their open questions | [Competitor-reported preprocessing notes](unverified-preprocessing-notes.md) |
 | Tracing field-of-view decisions | [Field-of-view selection history](field-of-view-selection-history.md) |
 | Choosing plane/fluid spacing from the smart-crops results, acquired detail and disease crop overlays | [Plane and fluid spacing review](plane-fluid-spacing-review.md) |
 | Generating augmentation previews | [Preview augmentations](preview-augmentations.md) |

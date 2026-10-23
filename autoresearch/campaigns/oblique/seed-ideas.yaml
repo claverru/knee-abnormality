@@ -17,10 +17,10 @@ ideas:
       from oblique_split; carry it as one PreparedSeries field through collate_studies to
       the model.
     precedents:
-      - docs/validation/results/2026-09-22-oblique-groups-result.md (reference run; per-label localization)
+      - docs/validation/results/sampling/2026-09-22-oblique-groups-result.md (reference run; per-label localization)
       - outputs/analysis/a/acquisition-geometry-20260922/protocol_prior.txt (an oblique flag added after training gave -0.0003 to -0.0014, so the gain must come from routing inside the model, not new information)
-      - docs/validation/results/2026-09-14-knee-side-embedding-result.md (a knee-side embedding tied; it marked patient geometry, not acquisition protocol)
-      - docs/backlog/small-changes.md#oblique-embedding (transferred general-backlog entry)
+      - docs/validation/results/pooling-and-attention/2026-09-14-knee-side-embedding-result.md (a knee-side embedding tied; it marked patient geometry, not acquisition protocol)
+      - docs/backlog/untried-ideas.md#position-and-knee-side (transferred general-backlog entry)
     novelty: >-
       The oblique groups exist since 2026-09-22 and no representation change has been
       tried for them. Unlike the retired knee-side and 3D embeddings, it marks how a view
@@ -70,9 +70,9 @@ ideas:
       training: whether ACL moves attention mass to the oblique groups.
     precedents:
       - autoresearch/anatomical-attention.md (learned family strengths adopted, +0.002331)
-      - docs/validation/results/2026-09-17-plane-contrast-importance.md (label-specific type dependence)
-      - docs/validation/results/2026-09-17-test-time-allocation.md (removal costs and value curves by type)
-      - docs/validation/results/2026-09-15-attention-prior-result.md (a fixed spatial prior regressed -0.002177; this one is learned from zero)
+      - docs/validation/results/pooling-and-attention/2026-09-17-plane-contrast-importance.md (label-specific type dependence)
+      - docs/validation/results/sampling/2026-09-17-test-time-allocation.md (removal costs and value curves by type)
+      - docs/validation/results/pooling-and-attention/2026-09-15-attention-prior-result.md (a fixed spatial prior regressed -0.002177; this one is learned from zero)
     novelty: >-
       No view-level attention bias has been tried. The general backlog's plane/contrast
       readouts and adapters act on features, not on attention mass.
@@ -114,8 +114,8 @@ ideas:
       residual, so their predictions are unchanged at initialization and are affected only
       through shared training.
     precedents:
-      - docs/backlog/small-changes.md#planecontrast-specific-readouts (general per-type readouts, untested)
-      - docs/validation/results/2026-09-18-overnight-results.md (residual_readout, a per-target MLP on the same pooled vector, -0.0005; different mechanism)
+      - docs/backlog/untried-ideas.md#pooling-and-the-attention-head (general per-type readouts, untested)
+      - docs/validation/results/campaigns-and-queues/2026-09-18-overnight-results.md (residual_readout, a per-target MLP on the same pooled vector, -0.0005; different mechanism)
       - autoresearch/campaigns/oblique/prior-work.md#label-profile-of-their-studies
     novelty: >-
       A dedicated evidence path for one acquisition kind; the rejected residual readout
@@ -156,7 +156,7 @@ ideas:
       zero.
     precedents:
       - outputs/analysis/a/acquisition-geometry-20260922/oblique_axes.txt (rotation axes of each oblique family)
-      - docs/backlog/big-bets.md#3d-embedding-training-time-effect (a patient-position 3D embedding was ignored at inference)
+      - docs/backlog/untried-ideas.md#position-and-knee-side (a patient-position 3D embedding was ignored at inference)
       - docs/data-preparation/reflection-geometry-and-previews.md (normal and side conventions)
     novelty: >-
       Encodes how a view cuts the anatomy, not where a token is; it also reaches the 10-20
@@ -200,8 +200,8 @@ ideas:
       and run totals equal the reference exactly.
     precedents:
       - outputs/analysis/a/acquisition-geometry-20260922/oblique_reach.txt (windows and run coverage per group)
-      - docs/validation/results/2026-09-17-test-time-allocation.md#repeated-series-in-one-slot (second-series triplets help on frozen models)
-      - docs/validation/results/2026-09-18-overnight-results.md (repeated_series_share took triplets from other types and lost publicly; this split stays inside the slot)
+      - docs/validation/results/sampling/2026-09-17-test-time-allocation.md#repeated-series-in-one-slot (second-series triplets help on frozen models)
+      - docs/validation/results/campaigns-and-queues/2026-09-18-overnight-results.md (repeated_series_share took triplets from other types and lost publicly; this split stays inside the slot)
     novelty: >-
       The first zero-sum split between the two groups of one slot; the reference and
       repeated_series_share both changed slot totals.

@@ -1,14 +1,14 @@
 # Fixes-and-removals prior work
 
 What the 2026-10-05 audit of `ca0f91c` found and what was measured the same day. Full tables are
-in the [code-audit measurements](../../../docs/validation/results/2026-10-05-code-audit-measurements.md).
+in the [code-audit measurements](../../../docs/validation/results/campaigns-and-queues/2026-10-05-code-audit-measurements.md).
 
 ## Precedents
 
 | ID | Mechanism | Setting | Run or measurement | Macro delta | Source |
 |---|---|---|---|---|---|
 | F01 | Reflection TTA with `view_to_wide @ F` (the training reflection's convention) | Five S106 ResNet-50 children, pooled out of fold, ×6, τ 0.8 | `outputs/analysis/t/tta-detail-coordinates-20261005b` | +0.000024 (95% [−0.000015, +0.000065]) | code-audit measurements, F01 |
-| F02 | Contrast mixing off | ResNet-18 fold 3, 2026-09-27, before the 84/93 mm views | `08-contrast-mixing-off` | −0.0013 ×1, −0.0025 ×4 | `docs/validation/results/2026-09-27-b3-overnight-queue.md` |
+| F02 | Contrast mixing off | ResNet-18 fold 3, 2026-09-27, before the 84/93 mm views | `08-contrast-mixing-off` | −0.0013 ×1, −0.0025 ×4 | `docs/validation/results/campaigns-and-queues/2026-09-27-b3-overnight-queue.md` |
 
 ## Measured and closed: do not propose
 

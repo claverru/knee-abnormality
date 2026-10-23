@@ -13,7 +13,7 @@ CoAtNet a supported alternative. The three slices per input, the 256-wide projec
 The retired diagrams are elsewhere:
 
 - **Crop selection and learned zoom:** the
-  [historical crop-selection sources](../history/crop-selection-sources/README.md).
+  [historical crop-selection sources](../history/sources/crop-selection/README.md).
 - **Token graph:** the `00-baseline` run archive and the [model lineage](../history/model-lineage.md#retired-token-graph).
 - **Historical 1C:** it changes only the readout and classifier grouping, described in
   [modeling](retired-side-and-compartment-variants.md#historical-disease-sharing).

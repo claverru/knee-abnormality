@@ -77,7 +77,7 @@ without teachers (S142) and 0.960 for the 0.5-share child of the earlier recipe 
 | A Baker's-only 120 mm view | ResNet-18 | Baker's +0.0023, macro level | `docs/validation/results` |
 | Axial at 130 and 140 mm against 120 mm | ResNet-18 | level | `docs/validation/results` |
 | Contrast mixing with an aligned donor | ResNet-18 | −0.0008; aligned and feathered −0.0011; mixing off −0.0025 | fixes-and-removals, F02 |
-| Centred token grid at 257 px (9 by 9 and inner 7 by 7) | ResNet-18 | −0.0004 and −0.0005, public 0.954 = 0.954, 1.2 of the time | `docs/validation/results/2026-10-08-token-grid-alignment.md` |
+| Centred token grid at 257 px (9 by 9 and inner 7 by 7) | ResNet-18 | −0.0004 and −0.0005, public 0.954 = 0.954, 1.2 of the time | `docs/validation/results/crops-and-views/2026-10-08-token-grid-alignment.md` |
 | Centred token grid at 225 px | ResNet-18 | −0.0024, cause not established | same |
 
 ## The token grid at 224 px

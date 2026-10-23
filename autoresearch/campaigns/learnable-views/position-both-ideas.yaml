@@ -29,7 +29,7 @@ ideas:
     embeddings, was worth about zero and was removed (S21, same public score without it); it used
     the computed centre as a fixed input and raw rather than side-normalized coordinates.
   - 'near-misses #6, side-normalized 3D position in place of 1D and 2D, computed centre, ReXNet recipe:
-    +0.0008 hard, -0.0006 soft, PF OA +0.0061; rejected (docs/validation/results/2026-09-25-near-misses-campaign.md).'
+    +0.0008 hard, -0.0006 soft, PF OA +0.0061; rejected (docs/validation/results/campaigns-and-queues/2026-09-25-near-misses-campaign.md).'
   novelty: First run with the side-normalized 3D position from a learned centre beside the 1D and
     2D embeddings; completes the two-by-two with learned-centre-fit and knee-frame-3d-position.
   coverage: Every token of every study; the full 3D branch for studies with an accepted fit and a

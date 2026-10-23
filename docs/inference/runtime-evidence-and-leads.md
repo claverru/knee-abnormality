@@ -1,4 +1,4 @@
-# Unverified runtime evidence and efficiency leads
+# Competitor-reported runtime evidence and efficiency leads (unverified)
 
 ## Unverified submission results
 
@@ -54,17 +54,16 @@ batch sizes, numerical-equivalence checks, or stable hardware conditions.
 Reported training durations and backbone choices are in
 [modeling](../modeling/unverified-modeling-notes.md#unverified-model-structure).
 
-## Remaining efficiency questions and historical context
+## Efficiency questions left open by these sources
 
-Whether the public board depends on selected submissions was an open question in
-earlier notes; it is answered in the
+Whether the public board depends on selected submissions is answered in the
 [efficiency leaderboard](efficiency-leaderboard.md), which also holds our standing
 and the rate the formula sets. Final prize eligibility follows the
 [official requirements above](submission-requirements-and-output-contract.md#verified-submission-requirements).
 
 TPU eligibility, hardware normalization, and medal eligibility were not resolved
-by the sources reviewed. Verify these details on the official competition pages
-before choosing a strategy.
+by the sources reviewed. The code requirements list only CPU and GPU notebooks
+([requirements](submission-requirements-and-output-contract.md#verified-submission-requirements)).
 
 The five-minute claim recurred on 2026-09-17: the same competitor repeats it for
 a single-fold single model at 0.949, says read time is still 60–70% of that
@@ -74,7 +73,7 @@ is still a self-report without a linked run, but it is no longer isolated.
 ## Techniques from the public two-T4 notebook (2026-09-18)
 
 Downloaded source of [jiweiliu's fast 2×T4 inference notebook](https://www.kaggle.com/code/jiweiliu/rsna-knee-fast-2xt4-inference)
-(kernel `134262775`, [manifest](../research/public-notebook-sources.json)), a
+(kernel `134262775`, [manifest](../research/competition-and-prior-art/public-notebook-sources.json)), a
 re-engineering of the public 0.941 blend. Its timings are the author's, on a
 dual-V100 proxy over 58- and 144-study gates, for a blend of about 30 members,
 so they do not transfer to our single model; the mechanisms do.
@@ -103,7 +102,7 @@ workers per GPU, on ~76 MB studies, and read it as a bandwidth ceiling.
 Our own measurements agree on the conclusion and disagree on the cause: the
 frame stage runs at 53–62% of a measured **510 MB/s** ceiling on Kaggle and the
 box is 98.2% busy at 0.7% iowait with 91.3% of CPU in the loader workers
-([attribution](../backlog/loading-speedup/attribution.md#the-model-that-replaces-the-old-ranking)).
+([attribution](profiling/loading-cost-attribution.md#the-model-that-replaces-the-old-ranking)).
 Their plateau across worker counts is consistent with CPU saturation rather than
 storage bandwidth. Either way the lever is reading fewer bytes per study, not
 reading them faster.

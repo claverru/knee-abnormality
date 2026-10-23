@@ -31,7 +31,7 @@ ideas:
     Validation, prediction and Kaggle inference run the same backbone. No option and no config
     field.
   precedents:
-  - 'docs/ongoing/radimagenet-backbone.md: how the Refined-RadImageNet weights are loaded.'
+  - 'docs/modeling/backbones/resnet-radimagenet-backbones.md: how the Refined-RadImageNet weights are loaded.'
   - 'seed-ideas-7.yaml, squeeze-excitation-in-the-resnet-blocks: the same slot, load rule and optimizer treatment.'
   novelty: First spatial context module inside the backbone.
   coverage: Every image, at stages two to four.
@@ -137,7 +137,7 @@ ideas:
     function changes slightly at the start (0.018 relative on random weights, measured by the
     modernisation review of 2026-10-13) and fine-tuning adapts: guess, low, -0.0005 to +0.0005
     macro. Never run here; the token mapping already handles these shortcuts
-    (docs/ongoing/radimagenet-backbone.md).
+    (docs/modeling/backbones/resnet-radimagenet-backbones.md).
   mechanism: >-
     In modeling/model.py the ResNet backbone is created with avg_down=True in addition to today's
     arguments. timm then builds each shortcut as (average pool, 1 by 1 convolution at stride 1,
@@ -149,8 +149,8 @@ ideas:
     optimizer groups are built from the loaded parameters as today. Validation, prediction and
     Kaggle inference run the same backbone. No option and no config field.
   precedents:
-  - 'docs/ongoing/radimagenet-backbone.md: _resnet_mapping walks ResNet-D average-pool shortcuts.'
-  - 'docs/modeling/backbone-swaps.md: how the feature mapping checks each residual shortcut.'
+  - 'docs/modeling/backbones/resnet-radimagenet-backbones.md: _resnet_mapping walks ResNet-D average-pool shortcuts.'
+  - 'docs/modeling/backbones/backbone-swaps.md: how the feature mapping checks each residual shortcut.'
   novelty: First change to the backbone's downsampling.
   coverage: Every image, at the three stride-two transitions.
   exploitation: >-
@@ -201,8 +201,8 @@ ideas:
     L2-SP anchors and the optimizer groups are unchanged. Validation, prediction and Kaggle
     inference run the same backbone. No option and no config field.
   precedents:
-  - 'docs/ongoing/radimagenet-backbone.md: how the Refined-RadImageNet weights are loaded.'
-  - 'docs/research/input-resolution.md: downsampling must be antialiased; the repository resampler is, the backbone is not.'
+  - 'docs/modeling/backbones/resnet-radimagenet-backbones.md: how the Refined-RadImageNet weights are loaded.'
+  - 'docs/research/geometry-and-views/input-resolution.md: downsampling must be antialiased; the repository resampler is, the backbone is not.'
   novelty: First anti-aliased downsampling inside the backbone.
   coverage: Every image, at the three stride-two transitions.
   exploitation: >-

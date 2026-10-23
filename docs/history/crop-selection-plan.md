@@ -3,7 +3,7 @@
 Drafted and implemented on 2026-09-15, revised on 2026-09-16, and dropped with the
 [crop-selection investigation](crop-selection-investigation.md) on 2026-09-16. Moved here from
 the repository root; it is kept as the design rationale, not as current guidance. The first run is
-recorded in the [crop-selection result](../validation/results/2026-09-15-crop-selection-result.md).
+recorded in the [crop-selection result](../validation/results/crops-and-views/2026-09-15-crop-selection-result.md).
 
 **Revised on 2026-09-16.** Crops are now 224 px (112 mm), with static gains (no
 covered-footprint bookkeeping) and a value map that keeps its twelve per-label values: summing
@@ -49,7 +49,7 @@ unchanged, and the number of crops equals the number of triplets.
 | Draft prediction | Shared attention and head applied to coarse tokens only |
 | Value map | Expected loss-gradient size per cell, summed over labels |
 | Footprint | Cells whose anchors fall inside a crop: 10×10 |
-| Budget | Crops per study = `data.crops_per_canvas` × canvases kept after series dropout (1 in the baseline, 2 in `configs/two-crops.yaml`) |
+| Budget | Crops per study = `data.crops_per_canvas` × canvases kept after series dropout (1 in the baseline, 2 in `configs/two-crops.yaml` (removed)) |
 | Focus | A selected cell; the crop is centered on its anchor |
 
 ## Shape schema
@@ -128,7 +128,7 @@ final:     scores (r + c for coarse, fine scores) → masked softmax per study a
      with equal attention mass, so ReXNet's gradient is not diluted 14× at the start.
    - The offset cancels inside the draft softmax, so it does not affect selection.
    - The optional attention prior applies to both token sets.
-10. **No alternatives kept.** This replaces the full-triplet path; `configs/baseline.yaml`
+10. **No alternatives kept.** This replaces the full-triplet path; `configs/baseline.yaml` (removed)
     carries the recipe.
 11. **Geometry constraints**, checked at model construction:
     - `crop_size < image_size`;
@@ -221,7 +221,7 @@ backbone.
 ## Evaluation
 
 - Compare with `00-baseline` (0.892763) on fold 0 using the
-  [fold-run comparison](../validation/fold-run-comparison.md). Given ±0.002 run
+  [fold-run comparison](../validation/run-comparison-and-diagnostics.md#fold-run-comparison). Given ±0.002 run
   variability, confirm a gain with a second seed.
 - A gain mixes resolution, field of view, coarse context and learned placement. If it
   wins, isolate placement with random selectable foci.
@@ -229,7 +229,7 @@ backbone.
 
 ## Evidence
 
-- [Input resolution research](../research/input-resolution.md):
+- [Input resolution research](../research/geometry-and-views/input-resolution.md):
   - stored images are interpolated about 2×, and 0.5 mm is the useful limit;
   - 140 mm clips posterior tissue in 34% of sagittal series (150 mm: 8%);
   - the joint line sits 12–17 mm below the image center;

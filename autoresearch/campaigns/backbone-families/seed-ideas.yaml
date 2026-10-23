@@ -17,7 +17,7 @@ ideas:
     Settings: model.backbone the new name, optimizer.backbone_lr 0.0001, optimizer.anchor_alpha_early 0.01,
     optimizer.anchor_alpha_late 0.0001; everything else the recipe''s.'
   precedents:
-  - 'Swin-T on the MambaVision recipe, fold 2, 2026-10-14: ×4 0.937176, blend with the ResNet-50 +0.0016 (docs/validation/results/2026-10-14-swin-t.md).'
+  - 'Swin-T on the MambaVision recipe, fold 2, 2026-10-14: ×4 0.937176, blend with the ResNet-50 +0.0016 (docs/validation/results/backbones/2026-10-14-swin-t.md).'
   - 'ResNet-50 recipe (weights 0.062 stem to 0.0073 last stage): rate 5e-5, anchors 0.01 and 0.001.'
   novelty: First attention-only backbone with dense segmentation pretraining here.
   coverage: Every study and every label.
@@ -110,7 +110,7 @@ ideas:
     final map the fourth''s through the final norm. Image counts padded to a multiple of 16 (depthwise convolutions, no
     BatchNorm). Settings: model.backbone the new name; rate and anchors the recipe''s.'
   precedents:
-  - 'ConvNeXt-T padding of image counts to multiples of 16 (docs/modeling/mambavision-backbone.md, New batch sizes): 4.3
+  - 'ConvNeXt-T padding of image counts to multiples of 16 (docs/modeling/backbones/mambavision-backbone.md, New batch sizes): 4.3
     s per unseen count without it.'
   novelty: First modulation-based backbone here.
   coverage: Every study and every label.

@@ -1,7 +1,7 @@
 # Proposed discriminating work
 
 These historical proposals explain how the investigation could discriminate
-between causes. The [later research shortlist](../../research/medial-lateral-transfer.md)
+between causes. The [later research shortlist](../../research/geometry-and-views/medial-lateral-transfer.md)
 supersedes their priority order. Current code uses independent heads at sigma 40;
 no training, GPU diagnostics or submissions are scheduled by this record.
 
@@ -44,7 +44,7 @@ no training, GPU diagnostics or submissions are scheduled by this record.
 ## Efficiency
 
 Deferred by user decision after this investigation, then resumed on 2026-09-15 as
-[loading speedup](../../backlog/loading-speedup/INDEX.md).
+[loading speedup](../../inference/profiling/INDEX.md).
 
 Create one Kaggle profiling notebook with a fixed checkpoint and a representative
 set of training studies available on Kaggle, including expensive study/codec

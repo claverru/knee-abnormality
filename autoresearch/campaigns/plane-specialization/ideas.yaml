@@ -92,7 +92,7 @@ ideas:
     no extra weight. Validation and inference output the present-plane mean. Shared
     head.
   precedents:
-  - 'Per-view disease classifiers (RSNA 2024 lumbar winner, as auxiliaries): docs/backlog/big-bets.md#auxiliary-loss-campaign.'
+  - 'Per-view disease classifiers (RSNA 2024 lumbar winner, as auxiliaries): docs/backlog/untried-ideas.md#supervision-and-labels.'
   novelty: Dense counterpart of the random partition; isolates the effect of subsampling
     labels.
   coverage: All studies and labels.
@@ -636,7 +636,7 @@ ideas:
     0.5809, demonstrating unequal learned contributions without establishing which
     peer should teach another. Teachers therefore use a symmetric rule independent
     of validation results and static fusion weights.
-  budget: "Classify in docs/backlog/small-changes.md. Adds arithmetic over batch \xD7\
+  budget: "Classify in docs/backlog/untried-ideas.md. Adds arithmetic over batch \xD7\
     \ three planes \xD7 twelve labels, with no new parameters, pooling calls, encoder\
     \ passes or inference computation. Similar runtime to the 1,627.1-second incumbent\
     \ is expected but unmeasured; the cap remains 1,806 seconds. Use supervisor seed\
@@ -892,7 +892,7 @@ ideas:
     \ but do not diagnose attention concentration. The historical +0.0049 and -0.0063\
     \ macro seed shifts limit confidence in small effects; they do not alter the fixed\
     \ adoption rule."
-  budget: "Supervisor classification: docs/backlog/small-changes.md. Reuse existing\
+  budget: "Supervisor classification: docs/backlog/untried-ideas.md. Reuse existing\
     \ attention tensors and the single encoder execution; return reduced entropy statistics\
     \ rather than retaining additional attention maps. No inference cost or additional\
     \ forward pass. Incremental training cost is unmeasured. Preserve the supervisor's\
@@ -982,7 +982,7 @@ ideas:
     justify label-specific treatment. Analytically, coefficient 0.5 cannot reverse
     dense BCE's logit-gradient direction for hard targets; that limited property provides
     no protection for soft targets or guarantee about parameter updates.
-  budget: "Supervisor classification: docs/backlog/small-changes.md. Adds arithmetic\
+  budget: "Supervisor classification: docs/backlog/untried-ideas.md. Adds arithmetic\
     \ over batch \xD7 three planes \xD7 twelve labels, with no extra encoder or pooling\
     \ pass and no inference cost. Incremental runtime is unmeasured. Preserve the\
     \ current incumbent's supervisor-assigned seed, presently 703791404, ten epochs,\
@@ -1035,7 +1035,7 @@ ideas:
     the ReXNet-only DSU path is untouched. Validation and inference run the backbones
     unchanged.'
   precedents:
-  - 'DSU on ReXNet-200: +0.0022, rerun +0.0012 (docs/validation/results/2026-09-26-augmentation-campaign.md).'
+  - 'DSU on ReXNet-200: +0.0022, rerun +0.0012 (docs/validation/results/campaigns-and-queues/2026-09-26-augmentation-campaign.md).'
   - The ReXNet control scanner-confusion-control uses DSU at 0.5; the campaign reference
     had it off.
   novelty: First DSU on EfficientNet and on plane-specific backbones.

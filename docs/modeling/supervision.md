@@ -14,7 +14,7 @@ extraction improvements have not consistently improved downstream models.
 using the pinned file from Kaggle dataset version 6. Keep official reference
 labels separate and apply them only to eligible training rows under the fixed folds.
 
-The current [all-study protocol](../validation/project-validation-protocol.md)
+The current [all-study protocol](../validation/validation-protocol.md)
 assigns all 4,407 studies to five folds, stratifying effective labels, gold
 labels and gold status. Training uses gold where available and the selected
 report-derived probabilities otherwise. All nonmissing targets contribute to training;
@@ -33,15 +33,15 @@ encodings differ; consult the audit before constructing training targets.
 The [report-state audit](../public-labels/uncertainty-and-confidence-encoding.md#report-state-audit-and-implications-for-supervision)
 measures disease despite report silence, information lost by collapsing soft scores and
 reporting-status associations in saved image predictions. Auxiliary report-state supervision
-is proposed but unimplemented; the current disease targets and loss remain in force.
+was never implemented; the disease targets and loss stayed as described here.
 
 ## Fixed class-balanced BCE
 
 **Measured 2026-09-19:** `balanced-bce` reached 0.895282, +0.008796 over the closest same-seed
-historical reference ([result and attribution limits](../validation/results/2026-09-19-balanced-bce-result.md)).
+historical reference ([result and attribution limits](../validation/results/labels-and-losses/2026-09-19-balanced-bce-result.md)).
 It is always on; `trainer.class_balance_exponent` (required) damps it, and 0 gives unit weights,
 ordinary masked soft-target BCE. The
-[research note](../research/auc_loss_approaches.md#weighting-and-sampling-design-space) explains
+[research note](../research/training-objectives/auc_loss_approaches.md#weighting-and-sampling-design-space) explains
 the hypothesis and alternative weighting/sampling methods.
 
 For each label, compute its positive fraction `r_c` once from observed targets in the actual
@@ -55,7 +55,7 @@ gives ratio `sqrt((1 - r_c) / r_c)`). Only training rows enter these counts, and
 remain fixed throughout the run. For any exponent, each label's mean weight over the training
 subset is one. **Measured 2026-09-21:** on the public leaderboard, k=0.5 scored 0.945, unweighted
 0.943 and k=1 0.940. Fold-0 validation ranked them in the opposite order
-([result](../validation/results/2026-09-21-class-balance-exponent.md)).
+([result](../validation/results/labels-and-losses/2026-09-21-class-balance-exponent.md)).
 
 Multiply the entire unreduced BCE cell by its group's weight and retain the mean over observed
 cells. Targets remain soft and every observed cell remains active. There is no per-batch weight
@@ -76,7 +76,7 @@ model-state entries.
 
 The option changes training loss only. Study exposure, validation BCE/AUC and inference scoring
 retain their existing behavior. Weighting can amplify rare-label errors; the first run improved
-ten of twelve label AUCs against its historical reference. The separate [cell-masking proposal](../backlog/small-changes.md#report-label-supervision)
+ten of twelve label AUCs against its historical reference. The separate [cell-masking proposal](../backlog/untried-ideas.md#supervision-and-labels)
 drops selected majority cells and remains unimplemented.
 
 ## Training-label masking
@@ -96,7 +96,7 @@ Of 3,503 training studies, including 47 gold, masking excluded **10,548** target
 entries and retained **31,488**, including all **564** gold targets. Forty-six
 studies had no supervised targets left. All 904 validation studies and 10,848
 validation entries were retained, with the same complete label-row hash as
-reflection. The [label-loading summary](../../outputs/analysis/l/label-masking-20260913/label-summary.json)
+reflection. The label-loading summary (`outputs/analysis/l/label-masking-20260913/label-summary.json`, deleted)
 records source hashes, identities and per-target counts.
 
 The policy field, evidence requirement, training-mask application, empty-batch
@@ -109,13 +109,13 @@ and recorded identities remain unchanged.
 ## Training with Tonylin soft labels
 
 **Historical reproduction:** prepared on 2026-09-13 for the
-[completed fold-0 comparison](../validation/results/2026-09-13-tonylin-label-comparison.md),
+[completed fold-0 comparison](../validation/results/labels-and-losses/2026-09-13-tonylin-label-comparison.md),
 which scored 0.921 publicly versus Steven v4's 0.929. The active labels are now
-[`rebuild_state_v2`](../public-labels/label-rebuild.md); the procedure below preserves the Tonylin
+[`rebuild_state_v2`](../public-labels/label-rebuild/INDEX.md); the procedure below preserves the Tonylin
 experiment.
 The exact historical run needs its archived source; the procedure below trains the same label
 setup with the current code.
-The [label audit](../public-labels/2026-09-13-new-public-label-comparison.md)
+The [label audit](../public-labels/audits/2026-09-13-new-public-label-comparison.md)
 owns the source-quality evidence and its limitations.
 
 `data/labels/prepared/tonylin-soft-v3/labels.csv` contains all 4,407 study IDs
@@ -127,7 +127,7 @@ original CSV, metadata, column mapping and preparation script. The prepared
 CSV SHA-256 is
 `aa852eebb32e6ef95bbf1736e4f73b40699bb3dd247049606e8f1696bca4e216`.
 
-In a copy of `configs/resnet50.yaml` saved as `configs/tonylin-soft-v3.yaml`, change these
+In a copy of `configs/resnet50.yaml` saved as `configs/tonylin-soft-v3.yaml` (removed), change these
 two values, retaining the other path settings:
 
 ```yaml
@@ -149,7 +149,7 @@ membership, protocol and evaluation-target hashes.
 After editing the YAML, launch a fresh run with:
 
 ```bash
-rtk proxy uv run --locked just train configs/tonylin-soft-v3.yaml --run-id tonylin-soft-v3 --validation.folds '[0]'
+uv run --locked just train configs/tonylin-soft-v3.yaml --run-id tonylin-soft-v3 --validation.folds '[0]'
 ```
 
 `just train` does not generate folds. Do not run `just validation prepare` for this
@@ -164,7 +164,7 @@ tabular metadata and the existing fold-label loader. To reproduce into fresh
 locations, run from the repository root:
 
 ```bash
-rtk proxy uv run --locked python -m scripts.adhoc.prepare_tonylin_labels --output-dir data/labels/prepared/tonylin-soft-v3-reproduction --output-manifest configs/labels/tonylin-label-sources-reproduction.json
+uv run --locked python -m scripts.adhoc.prepare_tonylin_labels --output-dir data/labels/prepared/tonylin-soft-v3-reproduction --output-manifest configs/labels/tonylin-label-sources-reproduction.json
 ```
 
 The utility leaves the input YAML and split files unchanged. Preparation ran
@@ -210,7 +210,7 @@ institutional review or sign-off, which its data use certification does
 A per-dataset ruling for MRNet, SKM-TEA, fastMRI(+) and KneeMRI was still unanswered on 2026-09-28.
 
 For actual public label-table comparisons, missing-label experiments and
-negative results, read [public supervision evidence](../research/public-research.md#report-derived-supervision).
+negative results, read [public supervision evidence](../research/competition-and-prior-art/public-research.md#report-derived-supervision).
 
 ## Available supervision
 
@@ -236,7 +236,7 @@ Unverified context and research leads:
 - Reports were said to be unavailable at inference, so text extraction is an
   offline supervision step for the image model.
 - This [public-label discussion](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/discussion/733932)
-  is a relevant public resource. The [public review](../research/public-research.md#report-derived-supervision)
+  is a relevant public resource. The [public review](../research/competition-and-prior-art/public-research.md#report-derived-supervision)
   identifies concrete sources and author-reported version comparisons.
 
 ## Reference label distribution

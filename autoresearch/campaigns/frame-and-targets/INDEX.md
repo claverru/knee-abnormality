@@ -23,4 +23,4 @@ both ×1 and ×4.
 | Reading the keeper's requeue of the two template seeds with the scoring corrected (only femur-band tokens, mean similarity over the tokens that land), after the first candidate's angles saturated | [Template requeues](template-requeue-ideas.yaml) |
 | Reading the keeper's repairs, adoption decisions and each run's per-target details | [Run notes](run-notes.md) |
 | Reading the proposals, the queue and the decision summary once the campaign runs | [Ideas](ideas.yaml), [Backlog](backlog.yaml), [Findings](findings.md) |
-| Reading the design, every run's tables, the drawings and the measurements | [Side-routed shared heads](../../../docs/ongoing/side-routed-heads.md) |
+| Reading the design, every run's tables, the drawings and the measurements | [Side-routed shared heads](../../../docs/modeling/side-routed-heads.md) |
