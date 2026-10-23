@@ -86,9 +86,14 @@ class AnatomyTargets(nn.Module):
         study_uids: list[str],
         token_study: torch.Tensor,
     ) -> torch.Tensor:
-        return torch.tensor(
-            [self.rows.get(uid, -1) for uid in study_uids], device=token_study.device
-        )[token_study]
+        return self._study_rows(study_uids, token_study.device)[token_study]
+
+    def _study_rows(self, study_uids: list[str], device: torch.device) -> torch.Tensor:
+        rows = torch.tensor(
+            [self.rows.get(uid, -1) for uid in study_uids],
+            pin_memory=device.type == "cuda",
+        )
+        return rows.to(device, non_blocking=True)
 
     def token_shares(
         self,
@@ -151,9 +156,7 @@ class AnatomyTargets(nn.Module):
         return height.nan_to_num(0.0), known
 
     def study_centres(self, study_uids: list[str]) -> tuple[torch.Tensor, torch.Tensor]:
-        row = torch.tensor(
-            [self.rows.get(uid, -1) for uid in study_uids], device=self.planes.device
-        )
+        row = self._study_rows(study_uids, self.planes.device)
         plane = self.planes[row.clamp_min(0)]
         known = (row >= 0) & (plane[:, 3:6].abs().sum(-1) > 0)
         return plane[:, :3], known
@@ -166,28 +169,37 @@ def anatomy_loss(
     names: tuple[str, ...],
 ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
     logits = logits.float()
-    if not mask.any():
-        return logits.sum() * 0.0, {}
-    chosen = logits[mask]
-    target = shares[mask]
-    loss = -(target * chosen.log_softmax(-1)).sum(-1).mean()
-    shares = chosen.softmax(-1)
-    present = target.sum(0) > 0
+    selected = mask[..., None]
+    row_weight = mask.float()
+    count = row_weight.sum().clamp_min(1)
+    chosen = torch.where(selected, logits, 0.0)
+    target = torch.where(selected, shares, 0.0)
+    loss = -((target * chosen.log_softmax(-1)).sum(-1) * row_weight).sum() / count
+    probability = chosen.softmax(-1) * row_weight[..., None]
+    dimensions = tuple(range(logits.ndim - 1))
+    present = target.sum(dimensions) > 0
     overlap = (
-        2 * (shares * target).sum(0) / (shares.sum(0) + target.sum(0)).clamp_min(1e-6)
+        2
+        * (probability * target).sum(dimensions)
+        / (probability.sum(dimensions) + target.sum(dimensions)).clamp_min(1e-6)
     )
-    loss = loss + (1 - overlap[present]).mean()
+    loss = loss + ((1 - overlap) * present).sum() / present.sum().clamp_min(1)
     with torch.no_grad():
-        probability = chosen.softmax(-1)
+        probability = probability.detach()
         metrics = {
-            "agreement": (probability.argmax(-1) == target.argmax(-1)).float().mean(),
-            "share_error": (probability - target).abs().sum(-1).mean() / 2,
+            "agreement": (
+                (probability.argmax(-1) == target.argmax(-1)).float() * row_weight
+            ).sum()
+            / count,
+            "share_error": ((probability - target).abs().sum(-1) * row_weight).sum()
+            / count
+            / 2,
         }
         for item, name in enumerate(names[1:], start=1):
-            both = probability[:, item].sum() + target[:, item].sum()
+            both = probability[..., item].sum() + target[..., item].sum()
             metrics[f"overlap_{name}"] = (
                 2
-                * torch.minimum(probability[:, item], target[:, item]).sum()
+                * torch.minimum(probability[..., item], target[..., item]).sum()
                 / both.clamp_min(1e-6)
             )
     return loss, metrics

@@ -1,3 +1,4 @@
+import logging
 from collections import defaultdict
 
 import numpy as np
@@ -142,9 +143,20 @@ def _central_values(
         )
     block = values[offset : offset + height * width]
     block = block.view(np.int16 if signed else np.uint16).reshape(height, width)
-    region = resample_window(
-        block[:, first:last], resample_plan(*plan_key), rows, columns
-    )
+    plan = resample_plan(*plan_key)
+    try:
+        region = resample_window(block[:, first:last], plan, rows, columns)
+    except ValueError:
+        logging.getLogger(__name__).warning(
+            "Windowed resampling failed: block=%s plan=%s rows=%s columns=%s",
+            block[:, first:last].shape,
+            plan_key,
+            rows,
+            columns,
+        )
+        region = resample_block(block[:, first:last], plan)[
+            rows[0] : rows[1], columns[0] : columns[1]
+        ]
     if slope != 1.0 or intercept != 0.0:
         region *= np.float32(slope)
         region += np.float32(intercept)

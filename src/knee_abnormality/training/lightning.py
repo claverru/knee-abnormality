@@ -1,6 +1,7 @@
 import json
 import math
 from collections import Counter
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -11,13 +12,19 @@ from timm.models import group_parameters
 from torch.nn import functional as F
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import LambdaLR
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Sampler
 
 from knee_abnormality.config import ExperimentConfig, OptimizerConfig
-from knee_abnormality.data.dataset import KneeStudyDataset, build_data_loader
+from knee_abnormality.data.dataset import (
+    KneeStudyDataset,
+    build_data_loader,
+    collate_prepared,
+    collate_prepared_middle,
+)
 from knee_abnormality.data.labels import FoldLabels, distilled, load_fold_labels
 from knee_abnormality.data.preprocessing.device import with_images
 from knee_abnormality.data.sources import build_series_index
+from knee_abnormality.data.splits import STUDY
 from knee_abnormality.evaluation.metrics import validation_metrics
 from knee_abnormality.evaluation.predictions import make_prediction_frame
 from knee_abnormality.identity import preprocessing_identity
@@ -32,6 +39,7 @@ from knee_abnormality.modeling.model import (
     TARGET_ROUTES,
     KneeAbnormalityModel,
 )
+from knee_abnormality.provenance import sha256_file
 from knee_abnormality.training.anatomy import (
     ANATOMY_CLASSES,
     ANATOMY_POINTS,
@@ -98,7 +106,10 @@ def build_optimizer(
 
 
 def fixed_class_balance(
-    training: pl.DataFrame, targets: tuple[str, ...], exponent: float
+    training: pl.DataFrame,
+    targets: tuple[str, ...],
+    exponent: float,
+    soft_prevalence: bool = False,
 ) -> dict:
     rows = []
     for target in targets:
@@ -109,7 +120,11 @@ def fixed_class_balance(
             raise ValueError(
                 f"Fixed class-balanced BCE requires both target groups for {target}"
             )
-        fraction = positive / observed.height
+        fraction = (
+            observed.get_column(f"target_{target}").mean()
+            if soft_prevalence
+            else positive / observed.height
+        )
         rho = ((1 - fraction) / fraction) ** exponent
         negative_weight = 1 / (fraction * rho + 1 - fraction)
         positive_weight = rho * negative_weight
@@ -124,7 +139,12 @@ def fixed_class_balance(
                 "negative_weight": negative_weight,
             }
         )
-    return {"version": 1, "exponent": exponent, "targets": rows}
+    return {
+        "version": 1,
+        "exponent": exponent,
+        "targets": rows,
+        **({"prevalence": "mean_soft_target"} if soft_prevalence else {}),
+    }
 
 
 def class_balance_weight_tensor(class_balance: dict) -> torch.Tensor:
@@ -169,6 +189,33 @@ def masked_binary_cross_entropy_with_logits(
     return (losses * weights)[observed].mean()
 
 
+class ExtraBatches(Sampler):
+    def __init__(self, dataset: KneeStudyDataset, batch_size: int, seed: int) -> None:
+        self.dataset = dataset
+        self.studies = len(dataset)
+        self.batch_size = batch_size
+        self.seed = seed
+
+    def __len__(self) -> int:
+        return math.ceil(self.studies / self.batch_size)
+
+    def _order(self, cycle: int) -> list[int]:
+        generator = torch.Generator().manual_seed(self.seed + 7919 * (cycle + 1))
+        return torch.randperm(self.studies, generator=generator).tolist()
+
+    def __iter__(self):
+        epoch = int(self.dataset.epoch.value)
+        batches = len(self)
+        cycle, offset = divmod(epoch * batches * self.batch_size, self.studies)
+        pool = self._order(cycle)[offset:]
+        for _ in range(batches):
+            while len(pool) < self.batch_size:
+                cycle += 1
+                pool = pool + self._order(cycle)
+            yield pool[: self.batch_size]
+            pool = pool[self.batch_size :]
+
+
 class KneeDataModule(L.LightningDataModule):
     def __init__(
         self,
@@ -186,6 +233,7 @@ class KneeDataModule(L.LightningDataModule):
         self.labels: FoldLabels | None = None
         self.train_dataset: KneeStudyDataset | None = None
         self.validation_dataset: KneeStudyDataset | None = None
+        self.extra_dataset: KneeStudyDataset | None = None
 
     def setup(self, stage: str | None = None) -> None:
         if self.labels is not None:
@@ -219,12 +267,78 @@ class KneeDataModule(L.LightningDataModule):
             None,
             self.config.data.validation_image_multiplier,
         )
+        extra = self.config.extra_training
+        if extra is None:
+            return
+        targets = self.labels.targets
+        table = pl.read_parquet(extra.labels).filter(pl.col("fold") == self.fold)
+        if table.columns != [STUDY, "fold", *targets]:
+            raise ValueError("Extra training labels differ from the frozen targets")
+        if table.is_empty() or table[STUDY].n_unique() != table.height:
+            raise ValueError(
+                f"Extra training labels need one row per study for fold {self.fold}"
+            )
+        studies = table.select(
+            STUDY,
+            pl.lit(False).alias("is_gold"),
+            *(
+                pl.col(name).fill_null(0.0).cast(pl.Float32).alias(f"target_{name}")
+                for name in targets
+            ),
+            *(pl.col(name).is_not_null().alias(f"observed_{name}") for name in targets),
+        ).sort(STUDY)
+        self.extra_dataset = KneeStudyDataset(
+            studies,
+            build_series_index(
+                extra.data_root, self.config.data, "train", studies[STUDY].to_list()
+            ),
+            self.config.data,
+            targets,
+            self.config.seed,
+        )
+        self.labels = replace(
+            self.labels,
+            provenance={
+                **self.labels.provenance,
+                "extra_training": {
+                    "data_root": str(extra.data_root),
+                    "labels": str(extra.labels),
+                    "sha256": sha256_file(extra.labels),
+                    "studies": studies.height,
+                },
+            },
+        )
+
+    @property
+    def class_balance_studies(self) -> pl.DataFrame:
+        if self.extra_dataset is not None:
+            return self.extra_dataset.studies
+        return self.train_dataset.studies
 
     def train_dataloader(self) -> DataLoader:
         module = getattr(self.trainer, "lightning_module", None)
         if module is not None:
-            self.train_dataset.set_epoch(
-                max(module.sampling_epoch, self.trainer.current_epoch)
+            epoch = max(module.sampling_epoch, self.trainer.current_epoch)
+            self.train_dataset.set_epoch(epoch)
+            if self.extra_dataset is not None:
+                self.extra_dataset.set_epoch(epoch)
+        if self.extra_dataset is not None:
+            settings = self.config.trainer
+            return DataLoader(
+                self.extra_dataset,
+                batch_sampler=ExtraBatches(
+                    self.extra_dataset, settings.batch_size, self.config.seed
+                ),
+                num_workers=settings.num_workers,
+                collate_fn=collate_prepared_middle
+                if self.middle_only
+                else collate_prepared,
+                pin_memory=True,
+                persistent_workers=settings.persistent_workers
+                and settings.num_workers > 0,
+                prefetch_factor=settings.prefetch_factor
+                if settings.num_workers > 0
+                else None,
             )
         return build_data_loader(
             self.train_dataset,
@@ -258,6 +372,7 @@ class KneeModule(L.LightningModule):
         class_balance: dict,
         load_pretrained: bool | None = None,
         input_identity: dict | None = None,
+        initial_weights: dict | None = None,
     ) -> None:
         super().__init__()
         self.config = config
@@ -277,6 +392,8 @@ class KneeModule(L.LightningModule):
         self.model = KneeAbnormalityModel(
             config.model, config.data, targets, load_pretrained=load_pretrained
         )
+        if initial_weights is not None:
+            self.model.load_state_dict(initial_weights, strict=True)
         self.anatomy_targets = AnatomyTargets(
             config.paths.anatomy_targets, len(ANATOMY_CLASSES), ANATOMY_POINTS
         )
@@ -461,10 +578,14 @@ class KneeModule(L.LightningModule):
         self,
         name: str,
         value: torch.Tensor | float,
-        batch_size: int,
+        batch_size: int | torch.Tensor,
         reduce_fx: str = "mean",
     ) -> None:
-        weight = float(batch_size) if reduce_fx == "mean" else 1.0
+        weight = (
+            batch_size.detach().float()
+            if isinstance(batch_size, torch.Tensor)
+            else float(batch_size)
+        ) if reduce_fx == "mean" else 1.0
         entry = self.epoch_totals[self.validating].setdefault(
             name, [0.0, 0.0, reduce_fx, [], []]
         )
@@ -472,15 +593,25 @@ class KneeModule(L.LightningModule):
             entry[3].append(value.detach())
             entry[4].append(weight)
         else:
-            entry[0] += float(value) * weight
-        entry[1] += weight
+            entry[0] = entry[0] + float(value) * weight
+        entry[1] = entry[1] + weight
 
     def _flush_epoch_metrics(self) -> None:
         totals = self.epoch_totals[self.validating]
         for name, (total, weight, reduce_fx, values, weights) in totals.items():
             if values:
                 stacked = torch.stack([value.float().reshape(()) for value in values])
-                total = total + (stacked * stacked.new_tensor(weights)).sum()
+                scale = torch.stack(
+                    [
+                        item.reshape(())
+                        if isinstance(item, torch.Tensor)
+                        else stacked.new_tensor(item)
+                        for item in weights
+                    ]
+                )
+                total = total + (stacked * scale).sum()
+            if float(weight) == 0:
+                continue
             self.log(
                 name,
                 total / weight if reduce_fx == "mean" else total,
@@ -491,6 +622,8 @@ class KneeModule(L.LightningModule):
         totals.clear()
         spreads = self.epoch_spreads[self.validating]
         for (name, suffix), (total, square, count) in spreads.items():
+            if float(count) == 0:
+                continue
             self.log(
                 f"{name}{suffix}",
                 (square / count - (total / count).square()).clamp_min(0).sqrt(),
@@ -501,15 +634,25 @@ class KneeModule(L.LightningModule):
         spreads.clear()
 
     def _log_epoch_spread(
-        self, name: str, values: torch.Tensor, suffix: str = "_std"
+        self,
+        name: str,
+        values: torch.Tensor,
+        suffix: str = "_std",
+        mask: torch.Tensor | None = None,
     ) -> None:
         values = values.detach().float()
         entry = self.epoch_spreads[self.validating].setdefault(
             (name, suffix), [0.0, 0.0, 0]
         )
-        entry[0] = entry[0] + values.sum()
-        entry[1] = entry[1] + values.square().sum()
-        entry[2] += values.numel()
+        if mask is None:
+            entry[0] = entry[0] + values.sum()
+            entry[1] = entry[1] + values.square().sum()
+            entry[2] = entry[2] + values.numel()
+            return
+        weight = mask.float()
+        entry[0] = entry[0] + (values * weight).sum()
+        entry[1] = entry[1] + (values.square() * weight).sum()
+        entry[2] = entry[2] + weight.sum()
 
     def _log_crop_frames(self, encoded: dict, prefix: str) -> None:
         studies = encoded["batch_size"]
@@ -524,44 +667,47 @@ class KneeModule(L.LightningModule):
         self._log_epoch_metric(
             f"{prefix}crop_turned_study_fraction", applied.float().mean(), studies
         )
-        moved = encoded["image_plane"] > 0
-        if moved.any():
-            self._log_epoch_metric(
-                f"{prefix}crop_shift_abs_px",
-                encoded["crop_shift"].detach().float()[moved].abs().mean(),
-                int(moved.sum()),
-            )
+        shift = encoded["crop_shift"].detach().float()
+        moved = (encoded["image_plane"] > 0).float()
+        moved_count = moved.sum()
+        self._log_epoch_metric(
+            f"{prefix}crop_shift_abs_px",
+            (shift.abs() * moved[:, None]).sum() / (2 * moved_count).clamp_min(1),
+            moved_count,
+        )
         for plane, name in ((1, "coronal"), (2, "sagittal")):
-            selected = encoded["image_plane"] == plane
+            selected = (encoded["image_plane"] == plane).float()
             counts = torch.zeros(studies, device=angles.device).index_add(
-                0, member[selected], torch.ones_like(angles[selected])
+                0, member, selected
             )
-            total = torch.zeros_like(counts).index_add(
-                0, member[selected], angles[selected]
-            )
+            total = torch.zeros_like(counts).index_add(0, member, angles * selected)
             absolute = torch.zeros_like(counts).index_add(
-                0, member[selected], angles[selected].abs()
+                0, member, angles.abs() * selected
             )
-            present = counts > 0
-            number = int(present.sum())
-            if number:
-                values = (total / counts.clamp_min(1))[present]
-                metric = f"{prefix}crop_turn_{name}_deg"
-                self._log_epoch_metric(metric, values.mean(), number)
-                self._log_epoch_spread(metric, values)
-                self._log_epoch_metric(
-                    f"{prefix}crop_turn_{name}_abs_deg",
-                    (absolute / counts.clamp_min(1))[present].mean(),
-                    number,
+            present = (counts > 0).float()
+            number = present.sum()
+            divisor = counts.clamp_min(1)
+            values = total / divisor
+            metric = f"{prefix}crop_turn_{name}_deg"
+            self._log_epoch_metric(
+                metric, (values * present).sum() / number.clamp_min(1), number
+            )
+            self._log_epoch_spread(metric, values, mask=present)
+            self._log_epoch_metric(
+                f"{prefix}crop_turn_{name}_abs_deg",
+                (absolute / divisor * present).sum() / number.clamp_min(1),
+                number,
+            )
+            for axis, label in enumerate(("across", "down")):
+                total_shift = torch.zeros_like(counts).index_add(
+                    0, member, shift[:, axis] * selected
                 )
-                for axis, label in enumerate(("across", "down")):
-                    total_shift = torch.zeros_like(counts).index_add(
-                        0, member[selected], encoded["crop_shift"][selected, axis]
-                    )
-                    values = (total_shift / counts.clamp_min(1))[present]
-                    metric = f"{prefix}crop_shift_{name}_{label}_px"
-                    self._log_epoch_metric(metric, values.mean(), number)
-                    self._log_epoch_spread(metric, values)
+                values = total_shift / divisor
+                metric = f"{prefix}crop_shift_{name}_{label}_px"
+                self._log_epoch_metric(
+                    metric, (values * present).sum() / number.clamp_min(1), number
+                )
+                self._log_epoch_spread(metric, values, mask=present)
 
     def _log_smart_crop_pose(self, model: KneeAbnormalityModel, encoded: dict) -> None:
         windows = model.view_windows
@@ -630,11 +776,11 @@ class KneeModule(L.LightningModule):
         self._log_epoch_metric(
             f"{prefix}_effective_probability", affected / total, total
         )
-        changed = int(activity.changed_elements.item())
-        if changed > 0:
-            self._log_epoch_metric(
-                f"{prefix}_{change_name}", activity.mean_absolute_change, changed
-            )
+        self._log_epoch_metric(
+            f"{prefix}_{change_name}",
+            activity.mean_absolute_change,
+            activity.changed_elements,
+        )
 
     def _log_augmentation_activity(self, study_count: int) -> None:
         data = self.config.data
@@ -859,6 +1005,7 @@ class KneeModule(L.LightningModule):
             )
 
     def training_step(self, batch: dict, batch_index: int) -> torch.Tensor:
+        extra = self.config.extra_training is not None
         self._record_sampling_sources(batch)
         encoded = self.model.encode_batch(batch)
         self._log_crop_frames(encoded, "")
@@ -879,7 +1026,7 @@ class KneeModule(L.LightningModule):
         loss = loss + SIDE_LOSS_WEIGHT * self._side_step(self.model, batch, encoded, "")
         loss = loss + self._anatomy_step(self.model, encoded, batch, "")
         loss = loss + self._meniscus_step(encoded, batch, "")
-        if self.anchor_parameters:
+        if self.anchor_parameters and not extra:
             backbone_group = self.trainer.optimizers[0].param_groups[
                 self.backbone_optimizer_group_index
             ]
@@ -902,7 +1049,7 @@ class KneeModule(L.LightningModule):
                 len(batch["study_uid"]),
             )
         self.log(
-            "train_loss",
+            "train_extra_loss" if extra else "train_loss",
             loss,
             on_step=True,
             on_epoch=True,
@@ -932,11 +1079,11 @@ class KneeModule(L.LightningModule):
                 ).float(),
             ),
         ):
-            count = int(selected.sum())
-            if count:
-                self._log_epoch_metric(
-                    f"{prefix}{name}", values[selected].mean(), count
-                )
+            weight = selected.float()
+            count = weight.sum()
+            self._log_epoch_metric(
+                f"{prefix}{name}", (values * weight).sum() / count.clamp_min(1), count
+            )
         for name, selected in (
             ("certain", batch["knee_side_certain"]),
             ("coordinates", coordinates),
@@ -989,16 +1136,18 @@ class KneeModule(L.LightningModule):
                 study_shift[:, number].abs().mean(),
                 studies,
             )
-        valid = encoded["visual_valid"]
-        tokens = int(valid.sum())
+        tokens = encoded["visual_valid"].sum()
         for route, value in zip(ROUTES, model.routing_mean, strict=True):
             self._log_epoch_metric(f"{prefix}routing_weight_{route}", value, tokens)
-        if not certain.any():
-            return logit.sum() * 0
-        loss = F.binary_cross_entropy_with_logits(
-            logit[certain], target[certain].float()
-        )
-        self._log_epoch_metric(f"{prefix}side_head_loss", loss, int(certain.sum()))
+        weight = certain.float()
+        count = weight.sum()
+        loss = (
+            F.binary_cross_entropy_with_logits(
+                torch.where(certain, logit, 0.0), target.float(), reduction="none"
+            )
+            * weight
+        ).sum() / count.clamp_min(1)
+        self._log_epoch_metric(f"{prefix}side_head_loss", loss, count)
         return loss
 
     def _meniscus_step(self, encoded: dict, batch: dict, prefix: str) -> torch.Tensor:
@@ -1015,12 +1164,11 @@ class KneeModule(L.LightningModule):
         loss, metrics = anatomy_loss(
             encoded["meniscus_scores"], shares, mask, SOFT_TISSUE_CLASSES
         )
-        tokens = int(mask.sum())
-        if tokens:
-            self._log_epoch_metric(f"{prefix}meniscus_loss", loss, tokens)
-            for name, value in metrics.items():
-                self._log_epoch_metric(f"{prefix}meniscus_{name}", value, tokens)
-        self._log_epoch_metric(f"{prefix}meniscus_tokens", float(tokens), 1, "sum")
+        tokens = mask.sum()
+        self._log_epoch_metric(f"{prefix}meniscus_loss", loss, tokens)
+        for name, value in metrics.items():
+            self._log_epoch_metric(f"{prefix}meniscus_{name}", value, tokens)
+        self._log_epoch_metric(f"{prefix}meniscus_tokens", tokens.float(), 1, "sum")
         self._log_soft_tissue_routing(encoded, prefix)
         return self.config.trainer.meniscus_loss_weight * loss
 
@@ -1061,12 +1209,11 @@ class KneeModule(L.LightningModule):
             mask,
             ANATOMY_CLASSES,
         )
-        tokens = int(mask.sum())
-        if tokens:
-            self._log_epoch_metric(f"{prefix}anatomy_loss", loss, tokens)
-            for name, value in metrics.items():
-                self._log_epoch_metric(f"{prefix}anatomy_{name}", value, tokens)
-        self._log_epoch_metric(f"{prefix}anatomy_tokens", float(tokens), 1, "sum")
+        tokens = mask.sum()
+        self._log_epoch_metric(f"{prefix}anatomy_loss", loss, tokens)
+        for name, value in metrics.items():
+            self._log_epoch_metric(f"{prefix}anatomy_{name}", value, tokens)
+        self._log_epoch_metric(f"{prefix}anatomy_tokens", tokens.float(), 1, "sum")
         self._log_epoch_metric(
             f"{prefix}anatomy_centre_displacement_mm",
             encoded["anatomy_centre_delta_mm"].norm(dim=-1).mean(),
