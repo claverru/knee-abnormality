@@ -18,8 +18,9 @@ The 2× and 3× submissions share batch size 2; the earlier 1× submission used
 batch size 8. These public scores favor 2× for current single-fold iteration.
 The intervals include queue and evaluation time plus up to one 30-second
 polling interval, so they do not isolate model inference. That 3× was the faster
-run is nonetheless established: the efficiency leaderboard selected the 3×
-submission over the higher-scoring 2× one, which requires Kaggle's measured
+run is nonetheless likely: the efficiency leaderboard showed the 3× submission
+over the higher-scoring 2× one while both were our two best public scores and so
+most likely both automatically selected, which requires Kaggle's measured
 runtime for 3× to be at least 71 s below the 2× run's
 ([efficiency leaderboard](efficiency-leaderboard.md#each-pick-is-a-measurement-of-our-hidden-runtimes)).
 
