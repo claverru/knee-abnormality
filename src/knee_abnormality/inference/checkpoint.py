@@ -165,6 +165,7 @@ def half_precision_weights(checkpoint: dict, model: KneeAbnormalityModel) -> dic
 
 
 ENSEMBLE_MEMBER_GLOB = "member-*.ckpt"
+MEMBER_DATA_FIELDS = {"mean", "std"}
 
 
 def ensemble_member_path(directory: Path, index: int) -> Path:
@@ -193,9 +194,9 @@ def load_ensemble_models(
                 f"Ensemble member {path.name} is missing saved configuration"
             )
         member_config = ExperimentConfig.model_validate(saved["config"])
-        if member_config.data.model_dump(mode="json") != config.data.model_dump(
-            mode="json"
-        ):
+        if member_config.data.model_dump(
+            mode="json", exclude=MEMBER_DATA_FIELDS
+        ) != config.data.model_dump(mode="json", exclude=MEMBER_DATA_FIELDS):
             raise ValueError(
                 f"Ensemble member {path.name} data config differs from the bundle"
             )
