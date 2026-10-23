@@ -12,6 +12,7 @@ import polars as pl
 from kaggle.api.kaggle_api_extended import KaggleApi
 from pydantic import BaseModel, Field
 from pydantic_settings import CliApp, CliSubCommand
+from requests import HTTPError
 
 from knee_abnormality.cli import CLISettings, command, describe
 from knee_abnormality.data.splits import STUDY
@@ -38,6 +39,59 @@ CONDITIONS = {
         "precision": "fp16",
         "batch_size": 4,
         "num_workers": 4,
+    },
+    "fp16-b2-w8": {
+        "kind": "prediction",
+        "precision": "fp16",
+        "batch_size": 2,
+        "num_workers": 8,
+    },
+    "fp16-b2-w8-compiled": {
+        "kind": "prediction",
+        "precision": "fp16",
+        "batch_size": 2,
+        "num_workers": 8,
+        "environment": {"KNEE_COMPILE_BACKBONE": "1"},
+    },
+    **{
+        f"paired-{first}-{second}": {
+            "kind": "paired",
+            "precision": "fp16",
+            "batch_size": 4,
+            "num_workers": 8,
+            "arms": [
+                {"name": name, "environment": {"KNEE_BACKBONE_MODE": name}}
+                for name in (first, second)
+            ],
+        }
+        for first, second in (("graph", "compiled-graph"), ("compiled-graph", "graph"))
+    },
+    **{
+        f"paired-s167-{order}": {
+            "kind": "paired",
+            "precision": "fp16",
+            "batch_size": 4,
+            "num_workers": 8,
+            "arms": [
+                {
+                    "submitted": {
+                        "name": "submitted",
+                        "environment": {},
+                        "bundle_slug": "knee-convnext-silver15-share075-ft-f0-x4-tau085",
+                    },
+                    "branch": {"name": "branch", "environment": {}},
+                    "compiled": {
+                        "name": "compiled",
+                        "environment": {"KNEE_BACKBONE_MODE": "compiled-graph"},
+                    },
+                }[name]
+                for name in names
+            ],
+        }
+        for order, names in (
+            ("abc", ("submitted", "branch", "compiled")),
+            ("cba", ("compiled", "branch", "submitted")),
+        )
     },
     "fp16-b4-w8": {
         "kind": "prediction",
@@ -156,13 +210,117 @@ CONDITIONS = {
             ["bytes", 16],
         ],
     },
+    "loader-lab": {
+        "kind": "loader-lab",
+        "timed_studies": 100,
+        "throughput_groups": [],
+        "rounds": 3,
+        "pass_timeout_seconds": 600,
+        "targets": [
+            ["engine", "build_series_index"],
+            ["dataset", "index_series"],
+            ["series", "parse_prefix"],
+            ["dataset", "clean_series"],
+            ["dataset", "estimate_reference"],
+            ["dataset", "split_knee_geometry"],
+            ["dataset", "resolve_knee_side"],
+            ["dataset", "build_pool"],
+            ["dataset", "select_triplets"],
+            ["dataset", "view_position"],
+            ["dataset", "fallback_window_center"],
+            ["dataset", "prepare_series"],
+            ["dataset", "decode_series"],
+            ["preparation", "decode_slice"],
+            ["preparation", "shared_empty"],
+            ["preparation", "mask_stored_bits"],
+            ["preparation", "_descriptor_plan"],
+            ["preparation", "_read_rows"],
+            ["preparation", "read_frame"],
+            ["series", "_safe_prefix"],
+            ["Dataset", "_index_study_geometry"],
+            ["Dataset", "_slot_sources"],
+            ["Dataset", "_study_budgets"],
+            ["Dataset", "_prepare_slot"],
+        ],
+    },
     "startup": {"kind": "startup"},
     "cudnn": {"kind": "cudnn"},
     "mainloop": {"kind": "mainloop", "studies": 64},
+    "compile-lab": {
+        "kind": "compile-lab",
+        "studies": 64,
+        "runs": [
+            ["graph", "graph", "none"],
+            ["default-cold", "default", "default"],
+            ["default-warm", "default", "default"],
+            ["reduce-cold", "reduce-overhead", "reduce"],
+            ["reduce-warm", "reduce-overhead", "reduce"],
+        ],
+    },
+    "compile-families": {
+        "kind": "compile-lab",
+        "studies": 32,
+        "runs": [
+            run
+            for member, family in enumerate(
+                (
+                    "convnext",
+                    "resnet50",
+                    "mambavision",
+                    "efficientvit",
+                    "focalnet",
+                    "nextvit",
+                )
+            )
+            for run in (
+                [f"{family}-graph", "graph", "none", member, f"{family}-graph"],
+                [f"{family}-compiled", "default", family, member, f"{family}-graph"],
+            )
+        ],
+    },
+    "compile-ensemble": {
+        "kind": "compile-lab",
+        "studies": 32,
+        "runs": [
+            ["ensemble-graph", "graph", "none", list(range(10)), "ensemble-graph"],
+            [
+                "ensemble-compiled",
+                "default",
+                "ensemble",
+                list(range(10)),
+                "ensemble-graph",
+            ],
+        ],
+    },
+    "page-lab": {"kind": "page-lab", "accelerator": "NvidiaTeslaT4"},
+    **{
+        f"variants-{shift}": {
+            "kind": "variants",
+            "variants": [
+                ("base", "fs", "idle")[(shift + item) % 3] for item in range(3)
+            ],
+        }
+        for shift in range(3)
+    },
     "parity": {"kind": "parity", "studies": 300},
     **{
         f"census-{part}": {"kind": "census", "part": part, "parts": 5}
         for part in range(5)
+    },
+    "fp16-b4-w8-pyspy": {
+        "kind": "prediction",
+        "precision": "fp16",
+        "batch_size": 4,
+        "num_workers": 8,
+        "pyspy": True,
+    },
+    "fp16-b4-w8-deadline": {
+        "kind": "prediction",
+        "precision": "fp16",
+        "batch_size": 4,
+        "num_workers": 8,
+        "deadline": 600,
+        "internet": True,
     },
     "fp16-b4-w16-pyspy": {
         "kind": "prediction",
@@ -283,6 +441,7 @@ torch.set_num_threads(1)
 from knee_abnormality.config import load_config
 from knee_abnormality.data import dataset as dataset_module
 from knee_abnormality.data.preprocessing import dicom as dicom_module
+from knee_abnormality.data.preprocessing import laterality as laterality_module
 from knee_abnormality.data.preprocessing import preparation as preparation_module
 from knee_abnormality.data.preprocessing import series as series_module
 from knee_abnormality.data.preprocessing import spatial as spatial_module
@@ -331,27 +490,37 @@ for module, name in (
     (engine_module, "build_series_index"),
     (dataset_module, "index_series"),
     (series_module, "parse_prefix"),
+    (dataset_module, "clean_series"),
     (dataset_module, "estimate_reference"),
+    (dataset_module, "split_knee_geometry"),
+    (dataset_module, "resolve_knee_side"),
     (dataset_module, "build_pool"),
     (dataset_module, "select_triplets"),
+    (dataset_module, "view_position"),
+    (dataset_module, "fallback_window_center"),
     (dataset_module, "prepare_series"),
     (dataset_module, "decode_series"),
+    (preparation_module, "decode_slice"),
     (preparation_module, "resample_crop"),
+    (dataset_module.KneeStudyDataset, "_index_study_geometry"),
+    (dataset_module.KneeStudyDataset, "_slot_sources"),
+    (dataset_module.KneeStudyDataset, "_study_budgets"),
+    (dataset_module.KneeStudyDataset, "_prepare_slot"),
 ):
     timed(module, name)
 
 for module, name in (
+    (series_module, "_safe_prefix"),
+    (preparation_module, "_read_rows"),
     (preparation_module, "read_frame"),
-    (preparation_module, "read_payload"),
-    (preparation_module, "frame_from_payload"),
     (dicom_module, "_read_pydicom_frame"),
 ):
     timed_on_threads(module, name)
 
 def reset_process_caches():
     dicom_module._TAGS_CACHE.clear()
-    spatial_module._axis_filter.cache_clear()
-    spatial_module.resample_plan.cache_clear()
+    for cached in (spatial_module._full_axis_filter, spatial_module._axis_filter, spatial_module.resample_plan, spatial_module._window_filters, laterality_module.text_sides):
+        cached.cache_clear()
     if dicom_module._POOL is not None:
         dicom_module._POOL.shutdown(wait=True)
         dicom_module._POOL = None
@@ -436,6 +605,244 @@ result["throughput"] = [
 print(json.dumps({pass_name: {"setup_seconds": value["setup_seconds"], "getitem_seconds": sum(item["getitem_seconds"] for item in value["studies"]), "timings": value["timings"]} for pass_name, value in result.items() if pass_name != "throughput"}, indent=1))
 print(json.dumps(result["throughput"], indent=1))
 """
+
+
+LOADER_LAB_PASS = """import hashlib
+import json
+import resource
+import sys
+import threading
+import time
+from collections import defaultdict
+from pathlib import Path
+
+spec = json.loads(Path(sys.argv[1]).read_text())
+sys.path.insert(0, spec["code"])
+import numpy as np
+import torch
+
+torch.set_num_threads(1)
+from knee_abnormality.config import load_config
+from knee_abnormality.data import dataset as dataset_module
+from knee_abnormality.data.preprocessing import device as device_module
+from knee_abnormality.data.preprocessing import preparation as preparation_module
+from knee_abnormality.data.preprocessing import series as series_module
+from knee_abnormality.inference import engine as engine_module
+
+owners = {
+    "engine": engine_module,
+    "dataset": dataset_module,
+    "series": series_module,
+    "preparation": preparation_module,
+    "Dataset": dataset_module.KneeStudyDataset,
+}
+records = defaultdict(lambda: [0, 0.0, 0.0, 0.0])
+lock = threading.Lock()
+
+
+def timed(owner, name):
+    original = getattr(owner, name, None)
+    if original is None:
+        return
+
+    def wrapper(*arguments, **keywords):
+        usage = resource.getrusage(resource.RUSAGE_THREAD)
+        started = time.perf_counter()
+        try:
+            return original(*arguments, **keywords)
+        finally:
+            wall = time.perf_counter() - started
+            finished = resource.getrusage(resource.RUSAGE_THREAD)
+            with lock:
+                record = records[name]
+                record[0] += 1
+                record[1] += wall
+                record[2] += finished.ru_utime - usage.ru_utime
+                record[3] += finished.ru_stime - usage.ru_stime
+
+    setattr(owner, name, wrapper)
+
+
+for owner, name in spec["targets"]:
+    timed(owners[owner], name)
+
+
+def digest(value, hasher):
+    if isinstance(value, torch.Tensor):
+        value = value.detach().cpu().contiguous()
+        hasher.update(f"T{value.dtype}{tuple(value.shape)}".encode())
+        hasher.update(
+            value.view(torch.uint8).numpy().tobytes() if value.numel() else b""
+        )
+    elif isinstance(value, np.ndarray):
+        hasher.update(f"A{value.dtype}{value.shape}".encode())
+        hasher.update(np.ascontiguousarray(value).tobytes())
+    elif isinstance(value, dict):
+        for key in sorted(value, key=str):
+            if key in {"frame_buffers", "frames"}:
+                continue
+            hasher.update(f"K{key}".encode())
+            digest(value[key], hasher)
+    elif isinstance(value, (list, tuple)):
+        hasher.update(f"L{len(value)}".encode())
+        for item in value:
+            digest(item, hasher)
+    elif value is None or isinstance(value, (str, int, float, bool)):
+        hasher.update(repr(value).encode())
+    else:
+        hasher.update(type(value).__name__.encode())
+
+
+def fingerprint(batch):
+    keys = {}
+    for key in sorted(batch, key=str):
+        if key in {"frame_buffers", "frames"}:
+            continue
+        hasher = hashlib.sha256()
+        digest(batch[key], hasher)
+        keys[key] = hasher.hexdigest()[:16]
+    return keys
+
+
+def io_counters():
+    values = {}
+    for line in Path("/proc/self/io").read_text().splitlines():
+        key, value = line.split(":")
+        values[key] = int(value)
+    return values
+
+
+config = load_config(
+    Path(spec["bundle"]) / "config.json", data_root=Path(spec["data_root"])
+)
+usage = resource.getrusage(resource.RUSAGE_SELF)
+io_before = io_counters()
+pass_started = time.perf_counter()
+dataset, _, _ = engine_module.prediction_data(
+    config, "test", 0, image_multiplier=spec["multiplier"], study_ids=spec["studies"]
+)
+setup_seconds = time.perf_counter() - pass_started
+studies = []
+for index in range(len(dataset)):
+    begin = time.perf_counter()
+    item = dataset[index]
+    prepared = time.perf_counter()
+    batch = dataset_module.collate_studies([item])
+    collated = time.perf_counter()
+    entry = {
+        "study": item["study_uid"],
+        "getitem_seconds": prepared - begin,
+        "collate_seconds": collated - prepared,
+        "images": int(batch["slice_mask"].sum()),
+        "failures": len(item["failures"]),
+    }
+    if spec["fingerprint"]:
+        entry["fingerprint"] = fingerprint(device_module.prepare_images(batch))
+    studies.append(entry)
+pass_seconds = time.perf_counter() - pass_started
+finished = resource.getrusage(resource.RUSAGE_SELF)
+io_after = io_counters()
+Path(sys.argv[2]).write_text(
+    json.dumps(
+        {
+            "setup_seconds": setup_seconds,
+            "pass_seconds": pass_seconds,
+            "user_seconds": finished.ru_utime - usage.ru_utime,
+            "system_seconds": finished.ru_stime - usage.ru_stime,
+            "minor_faults": finished.ru_minflt - usage.ru_minflt,
+            "major_faults": finished.ru_majflt - usage.ru_majflt,
+            "voluntary_switches": finished.ru_nvcsw - usage.ru_nvcsw,
+            "involuntary_switches": finished.ru_nivcsw - usage.ru_nivcsw,
+            "io": {key: io_after[key] - io_before[key] for key in io_after},
+            "functions": {
+                name: dict(zip(("calls", "wall", "user", "system"), value))
+                for name, value in records.items()
+            },
+            "studies": studies,
+        }
+    )
+    + "\\n"
+)
+"""
+
+
+LOADER_LAB_CELL = (
+    "LAB_PASS = "
+    + json.dumps(LOADER_LAB_PASS)
+    + "\n"
+    + """labs = sorted({path.parent for pattern in ("datasets/*/*/lab.json", "datasets/*/*/*/lab.json", "*/lab.json", "*/*/lab.json") for path in Path("/kaggle/input").glob(pattern)})
+if len(labs) != 1:
+    raise RuntimeError(f"Expected one loader lab, found {labs}")
+lab = labs[0]
+variants = json.loads((lab / "lab.json").read_text())["variants"]
+pass_script = Path("/kaggle/working/loader_lab_pass.py")
+pass_script.write_text(LAB_PASS)
+multiplier = json.loads((bundle / "manifest.json").read_text())["runtime"]["image_multiplier"]
+files = [path for uid in STUDIES for path in sorted((competition / "train_series" / uid).glob("*/*.dcm"))]
+NFS_PROCEDURES = ("null", "getattr", "setattr", "lookup", "access", "readlink", "read", "write", "create", "mkdir", "symlink", "mknod", "remove", "rmdir", "rename", "link", "readdir", "readdirplus", "fsstat", "fsinfo", "pathconf", "commit")
+
+def evict():
+    for path in files:
+        descriptor = os.open(path, os.O_RDONLY)
+        try:
+            os.posix_fadvise(descriptor, 0, 0, os.POSIX_FADV_DONTNEED)
+        finally:
+            os.close(descriptor)
+
+def nfs_calls():
+    path = Path("/proc/net/rpc/nfs")
+    if not path.exists():
+        return {}
+    for line in path.read_text().splitlines():
+        if line.startswith("proc3 "):
+            return dict(zip(NFS_PROCEDURES, map(int, line.split()[2:])))
+    return {}
+
+def check_eviction(sample):
+    evict()
+    started = time.perf_counter()
+    for path in sample:
+        path.read_bytes()
+    cold = time.perf_counter() - started
+    started = time.perf_counter()
+    for path in sample:
+        path.read_bytes()
+    return {"files": len(sample), "cold_seconds": cold, "warm_seconds": time.perf_counter() - started}
+
+def run(name, label, fingerprint):
+    spec_path = profile_dir / f"spec-{name}-{label}.json"
+    output = profile_dir / f"lab-{name}-{label}.json"
+    spec_path.write_text(json.dumps({"code": str(lab / "variants" / name), "bundle": str(bundle), "data_root": str(data_root), "studies": STUDIES, "multiplier": multiplier, "fingerprint": fingerprint, "targets": CONDITION["targets"]}))
+    before = nfs_calls()
+    started = time.perf_counter()
+    try:
+        completed = subprocess.run([sys.executable, str(pass_script), str(spec_path), str(output)], capture_output=True, text=True, timeout=CONDITION["pass_timeout_seconds"])
+    except subprocess.TimeoutExpired:
+        print(json.dumps({"variant": name, "label": label, "timed_out": True}), flush=True)
+        return {"variant": name, "label": label, "timed_out": True}
+    elapsed = time.perf_counter() - started
+    after = nfs_calls()
+    if completed.returncode:
+        print(completed.stdout[-3000:])
+        print(completed.stderr[-6000:])
+        raise RuntimeError(f"{name} {label} failed")
+    result = json.loads(output.read_text())
+    result.update(variant=name, label=label, process_seconds=elapsed, nfs_calls={key: after[key] - before.get(key, 0) for key in after})
+    print(json.dumps({"variant": name, "label": label, "pass_seconds": result["pass_seconds"], "user": result["user_seconds"], "system": result["system_seconds"], "nfs": {key: value for key, value in result["nfs_calls"].items() if value}}), flush=True)
+    return result
+
+lab_results = {"variants": variants, "kernel": os.uname().release, "transparent_hugepages": {name: Path("/sys/kernel/mm/transparent_hugepage", name).read_text().strip() for name in ("enabled", "shmem_enabled") if Path("/sys/kernel/mm/transparent_hugepage", name).exists()}, "eviction": check_eviction(files[:300]), "passes": []}
+print(json.dumps({key: lab_results[key] for key in ("kernel", "transparent_hugepages", "eviction")}), flush=True)
+for round_index in range(CONDITION["rounds"]):
+    shift = round_index % len(variants)
+    for name in variants[shift:] + variants[:shift]:
+        evict()
+        lab_results["passes"].append(run(name, f"cold{round_index}", False))
+for name in variants:
+    lab_results["passes"].append(run(name, "fingerprint", True))
+(profile_dir / "lab.json").write_text(json.dumps(lab_results) + "\\n")
+"""
+)
 
 
 PRECISION_CELL = """sys.path.insert(0, str(bundle / "code"))
@@ -687,55 +1094,242 @@ print(json.dumps(results, indent=1))
 
 
 MAINLOOP_CELL = """sys.path.insert(0, str(bundle / "code"))
-import torch
-from collections import defaultdict
+import importlib.util
+import traceback
+import warnings
+from collections import Counter, defaultdict
 
+import torch
+import torch.nn.functional as F
+from torch.nn.utils.fusion import fuse_conv_bn_eval
+
+from knee_abnormality.inference.processes import use_blocking_sync
+
+use_blocking_sync()
+torch.set_num_threads(1)
+sys.modules["wandb"] = None
 from knee_abnormality.config import load_config
 from knee_abnormality.data.dataset import build_data_loader
-from knee_abnormality.data.preprocessing import device as device_module
 from knee_abnormality.inference import engine
 from knee_abnormality.inference.checkpoint import load_models
 
 config = load_config(bundle / "config.json", data_root=data_root)
 manifest = json.loads((bundle / "manifest.json").read_text())
-dataset, targets, _ = engine.prediction_data(config, "test", 0, image_multiplier=manifest["runtime"]["image_multiplier"], study_ids=STUDIES)
+runtime = manifest["runtime"]
+dataset, targets, _ = engine.prediction_data(config, "test", 0, image_multiplier=runtime["image_multiplier"], study_ids=STUDIES)
 loader = build_data_loader(dataset, config.trainer, 4, num_workers=4, pin_memory=False, prepare_on_loader=False)
 cuda = torch.device("cuda")
-models = load_models(config, targets, bundle / "model.ckpt", cuda, attention_temperature=manifest["runtime"]["attention_temperature"])
-engine.use_fixed_backbone_chunks(models[0], config.data.image_size)
-timings = defaultdict(float)
-sizes = defaultdict(int)
-original_sort = torch.Tensor.sort
+models = load_models(config, targets, bundle / "models" if "checkpoints" in manifest else bundle / "model.ckpt", cuda, attention_temperature=runtime["attention_temperature"])
+plain_features = [model._backbone_features for model in models]
+middle_only = all(model.repeated_middle_slice for model in models)
+batches = list(loader)
+wall = defaultdict(float)
+cpu = defaultdict(float)
+counts = Counter()
+synchronized = True
 
-def timed(name, function, *arguments):
-    torch.cuda.synchronize()
+def timed(name, function, *arguments, **keywords):
+    if synchronized:
+        torch.cuda.synchronize()
     started = time.perf_counter()
-    value = function(*arguments)
-    torch.cuda.synchronize()
-    timings[name] += time.perf_counter() - started
+    cpu_started = time.process_time()
+    value = function(*arguments, **keywords)
+    if synchronized:
+        torch.cuda.synchronize()
+    wall[name] += time.perf_counter() - started
+    cpu[name] += time.process_time() - cpu_started
     return value
 
-def sort(self, *arguments, **keywords):
-    return timed("prepare.sort", lambda: original_sort(self, *arguments, **keywords))
+def capture(index, model):
+    engine.use_fixed_backbone_chunks(model, config.data.image_size)
+    chunked = model._backbone_features
 
-batches = list(loader)
-with torch.inference_mode():
-    for repeat in range(2):
-        timings.clear()
-        for batch in batches:
-            sizes["values"] += sum(count for _, count, _ in batch["series_frames"])
-            locked = timed("page_lock", lambda: [buffer for buffer in batch["frame_buffers"] if engine._page_lock(buffer)])
+    def features(images):
+        counts[f"images.{index}"] += images.shape[0]
+        counts[f"chunks.{index}"] += -(-images.shape[0] // engine.BACKBONE_CHUNK_IMAGES)
+        return timed(f"backbone.{index}", chunked, images)
+
+    model._backbone_features = features
+
+original_grid_sample = F.grid_sample
+F.grid_sample = lambda *arguments, **keywords: timed("grid_sample", original_grid_sample, *arguments, **keywords)
+
+def run(selected):
+    outputs = []
+    with torch.inference_mode():
+        for batch in selected:
+            locked = timed("page_lock", lambda: [buffer for buffer in batch.get("frame_buffers", ()) if engine._page_lock(buffer)])
             moved = timed("transfer", engine.move_batch, batch, cuda)
-            torch.Tensor.sort = sort
-            prepared = timed("prepare_images", device_module.prepare_images, moved)
-            torch.Tensor.sort = original_sort
+            prepared = timed("prepare_images", engine.with_images, moved, middle_only)
             with torch.autocast("cuda", dtype=torch.float16):
-                timed("forward", lambda: torch.sigmoid(models[0](prepared).float()).cpu())
+                probabilities = []
+                for index, model in enumerate(models):
+                    pose = timed(f"pose.{index}", model.first_look_pose, prepared)
+                    probabilities.append(timed(f"read.{index}", lambda: torch.sigmoid(model(prepared, pose).to(torch.float32))))
+                outputs.append(timed("to_cpu", lambda: torch.stack(probabilities).mean(dim=0).cpu()))
             timed("unlock", lambda: [torch.cuda.cudart().cudaHostUnregister(buffer.data_ptr()) for buffer in locked])
-        print(repeat, {key: round(value, 3) for key, value in timings.items()})
-result = {"batches": len(batches), "per_batch_seconds": {key: value / len(batches) for key, value in timings.items()}, "bytes_per_batch": sum(buffer.numel() * buffer.element_size() for batch in batches for buffer in batch["frame_buffers"]) / len(batches)}
+    return torch.cat(outputs)
+
+def measure():
+    global synchronized
+    synchronized = True
+    run(batches)
+    wall.clear()
+    cpu.clear()
+    counts.clear()
+    outputs = run(batches)
+    stages = {name: {"wall_seconds_per_batch": wall[name] / len(batches), "cpu_seconds_per_batch": cpu[name] / len(batches)} for name in wall}
+    chunks = dict(counts)
+    synchronized = False
+    torch.cuda.synchronize()
+    started = time.perf_counter()
+    cpu_started = time.process_time()
+    repeated = run(batches)
+    torch.cuda.synchronize()
+    free = {"wall_seconds_per_batch": (time.perf_counter() - started) / len(batches), "cpu_seconds_per_batch": (time.process_time() - cpu_started) / len(batches)}
+    return outputs, {"stages": stages, "counts": chunks, "free_running": free, "repeat_max_abs_difference": float((outputs - repeated).abs().max())}
+
+def fold(module):
+    folded = 0
+    previous_name, previous = None, None
+    for name, child in list(module.named_children()):
+        if type(child) is torch.nn.BatchNorm2d and isinstance(previous, torch.nn.Conv2d):
+            setattr(module, previous_name, fuse_conv_bn_eval(previous, child))
+            setattr(module, name, torch.nn.Identity())
+            folded += 1
+            previous_name, previous = None, None
+        else:
+            folded += fold(child)
+            previous_name, previous = name, child
+    return folded
+
+for index, model in enumerate(models):
+    capture(index, model)
+reference, result = measure()
+result = {"batches": len(batches), "studies": len(STUDIES), "members": [type(model.backbone).__name__ for model in models], "baseline": result}
+print(json.dumps(result["baseline"], indent=1))
+
+sites = Counter()
+
+def note(message, category, filename, lineno, file=None, line=None):
+    frames = [frame for frame in traceback.extract_stack() if "knee_abnormality" in frame.filename]
+    sites[f"{Path(frames[-1].filename).name}:{frames[-1].lineno} {frames[-1].line}" if frames else f"{filename}:{lineno} {message}"] += 1
+
+synchronized = False
+torch.cuda.set_sync_debug_mode("warn")
+with warnings.catch_warnings():
+    warnings.simplefilter("always")
+    warnings.showwarning = note
+    run(batches[:2])
+torch.cuda.set_sync_debug_mode("default")
+result["sync_sites_per_batch"] = {site: count / 2 for site, count in sites.most_common()}
+print(json.dumps(result["sync_sites_per_batch"], indent=1))
+
+folded = []
+for index, model in enumerate(models):
+    model._backbone_features = plain_features[index]
+    folded.append(fold(model.backbone))
+    capture(index, model)
+outputs, measured = measure()
+result["folded"] = {**measured, "folded_layers": folded, "max_abs_difference": float((outputs - reference).abs().max()), "mean_abs_difference": float((outputs - reference).abs().mean())}
+print(json.dumps(result["folded"], indent=1))
+
+packages = json.loads(subprocess.run([sys.executable, "-m", "pip", "list", "--format=json"], capture_output=True, text=True).stdout or "[]")
+result["packages"] = {package["name"]: package["version"] for package in packages if any(word in package["name"].lower() for word in ("onnx", "nvidia", "torch", "cudnn", "openvino", "pycuda"))}
+result["torch"] = {"version": torch.__version__, "cuda": torch.version.cuda, "cudnn": torch.backends.cudnn.version()}
+
+from knee_abnormality.data.preprocessing import device as device_module
+
+def prepare_all():
+    images = []
+    seconds = 0.0
+    with torch.inference_mode():
+        for batch in batches:
+            locked = [buffer for buffer in batch.get("frame_buffers", ()) if engine._page_lock(buffer)]
+            moved = engine.move_batch(batch, cuda)
+            torch.cuda.synchronize()
+            started = time.perf_counter()
+            prepared = engine.with_images(moved, middle_only)
+            torch.cuda.synchronize()
+            seconds += time.perf_counter() - started
+            images.append(prepared["images"].cpu())
+            for buffer in locked:
+                torch.cuda.cudart().cudaHostUnregister(buffer.data_ptr())
+    return images, seconds / len(batches)
+
+matrices = {}
+
+def dense_resample(blocks, plan):
+    key = (id(plan), blocks.shape[1], blocks.shape[2])
+    if key not in matrices:
+        vertical_index, vertical_weight, horizontal_index, horizontal_weight = plan
+        matrices[key] = (
+            torch.zeros((vertical_index.shape[0], blocks.shape[1]), device=blocks.device, dtype=vertical_weight.dtype).scatter_add_(1, vertical_index, vertical_weight),
+            torch.zeros((horizontal_index.shape[0], blocks.shape[2]), device=blocks.device, dtype=horizontal_weight.dtype).scatter_add_(1, horizontal_index, horizontal_weight).T.contiguous(),
+        )
+    vertical, horizontal = matrices[key]
+    return torch.matmul(torch.matmul(vertical.to(blocks.dtype), blocks), horizontal.to(blocks.dtype))
+
+synchronized = False
+prepare_all()
+baseline_images, baseline_seconds = prepare_all()
+before = run(batches)
+tap_resample = device_module._resample
+device_module._resample = dense_resample
+prepare_all()
+dense_images, dense_seconds = prepare_all()
+changed = 0
+total = 0
+largest = 0
+for expected, actual in zip(baseline_images, dense_images):
+    difference = (expected.to(torch.int16) - actual.to(torch.int16)).abs()
+    changed += int((difference > 0).sum())
+    total += difference.numel()
+    largest = max(largest, int(difference.max()))
+del dense_images
+after = run(batches)
+device_module._resample = tap_resample
+del baseline_images
+result["dense_resample"] = {"tap_prepare_seconds_per_batch": baseline_seconds, "dense_prepare_seconds_per_batch": dense_seconds, "changed_pixels": changed, "pixels": total, "largest_pixel_difference": largest, "max_abs_difference": float((after - before).abs().max()), "mean_abs_difference": float((after - before).abs().mean())}
+print(json.dumps(result["dense_resample"], indent=1))
+
+import inspect
+
+def wrap(owner, name, label):
+    function = getattr(owner, name)
+    setattr(owner, name, lambda *arguments, **keywords: timed(label, function, *arguments, **keywords))
+
+for name, value in list(vars(device_module).items()):
+    if inspect.isfunction(value) and value.__module__ == device_module.__name__:
+        wrap(device_module, name, f"device.{name}")
+import faulthandler
+
+faulthandler.dump_traceback_later(300, exit=True)
+for name in ("solve", "inv", "matrix_exp"):
+    wrap(torch.linalg, name, f"linalg.{name}")
+for index, model in enumerate(models):
+    for module_name, module in model.named_modules():
+        if module_name.split(".")[0] == "backbone" or not type(module).__module__.startswith("knee_abnormality"):
+            continue
+        for name, value in vars(type(module)).items():
+            if inspect.isfunction(value) and name not in vars(module) and not name.startswith("__") and name != "train":
+                wrap(module, name, f"model.{index}.{module_name or 'model'}.{name}")
+synchronized = True
+wall.clear()
+cpu.clear()
+functions = Counter()
+original_timed = timed
+
+def timed(name, function, *arguments, **keywords):
+    functions[name] += 1
+    return original_timed(name, function, *arguments, **keywords)
+
+run(batches[:4])
+faulthandler.cancel_dump_traceback_later()
+result["inclusive_functions"] = {name: {"wall_seconds_per_batch": wall[name] / 4, "cpu_seconds_per_batch": cpu[name] / 4, "calls_per_batch": functions[name] / 4} for name in sorted(wall, key=wall.get, reverse=True)}
+print(json.dumps(result["inclusive_functions"], indent=1))
 (profile_dir / "mainloop.json").write_text(json.dumps(result, indent=2) + "\\n")
-print(json.dumps(result, indent=1))
+print(json.dumps({key: result[key] for key in ("packages", "torch")}, indent=1))
 """
 
 
@@ -874,6 +1468,363 @@ finally:
 """
 
 
+VARIANTS_CELL = """variants = CONDITION["variants"]
+parts = [STUDIES[index :: len(variants)] for index in range(len(variants))]
+header = (data_root / "sample_submission.csv").read_text().splitlines()[0]
+series = (data_root / "test_series.csv").read_text().splitlines()
+results = {}
+for position, (variant, studies) in enumerate(zip(variants, parts)):
+    root = Path(f"/tmp/knee-variant-{position}")
+    (root / "test_series").mkdir(parents=True)
+    chosen = set(studies)
+    (root / "sample_submission.csv").write_text("\\n".join([header, *(f"{uid}," + ",".join(["0.5"] * header.count(",")) for uid in studies)]) + "\\n")
+    (root / "test_series.csv").write_text("\\n".join([series[0], *(row for row in series[1:] if row.split(",", 1)[0] in chosen)]) + "\\n")
+    for uid in studies:
+        (root / "test_series" / uid).symlink_to((data_root / "test_series" / uid).resolve(), target_is_directory=True)
+    output = profile_dir / f"{position}-{variant}"
+    output.mkdir()
+    command = [sys.executable, "-m", "scripts.pipeline.predict", str(bundle / "config.json"), "--bundle", str(bundle), "--data-root", str(root), "--output", str(output / "predictions.csv"), "--device", "cuda", "--precision", "fp16", "--batch-size", "4", "--num-workers", "8"]
+    environment_variables = os.environ.copy()
+    environment_variables["PYTHONPATH"] = str(bundle / "code")
+    environment_variables["KNEE_VARIANT"] = variant
+    started = time.time()
+    with (output / "predict.log").open("w") as log:
+        returncode = subprocess.run(command, env=environment_variables, stdout=log, stderr=subprocess.STDOUT).returncode
+    results[f"{position}-{variant}"] = {"seconds": time.time() - started, "returncode": returncode, "studies": len(studies)}
+    print(position, variant, results[f"{position}-{variant}"])
+    if returncode:
+        print("\\n".join((output / "predict.log").read_text(errors="replace").splitlines()[-40:]))
+(profile_dir / "variants.json").write_text(json.dumps(results, indent=2) + "\\n")
+if any(result["returncode"] for result in results.values()):
+    raise RuntimeError("A variant failed")
+"""
+
+
+STARTUP_IMPORTS = r"""import json, os, resource, sys, time
+marks = {}
+last = time.perf_counter()
+def mark(name):
+    global last
+    now = time.perf_counter()
+    marks[name] = now - last
+    last = now
+import torch
+mark("torch")
+import scripts.pipeline.predict_worker
+mark("worker_module")
+sys.modules["wandb"] = None
+from knee_abnormality.evaluation.predictions import make_prediction_frame
+from knee_abnormality.inference.checkpoint import load_models, member_checkpoints
+from knee_abnormality.inference.engine import predict_loader
+mark("model_stack")
+usage = resource.getrusage(resource.RUSAGE_SELF)
+io = dict(line.split(": ") for line in open("/proc/self/io").read().splitlines())
+record = {"marks": marks, "total": sum(marks.values()), "cpu_seconds": usage.ru_utime + usage.ru_stime, "major_faults": usage.ru_majflt, "read_bytes": int(io["read_bytes"]), "rchar": int(io["rchar"])}
+if len(sys.argv) > 1:
+    files = {getattr(module, name, None) for module in list(sys.modules.values()) for name in ("__file__", "__cached__")}
+    for line in open("/proc/self/maps").read().splitlines():
+        parts = line.split(maxsplit=5)
+        if len(parts) == 6 and parts[5].startswith("/"):
+            files.add(parts[5])
+    files = sorted(path for path in files if isinstance(path, str) and os.path.isfile(path))
+    json.dump(files, open(sys.argv[1], "w"))
+    record["files"] = len(files)
+print(json.dumps(record))
+"""
+
+
+PAGE_LAB_BODY = r"""import ctypes
+import re
+from concurrent.futures import ThreadPoolExecutor
+import numpy as np
+code_dir = bundle / "code"
+lab_dir = Path("/kaggle/working/page-lab")
+lab_dir.mkdir(parents=True, exist_ok=True)
+(lab_dir / "imports.py").write_text(STARTUP_IMPORTS)
+child_environment = os.environ.copy()
+child_environment.update(PYTHONPATH=str(code_dir), KNEE_BUNDLE=str(bundle))
+lab = {}
+file_list = lab_dir / "import-files.json"
+page = os.sysconf("SC_PAGE_SIZE")
+libc = ctypes.CDLL("libc.so.6", use_errno=True)
+libc.mmap.restype = ctypes.c_void_p
+libc.mmap.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_long]
+libc.munmap.argtypes = [ctypes.c_void_p, ctypes.c_size_t]
+libc.mincore.argtypes = [ctypes.c_void_p, ctypes.c_size_t, ctypes.c_void_p]
+
+def import_probe(label, extra=(), flags=()):
+    started = time.perf_counter()
+    completed = subprocess.run([sys.executable, *flags, str(lab_dir / "imports.py"), *extra], env=child_environment, cwd=str(code_dir), capture_output=True, text=True)
+    if completed.returncode:
+        raise RuntimeError(completed.stderr[-3000:])
+    record = json.loads(completed.stdout.strip().splitlines()[-1])
+    record["process_seconds"] = time.perf_counter() - started
+    record["stderr"] = completed.stderr
+    print(label, json.dumps({key: value for key, value in record.items() if key != "stderr"}))
+    return record
+
+def resident(path):
+    size = os.path.getsize(path)
+    if not size:
+        return []
+    descriptor = os.open(path, os.O_RDONLY)
+    try:
+        address = libc.mmap(None, size, 1, 1, descriptor, 0)
+    finally:
+        os.close(descriptor)
+    if address in (None, ctypes.c_void_p(-1).value):
+        return []
+    count = (size + page - 1) // page
+    vector = (ctypes.c_ubyte * count)()
+    libc.mincore(address, size, vector)
+    libc.munmap(address, size)
+    present = np.frombuffer(vector, dtype=np.uint8) & 1
+    edges = np.flatnonzero(np.diff(np.concatenate(([0], present, [0]))))
+    return [[int(start) * page, int(end - start) * page] for start, end in zip(edges[::2], edges[1::2])]
+
+def drop_caches():
+    try:
+        os.sync()
+        Path("/proc/sys/vm/drop_caches").write_text("3")
+        return True
+    except OSError:
+        for path in json.loads(file_list.read_text()):
+            try:
+                descriptor = os.open(path, os.O_RDONLY)
+            except OSError:
+                continue
+            try:
+                os.posix_fadvise(descriptor, 0, 0, os.POSIX_FADV_DONTNEED)
+            finally:
+                os.close(descriptor)
+        return False
+
+def read_ranges(item):
+    path, ranges = item
+    total = 0
+    try:
+        descriptor = os.open(path, os.O_RDONLY)
+    except OSError:
+        return 0
+    try:
+        for offset, length in ranges:
+            while length > 0:
+                chunk = os.pread(descriptor, min(length, 1 << 23), offset)
+                if not chunk:
+                    break
+                total += len(chunk)
+                offset += len(chunk)
+                length -= len(chunk)
+    finally:
+        os.close(descriptor)
+    return total
+
+def will_need(item):
+    path, ranges = item
+    try:
+        descriptor = os.open(path, os.O_RDONLY)
+    except OSError:
+        return 0
+    try:
+        for offset, length in ranges:
+            os.posix_fadvise(descriptor, offset, length, os.POSIX_FADV_WILLNEED)
+    finally:
+        os.close(descriptor)
+    return sum(length for _, length in ranges)
+
+def pre_read(method, threads=16):
+    started = time.perf_counter()
+    items = sorted(json.loads((lab_dir / "ranges.json").read_text()).items(), key=lambda item: -sum(length for _, length in item[1]))
+    with ThreadPoolExecutor(threads) as pool:
+        total = sum(pool.map(method, items))
+    return {"seconds": time.perf_counter() - started, "gib": total / 2**30, "files": len(items), "threads": threads}
+
+def concurrent(count, method=None):
+    started = time.perf_counter()
+    with ThreadPoolExecutor(count + 1) as pool:
+        warming = pool.submit(pre_read, method) if method else None
+        probes = [pool.submit(import_probe, f"concurrent-{index}") for index in range(count)]
+        records = [probe.result() for probe in probes]
+    for record in records:
+        record.pop("stderr")
+    return {"wall_seconds": time.perf_counter() - started, "probes": records, "pre_read": warming.result() if warming else None}
+
+def save():
+    (profile_dir / "page-lab.json").write_text(json.dumps(lab, indent=1))
+
+lab["cold"] = import_probe("cold", [str(file_list)])
+lab["cold"].pop("stderr")
+ranges = {path: resident(path) for path in json.loads(file_list.read_text())}
+ranges = {path: value for path, value in ranges.items() if value}
+(lab_dir / "ranges.json").write_text(json.dumps(ranges))
+(profile_dir / "ranges.json").write_text(json.dumps(ranges))
+lab["resident"] = {"files": len(ranges), "gib": sum(length for value in ranges.values() for _, length in value) / 2**30, "runs": sum(len(value) for value in ranges.values())}
+print(json.dumps(lab["resident"]))
+lab["drop_caches"] = drop_caches()
+lab["reset_cold"] = import_probe("reset_cold")
+lab["reset_cold"].pop("stderr")
+save()
+for label, method, threads in (("pread16", read_ranges, 16), ("pread32", read_ranges, 32), ("willneed16", will_need, 16)):
+    drop_caches()
+    lab[label] = {"pre_read": pre_read(method, threads)}
+    lab[label]["probe"] = import_probe(label)
+    lab[label]["probe"].pop("stderr")
+    save()
+drop_caches()
+lab["two"] = concurrent(2)
+save()
+drop_caches()
+lab["two_pread"] = concurrent(2, read_ranges)
+save()
+importtime = import_probe("importtime", flags=("-X", "importtime"))
+rows = []
+for line in importtime.pop("stderr").splitlines():
+    match = re.match(r"import time:\s+(\d+) \|\s+(\d+) \| (\s*)(\S+)", line)
+    if match:
+        rows.append({"self_us": int(match.group(1)), "cumulative_us": int(match.group(2)), "depth": len(match.group(3)) // 2, "module": match.group(4)})
+lab["importtime_top"] = sorted((row for row in rows if row["depth"] <= 1), key=lambda row: -row["cumulative_us"])[:60]
+lab["importtime_self_top"] = sorted(rows, key=lambda row: -row["self_us"])[:40]
+save()
+print(json.dumps(lab["importtime_top"][:30], indent=0))
+"""
+
+PAGE_LAB_CELL = (
+    "STARTUP_IMPORTS = " + json.dumps(STARTUP_IMPORTS) + "\n" + PAGE_LAB_BODY
+)
+
+COMPILE_CHILD = r"""import json, os, sys, time
+from pathlib import Path
+import numpy as np
+bundle, data_root, output = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
+spec = json.loads(sys.argv[4])
+import torch
+torch.multiprocessing.set_sharing_strategy("file_system")
+sys.modules["wandb"] = None
+from knee_abnormality.inference.processes import use_blocking_sync
+use_blocking_sync()
+torch.set_num_threads(1)
+from knee_abnormality.config import load_config
+from knee_abnormality.data.dataset import build_data_loader
+from knee_abnormality.inference import engine
+from knee_abnormality.inference.checkpoint import load_models
+config = load_config(bundle / "config.json", data_root=data_root)
+runtime = json.loads((bundle / "manifest.json").read_text())["runtime"]
+result = {"mode": spec["mode"], "member": spec["member"]}
+dataset, targets, _ = engine.prediction_data(config, "test", 0, image_multiplier=runtime["image_multiplier"], study_ids=spec["studies"])
+batches = list(build_data_loader(dataset, config.trainer, 4, num_workers=4, pin_memory=False, prepare_on_loader=False))
+cuda = torch.device("cuda")
+manifest = json.loads((bundle / "manifest.json").read_text())
+loaded = load_models(config, targets, bundle / "models" if "checkpoints" in manifest else bundle / "model.ckpt", cuda, attention_temperature=runtime["attention_temperature"])
+members = spec["member"] if isinstance(spec["member"], list) else [spec["member"]]
+models = [loaded[index] for index in members]
+result["backbone"] = [type(model.backbone).__name__ for model in models]
+size = engine.BACKBONE_CHUNK_IMAGES
+result["compile_seconds"] = []
+
+def compile_backbone(model):
+    model.channels_last = True
+    model.backbone.to(memory_format=torch.channels_last)
+    compiled = torch.compile(model._backbone_features, mode=spec["mode"], dynamic=False)
+
+    def chunked(images):
+        maps, extras = [], []
+        for start in range(0, images.shape[0], size):
+            chunk = images[start : start + size]
+            count = chunk.shape[0]
+            if count < size:
+                chunk = torch.cat((chunk, chunk.new_zeros((size - count, *chunk.shape[1:]))))
+            features, extra = compiled(chunk.contiguous(memory_format=torch.channels_last))
+            maps.append(features[:count].clone())
+            if extra is not None:
+                extras.append(extra[:count].clone())
+        return torch.cat(maps), (torch.cat(extras) if extras else None)
+
+    started = time.perf_counter()
+    with torch.inference_mode(), torch.autocast("cuda", dtype=torch.float16):
+        chunked(torch.zeros((size, *batches[0]["images"].shape[1:]) if "images" in batches[0] else (size, 3, config.data.image_size, config.data.image_size), device=cuda))
+    torch.cuda.synchronize()
+    result["compile_seconds"].append(time.perf_counter() - started)
+    model._backbone_features = chunked
+
+for model in models:
+    if spec["mode"] == "graph":
+        engine.use_fixed_backbone_chunks(model, config.data.image_size)
+    else:
+        compile_backbone(model)
+
+def run():
+    _, predictions, _ = engine.predict_loader(models, [dict(batch) for batch in batches], cuda, "fp16", False, None)
+    return predictions
+
+run()
+torch.cuda.synchronize()
+started = time.perf_counter()
+predictions = run()
+torch.cuda.synchronize()
+result["seconds_per_batch"] = (time.perf_counter() - started) / len(batches)
+result["batches"] = len(batches)
+np.save(output.with_suffix(".npy"), predictions.numpy())
+output.write_text(json.dumps(result))
+print(json.dumps(result), flush=True)
+"""
+
+
+COMPILE_LAB_BODY = r"""code_dir = bundle / "code"
+lab_dir = Path("/kaggle/working/compile-lab")
+lab_dir.mkdir(parents=True, exist_ok=True)
+(lab_dir / "child.py").write_text(COMPILE_CHILD)
+results = {}
+import numpy as np
+for label, mode, cache, *member_reference in CONDITION["runs"]:
+    member, reference_label = member_reference or (0, "graph")
+    values = os.environ.copy()
+    values.update(PYTHONPATH=str(code_dir), TORCHINDUCTOR_CACHE_DIR=f"/kaggle/working/inductor-{cache}", TRITON_CACHE_DIR=f"/kaggle/working/inductor-{cache}/triton")
+    started = time.perf_counter()
+    completed = subprocess.run([sys.executable, str(lab_dir / "child.py"), str(bundle), str(data_root), str(lab_dir / f"{label}.json"), json.dumps({"mode": mode, "studies": STUDIES, "member": member})], env=values, cwd=str(code_dir), capture_output=True, text=True)
+    record = json.loads((lab_dir / f"{label}.json").read_text()) if completed.returncode == 0 else {"error": completed.stderr[-4000:]}
+    record["process_seconds"] = time.perf_counter() - started
+    if completed.returncode == 0 and label != reference_label and (lab_dir / f"{reference_label}.npy").exists():
+        reference = np.load(lab_dir / f"{reference_label}.npy"); values = np.load(lab_dir / f"{label}.npy")
+        record["max_abs_difference"] = float(np.abs(values - reference).max())
+        record["mean_abs_difference"] = float(np.abs(values - reference).mean())
+    results[label] = record
+    print(label, json.dumps(record)[:1500], flush=True)
+    (profile_dir / "compile-lab.json").write_text(json.dumps(results, indent=1))
+"""
+
+COMPILE_LAB_CELL = (
+    "COMPILE_CHILD = " + json.dumps(COMPILE_CHILD) + "\n" + COMPILE_LAB_BODY
+)
+
+
+PAIRED_BODY = r"""base_profile = profile_dir
+def drop_cached(root):
+    for directory, _, names in os.walk(root):
+        for name in names:
+            try:
+                descriptor = os.open(os.path.join(directory, name), os.O_RDONLY)
+            except OSError:
+                continue
+            try:
+                os.posix_fadvise(descriptor, 0, 0, os.POSIX_FADV_DONTNEED)
+            finally:
+                os.close(descriptor)
+primary_bundle = bundle
+for arm in CONDITION["arms"]:
+    bundle = primary_bundle
+    if arm.get("bundle_slug"):
+        bundle = next(path.parent for path in Path("/kaggle/input/datasets").glob("*/*/manifest.json") if path.parent.name == arm["bundle_slug"])
+    for uid in STUDIES:
+        drop_cached(competition / "train_series" / uid)
+    drop_cached(bundle)
+    profile_dir = base_profile / arm["name"]
+    profile_dir.mkdir(parents=True, exist_ok=True)
+    CONDITION["environment"] = arm["environment"]
+    print("arm", arm["name"], flush=True)
+    exec(PREDICTION, globals())
+"""
+
+
 def notebook_source(
     bundle: Path,
     condition: dict,
@@ -957,6 +1908,9 @@ def sample_cpu():
 def sample_processes():
     ticks = os.sysconf("SC_CLK_TCK")
     page = os.sysconf("SC_PAGE_SIZE")
+    heartbeat = []
+    beats = 0
+    start = time.time()
     with (profile_dir / "processes.csv").open("w") as stream:
         stream.write("timestamp,pid,ppid,cpu_seconds,rss_mib,command\\n")
         while not stop.is_set():
@@ -975,7 +1929,13 @@ def sample_processes():
                 cpu = (int(stat[11]) + int(stat[12])) / ticks
                 rss = int(stat[21]) * page / 2**20
                 stream.write(f"{now},{name},{stat[1]},{cpu:.3f},{rss:.1f},{command}\\n")
+                if "predict" in command:
+                    heartbeat.append((name, cpu, rss))
             stream.flush()
+            beats += 1
+            if beats % 20 == 0:
+                print(f"heartbeat {now - start:.0f}s", " ".join(f"{pid}:{cpu:.0f}s/{rss:.0f}M" for pid, cpu, rss in heartbeat), [log.read_text(errors="replace").strip().splitlines()[-1:] for log in sorted(profile_dir.glob(".*/worker-*.log"))], flush=True)
+            heartbeat.clear()
             stop.wait(1)
 
 sampler = threading.Thread(target=sample_cpu, daemon=True)
@@ -996,11 +1956,13 @@ command = [
 ]
 if CONDITION.get("io_threads") is not None:
     command += ["--io-threads", str(CONDITION["io_threads"])]
-if CONDITION.get("pyspy"):
+if CONDITION.get("pyspy") or CONDITION.get("deadline"):
     subprocess.run([sys.executable, "-m", "pip", "install", "--quiet", "py-spy"], check=True)
+if CONDITION.get("pyspy"):
     command = [shutil.which("py-spy"), "record", "--subprocesses", "--nonblocking", "--rate", "20", "--format", "raw", "--output", str(profile_dir / "pyspy.txt"), "--", *command]
 environment_variables = os.environ.copy()
 environment_variables["PYTHONPATH"] = str(bundle / "code")
+environment_variables.update(CONDITION.get("environment", {}))
 record = {"notebook_started_at": notebook_started_at, "cell_started_at": time.time()}
 if CONDITION.get("pycache_prefix"):
     environment_variables["PYTHONPYCACHEPREFIX"] = "/tmp/knee-pycache"
@@ -1082,7 +2044,22 @@ with (profile_dir / "predict.log").open("w") as log:
     elif CONDITION.get("list_series"):
         prefetcher = threading.Thread(target=list_series, daemon=True)
         prefetcher.start()
-    returncode = process.wait()
+    try:
+        returncode = process.wait(timeout=CONDITION.get("deadline"))
+    except subprocess.TimeoutExpired:
+        dumps = []
+        for name in os.listdir("/proc"):
+            try:
+                command_line = Path("/proc", name, "cmdline").read_bytes().decode("utf-8", "replace").replace("\\x00", " ")
+            except OSError:
+                continue
+            if "predict" in command_line and name.isdigit():
+                dumped = subprocess.run([shutil.which("py-spy"), "dump", "--pid", name, "--locals"], capture_output=True, text=True, timeout=60)
+                dumps.append(f"### {name} {command_line[:160]}\\n{dumped.stdout}{dumped.stderr}")
+        (profile_dir / "hang.txt").write_text("\\n".join(dumps))
+        print("\\n".join(dumps)[-20000:], flush=True)
+        process.kill()
+        returncode = process.wait()
 finished_at = time.time()
 stop.set()
 if prefetcher is not None:
@@ -1116,12 +2093,20 @@ if returncode:
                 profile,
                 {
                     "loading": LOADING_CELL,
+                    "loader-lab": LOADER_LAB_CELL,
                     "precision": PRECISION_CELL,
                     "startup": STARTUP_CELL,
                     "cudnn": CUDNN_CELL,
                     "mainloop": MAINLOOP_CELL,
+                    "page-lab": PAGE_LAB_CELL,
+                    "compile-lab": COMPILE_LAB_CELL,
+                    "variants": VARIANTS_CELL,
                     "parity": PARITY_CELL,
                     "census": CENSUS_CELL,
+                    "paired": "PREDICTION = "
+                    + json.dumps(prediction)
+                    + "\n"
+                    + PAIRED_BODY,
                 }.get(condition["kind"], prediction),
             )
         ],
@@ -1132,17 +2117,22 @@ if returncode:
 
 
 def ensure_dataset(api: KaggleApi, bundle: Path, dataset: str, args: Launch) -> dict:
-    description = (
-        f"Private inference profiling bundle {sha256_file(bundle / 'manifest.json')}"
-    )
+    manifest_sha256 = sha256_file(bundle / "manifest.json")
+    description = f"Private inference profiling bundle {manifest_sha256}"
     if _dataset_exists(api, dataset):
         with tempfile.TemporaryDirectory(prefix="knee-profile-") as temporary:
             metadata = json.loads(
                 Path(api.dataset_metadata(dataset, temporary)).read_text()
             )
-        if metadata.get("info", {}).get("description") != description:
+        if (metadata.get("info", {}).get("description") or "").splitlines()[
+            -1:
+        ] not in (
+            [description],
+            [f"Private inference bundle {manifest_sha256}"],
+        ):
             raise ValueError(f"Dataset {dataset} holds a different bundle")
     else:
+        verify_bundle(bundle)
         with tempfile.TemporaryDirectory(prefix="knee-profile-") as temporary:
             directory = Path(temporary)
             shutil.copytree(bundle, directory / "bundle")
@@ -1165,10 +2155,9 @@ def ensure_dataset(api: KaggleApi, bundle: Path, dataset: str, args: Launch) -> 
                 raise RuntimeError(f"Dataset upload failed: {_jsonable(response)}")
     while True:
         try:
-            identity = _dataset_identity(api, dataset)
-            if identity["total_bytes"] > 0:
-                return identity
-        except RuntimeError:
+            if api.dataset_status(dataset) == "ready":
+                return _dataset_identity(api, dataset)
+        except (RuntimeError, HTTPError):
             pass
         time.sleep(args.poll_seconds)
 
@@ -1186,7 +2175,7 @@ def launch(args: Launch) -> dict:
     if unknown:
         raise ValueError(f"Choose known conditions; unknown: {unknown}")
     bundle = args.bundle.expanduser().resolve()
-    manifest = verify_bundle(bundle)
+    manifest = json.loads((bundle / "manifest.json").read_text())
     if not manifest.get("ready"):
         raise ValueError(f"Bundle is not ready: {manifest.get('unmet_prerequisites')}")
     output = args.output_dir.expanduser().resolve()
@@ -1213,15 +2202,19 @@ def launch(args: Launch) -> dict:
             condition = CONDITIONS[name]
             accelerator = (
                 None
-                if condition["kind"] in {"loading", "census"}
+                if condition["kind"] in {"loading", "loader-lab", "census"}
                 else condition.get("accelerator", args.accelerator)
             )
             tpu = accelerator is not None and accelerator.startswith("Tpu")
-            if condition["kind"] == "prediction":
+            if condition["kind"] in {"prediction", "variants", "paired"}:
                 selected, throughput_studies = studies, []
-            elif condition["kind"] in {"startup", "cudnn"}:
+            elif condition["kind"] in {"startup", "cudnn", "page-lab"}:
                 selected, throughput_studies = studies[:8], []
-            elif condition["kind"] in {"mainloop", "parity"}:
+            elif condition["kind"] in {
+                "mainloop",
+                "compile-lab",
+                "parity",
+            }:
                 selected, throughput_studies = studies[: condition["studies"]], []
             elif condition["kind"] == "census":
                 everything = (
@@ -1264,7 +2257,9 @@ def launch(args: Launch) -> dict:
                         "is_private": True,
                         "enable_gpu": accelerator is not None and not tpu,
                         "enable_tpu": tpu,
-                        "enable_internet": bool(condition.get("pyspy")),
+                        "enable_internet": bool(
+                            condition.get("pyspy") or condition.get("internet")
+                        ),
                         "competition_sources": [COMPETITION],
                         "dataset_sources": [args.dataset]
                         + ([args.reference_dataset] if args.reference_dataset else []),
@@ -1309,8 +2304,13 @@ def launch(args: Launch) -> dict:
             if not terminal:
                 item["seen_active"] = True
                 status["runs"][name]["state"] = state
+                if "running" in state.lower():
+                    status["runs"][name].setdefault(
+                        "running_at", datetime.now(UTC).isoformat()
+                    )
                 write_status(status_path, status, args.conditions)
                 continue
+            status["runs"][name]["completed_at"] = datetime.now(UTC).isoformat()
             if not item["seen_active"] and time.monotonic() - item["pushed"] < 600:
                 continue
             run_dir = output / "runs" / name
@@ -1437,52 +2437,48 @@ def loading_summary(result: dict) -> dict:
         thread_count = defaultdict(int, value["thread_counts"])
         studies = len(value["studies"])
         getitem = sum(item["getitem_seconds"] for item in value["studies"])
-        sampling = (
-            timing["estimate_reference"]
-            + timing["build_pool"]
-            + timing["select_triplets"]
-        )
-        sampling_cpu = (
-            processor["estimate_reference"]
-            + processor["build_pool"]
-            + processor["select_triplets"]
-        )
-        frames = thread_count["read_frame"] + thread_count["frame_from_payload"]
+        collate = sum(item["collate_seconds"] for item in value["studies"])
+
+        def split(source):
+            sampling = source["build_pool"] + source["select_triplets"]
+            views = source["view_position"] + source["fallback_window_center"]
+            return {
+                "series_listing": source["build_series_index"],
+                "header_reads": source["index_series"] - source["parse_prefix"],
+                "header_parse": source["parse_prefix"],
+                "series_cleaning": source["clean_series"],
+                "reference_and_side": source["estimate_reference"]
+                + source["split_knee_geometry"]
+                + source["resolve_knee_side"],
+                "geometry_other": source["_index_study_geometry"]
+                + source["_slot_sources"]
+                - source["index_series"]
+                - source["clean_series"]
+                - source["estimate_reference"]
+                - source["split_knee_geometry"]
+                - source["resolve_knee_side"],
+                "sampling": sampling,
+                "view_position": views,
+                "row_reads": source["decode_series"] - source["decode_slice"],
+                "fallback_decode": source["decode_slice"],
+                "prepare_other": source["prepare_series"] - source["decode_series"],
+                "slot_other": source["_prepare_slot"]
+                - sampling
+                - views
+                - source["prepare_series"],
+            }
+
         stages = {
-            "series_listing_index": timing["build_series_index"],
+            **split(timing),
             "setup_other": value["setup_seconds"] - timing["build_series_index"],
-            "slice_headers": timing["parse_prefix"],
-            "series_index_other": timing["index_series"] - timing["parse_prefix"],
-            "geometry_and_sampling": sampling,
-            "frame_reads": timing["decode_series"] - timing["resample_crop"],
-            "resample_crop": timing["resample_crop"],
-            "quantiles": timing["_linear_quantiles"],
-            "normalize": timing["_normalize_pixels"],
-            "prepare_other": timing["prepare_series"]
-            - timing["decode_series"]
-            - timing["_linear_quantiles"]
-            - timing["_normalize_pixels"],
             "getitem_other": getitem
-            - timing["index_series"]
-            - sampling
-            - timing["prepare_series"],
-            "collate": sum(item["collate_seconds"] for item in value["studies"]),
+            - timing["_index_study_geometry"]
+            - timing["_slot_sources"]
+            - timing["_study_budgets"]
+            - timing["_prepare_slot"],
+            "collate": collate,
         }
-        stages_cpu = {
-            "series_listing_index": processor["build_series_index"],
-            "slice_headers": processor["parse_prefix"],
-            "series_index_other": processor["index_series"] - processor["parse_prefix"],
-            "geometry_and_sampling": sampling_cpu,
-            "frame_reads": processor["decode_series"] - processor["resample_crop"],
-            "resample_crop": processor["resample_crop"],
-            "quantiles": processor["_linear_quantiles"],
-            "normalize": processor["_normalize_pixels"],
-            "prepare_other": processor["prepare_series"]
-            - processor["decode_series"]
-            - processor["_linear_quantiles"]
-            - processor["_normalize_pixels"],
-        }
-        total = value["setup_seconds"] + getitem + stages["collate"]
+        total = value["setup_seconds"] + getitem + collate
         passes[name] = {
             "studies": studies,
             "total_seconds": total,
@@ -1495,21 +2491,18 @@ def loading_summary(result: dict) -> dict:
             "major_faults": value["major_faults"],
             "images": sum(item["images"] for item in value["studies"]),
             "slice_headers": count["parse_prefix"],
-            "frames": frames,
-            "pydicom_frames": thread_count["_read_pydicom_frame"],
-            "milliseconds_per_header": 1000
+            "milliseconds_per_header_parse": 1000
             * timing["parse_prefix"]
             / max(count["parse_prefix"], 1),
-            "thread_milliseconds_per_frame": 1000
-            * (
-                thread_timing["read_frame"]
-                + thread_timing["read_payload"]
-                + thread_timing["frame_from_payload"]
-            )
-            / max(frames, 1),
+            "thread_milliseconds_per_prefix_read": 1000
+            * thread_timing["_safe_prefix"]
+            / max(thread_count["_safe_prefix"], 1),
+            "thread_milliseconds_per_row_read": 1000
+            * thread_timing["_read_rows"]
+            / max(thread_count["_read_rows"], 1),
             "stages_seconds": stages,
             "stages_fraction": {key: item / total for key, item in stages.items()},
-            "stages_cpu_seconds": stages_cpu,
+            "stages_cpu_seconds": split(processor),
             "thread_seconds": dict(thread_timing),
             "thread_counts": dict(thread_count),
         }
@@ -1522,6 +2515,93 @@ def loading_summary(result: dict) -> dict:
         },
         "throughput": result["throughput"],
     }
+
+
+def lab_summary(result: dict) -> dict:
+    variants = {}
+    fingerprints = {}
+    timed_out = defaultdict(list)
+    for value in result["passes"]:
+        if value.get("timed_out"):
+            timed_out[value["variant"]].append(value["label"])
+            continue
+        if value["label"] == "fingerprint":
+            fingerprints[value["variant"]] = {
+                item["study"]: item["fingerprint"] for item in value["studies"]
+            }
+            continue
+        total = (
+            value["setup_seconds"]
+            + sum(item["getitem_seconds"] for item in value["studies"])
+            + sum(item["collate_seconds"] for item in value["studies"])
+        )
+        variants.setdefault(value["variant"], []).append(
+            {
+                "total_seconds": total,
+                "pass_seconds": value["pass_seconds"],
+                "user_seconds": value["user_seconds"],
+                "system_seconds": value["system_seconds"],
+                "cpu_seconds": value["user_seconds"] + value["system_seconds"],
+                "syscalls_read": value["io"].get("syscr", 0),
+                "read_megabytes": value["io"].get("rchar", 0) / 2**20,
+                "nfs_calls": value["nfs_calls"],
+                "functions": value["functions"],
+            }
+        )
+    reference = fingerprints.get(result["variants"][0], {})
+    summary = {
+        key: result.get(key) for key in ("kernel", "transparent_hugepages", "eviction")
+    } | {"variants": {}, "timed_out": dict(timed_out)}
+    for name, runs in variants.items():
+        mean = {
+            key: float(np.mean([run[key] for run in runs]))
+            for key in (
+                "total_seconds",
+                "pass_seconds",
+                "user_seconds",
+                "system_seconds",
+                "cpu_seconds",
+                "syscalls_read",
+                "read_megabytes",
+            )
+        }
+        functions = defaultdict(lambda: defaultdict(float))
+        for run in runs:
+            for function, record in run["functions"].items():
+                for key, item in record.items():
+                    functions[function][key] += item / len(runs)
+        nfs = defaultdict(float)
+        for run in runs:
+            for key, item in run["nfs_calls"].items():
+                nfs[key] += item / len(runs)
+        own = fingerprints.get(name, {})
+        mismatched = {
+            study: sorted(
+                key
+                for key in set(values) | set(reference.get(study, {}))
+                if values.get(key) != reference.get(study, {}).get(key)
+            )
+            for study, values in own.items()
+            if values != reference.get(study)
+        }
+        summary["variants"][name] = {
+            "rounds": len(runs),
+            "mean": mean,
+            "runs": [
+                {key: run[key] for key in ("total_seconds", "cpu_seconds")}
+                for run in runs
+            ],
+            "nfs_calls": {key: item for key, item in nfs.items() if item},
+            "functions": {
+                key: dict(value)
+                for key, value in sorted(
+                    functions.items(), key=lambda pair: -pair[1]["wall"]
+                )
+            },
+            "fingerprint_studies": len(own),
+            "fingerprint_mismatches": mismatched,
+        }
+    return summary
 
 
 def analyze(args: Analyze) -> dict:
@@ -1550,6 +2630,10 @@ def analyze(args: Analyze) -> dict:
         "runs": {},
     }
     for run_dir in sorted((output / "runs").glob("*")):
+        lab = next(iter(run_dir.rglob("lab.json")), None)
+        if lab is not None:
+            summary["runs"][run_dir.name] = lab_summary(json.loads(lab.read_text()))
+            continue
         loading = next(iter(run_dir.rglob("loading.json")), None)
         if loading is not None:
             summary["runs"][run_dir.name] = loading_summary(

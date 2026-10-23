@@ -2,6 +2,7 @@ import logging
 import time
 from collections.abc import Iterable
 
+import numpy as np
 import polars as pl
 import torch
 
@@ -21,6 +22,7 @@ from knee_abnormality.data.sources import (
     select_studies,
 )
 from knee_abnormality.data.splits import STUDY
+from knee_abnormality.inference.buffers import PinnedBuffers
 from knee_abnormality.inference.reflection import reflect_batch, sagittal_types
 from knee_abnormality.modeling.model import KneeAbnormalityModel
 
@@ -176,7 +178,10 @@ def predict_loader(
     device: torch.device,
     precision: RuntimePrecision = "auto",
     reflection_tta: bool = False,
+    buffer_flags: np.ndarray | None = None,
 ) -> tuple[list[str], torch.Tensor, list[dict]]:
+    pinned = PinnedBuffers()
+    released = None if buffer_flags is None else buffer_flags.reshape(-1)
     study_ids = []
     outputs = []
     batches = []
@@ -208,11 +213,19 @@ def predict_loader(
                 "images": int(batch["slice_mask"].sum()),
                 "padded_images": int(batch["slice_mask"].numel()),
             }
+            slots = batch.pop("buffer_slots", None) or [-1] * len(
+                batch.get("frame_buffers", ())
+            )
+            for buffer, slot in zip(batch.get("frame_buffers", ()), slots, strict=True):
+                if slot >= 0:
+                    pinned.hold(slot, buffer, device.type == "cuda")
             locked = (
                 [
                     buffer
-                    for buffer in batch.get("frame_buffers", ())
-                    if _page_lock(buffer)
+                    for buffer, slot in zip(
+                        batch.get("frame_buffers", ()), slots, strict=True
+                    )
+                    if slot < 0 and _page_lock(buffer)
                 ]
                 if device.type == "cuda"
                 else []
@@ -264,6 +277,8 @@ def predict_loader(
                 outputs.append(probabilities.cpu())
             for value in locked:
                 torch.cuda.cudart().cudaHostUnregister(value.data_ptr())
+            if released is not None:
+                released[[slot for slot in slots if slot >= 0]] = 0
             finished = time.perf_counter()
             transfer_seconds = (
                 copy_events[0].elapsed_time(copy_events[1]) / 1000
@@ -280,6 +295,7 @@ def predict_loader(
                 }
             )
             requested = time.perf_counter()
+    pinned.close()
     return study_ids, torch.cat(outputs), batches
 
 

@@ -31,6 +31,7 @@ from knee_abnormality.inference.processes import (
     cuda_device_count,
     run_prediction_processes,
 )
+from knee_abnormality.inference.startup_pages import warm_startup_pages
 
 
 class PredictCLI(CLISettings, Runtime):
@@ -95,6 +96,8 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO)
     args = PredictCLI()
     bundle = args.bundle.expanduser().resolve() if args.bundle is not None else None
+    if bundle is not None:
+        warm_startup_pages()
     manifest = verify_bundle(bundle) if bundle is not None else None
     verified = time.perf_counter()
     if args.checkpoint is not None and bundle is not None:

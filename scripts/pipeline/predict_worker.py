@@ -4,8 +4,10 @@ import os
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from pathlib import Path
 
+import numpy as np
 from pydantic import Field
 from pydantic_settings import CliPositionalArg
 
@@ -18,6 +20,11 @@ from knee_abnormality.data.sources import (
     select_studies,
 )
 from knee_abnormality.data.splits import STUDY
+from knee_abnormality.inference.buffers import (
+    buffer_flags,
+    collate_pooled,
+    install_buffer_pool,
+)
 from knee_abnormality.inference.processes import PredictionRequest, use_blocking_sync
 
 
@@ -31,8 +38,9 @@ class PredictionWorkerCLI(CLISettings):
     )
 
 
-def lower_priority(worker_id: int) -> None:
+def start_loader_worker(flags: np.ndarray, worker_id: int) -> None:
     os.nice(INFERENCE_LOADER_NICENESS)
+    install_buffer_pool(flags, worker_id)
 
 
 def index_studies(
@@ -61,6 +69,7 @@ def predict_request(request: PredictionRequest) -> dict:
         )
         import torch
 
+        torch.multiprocessing.set_sharing_strategy("file_system")
         from knee_abnormality.data.dataset import KneeStudyDataset, build_data_loader
 
         imported = time.perf_counter()
@@ -85,8 +94,10 @@ def predict_request(request: PredictionRequest) -> dict:
         pin_memory=False,
         prepare_on_loader=False,
     )
+    flags = buffer_flags(request.num_workers)
     loader.in_order = False
-    loader.worker_init_fn = lower_priority
+    loader.collate_fn = collate_pooled
+    loader.worker_init_fn = partial(start_loader_worker, flags)
     batches = iter(loader)
     forked = time.perf_counter()
     sys.modules["wandb"] = None
@@ -119,7 +130,12 @@ def predict_request(request: PredictionRequest) -> dict:
             use_fixed_backbone_chunks(model, request.config.data.image_size)
     loaded = time.perf_counter()
     study_ids, predictions, records = predict_loader(
-        models, batches, device, request.precision, request.reflection_tta
+        models,
+        batches,
+        device,
+        request.precision,
+        request.reflection_tta,
+        flags,
     )
     predicted = time.perf_counter()
     frame = make_prediction_frame(
@@ -174,7 +190,8 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO)
     args = PredictionWorkerCLI()
     request = PredictionRequest.model_validate(json.loads(args.request.read_text()))
-    print(json.dumps(predict_request(request)))
+    print(json.dumps(predict_request(request)), flush=True)
+    os._exit(0)
 
 
 if __name__ == "__main__":

@@ -4,6 +4,37 @@ Investigation started 2026-09-17 with the user. Candidates, closed regressions, 
 protocol and prior art live in [loading speedup](../backlog/loading-speedup/INDEX.md); each
 measured step has a dated profile in [inference](../inference/INDEX.md#runtime-and-memory).
 
+## State on 2026-10-23
+
+**In main: the loader buffer pool, the early worker exit, the startup page pre-read, exported
+checkpoints that keep only the network, and convolution and linear weights stored in FP16.** The
+compiled backbone and its compile cache stay on branch `inference-speed`, uncommitted, which stays
+alive for the rest of the competition; single-model efficiency submissions are prepared from it.
+Open: a validation-fold score with the pool, and re-recording `kaggle_startup_pages.json` when
+Kaggle's image changes.
+
+## State on 2026-10-19
+
+**Branch `inference-speed`, uncommitted: buffer pool, early worker exit, startup page pre-read and
+checkpoints that keep only the network. S156 ×4 without TensorRT runs 318.9 s against 332.9 s, and
+the model is ready 7.6 s earlier; smaller bundles also start their Kaggle session sooner. TensorRT
+is removed (its runtime delays the session start) and the script kernel is rejected (about 40 s
+slower per session)** ([speed pass](../inference/2026-10-18-inference-speed-second-pass.md),
+[startup](../inference/2026-10-19-bundle-size-and-session-startup.md)).
+
+**The backbone is compiled before its CUDA-graph capture** (adopted 2026-10-20 on the branch only; its submission job
+builds the compile cache on Kaggle and ships it in the bundle):
+13–25% faster per batch on every family, S156 ×4 worker wall −30 to −42 s in paired runs, S167
+−34 s per session over three fresh sessions per arm
+([compile](../inference/2026-10-19-torch-compile-backbone.md)).
+
+## State on 2026-10-17
+
+**Loader workers reuse their pixel buffers from a capped shared-memory pool: S156 TensorRT ×4 on
+Kaggle 297.6 → 268.9 s** with near-equal predictions; direct reads were dropped
+([profile](../inference/2026-10-17-loader-buffer-pool.md)). Not hashed, so existing checkpoints
+take it. Open: a validation-fold score, and the same reuse in training loaders.
+
 ## State on 2026-10-12
 
 **Six bit-exact preparation changes for `repeated_middle` recipes are built and verified**: training
