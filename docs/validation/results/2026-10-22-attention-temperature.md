@@ -108,6 +108,8 @@ gen2 0.52, gen3 0.53); at ×8 it is 0.37–0.61 per label for gen2 (ACL 0.40, MC
 fits OAI's many-model limit and sits near the board optimum, but does not explain the board's
 gain on its own, and S191's equal per-label widths at ×8 lost a step.
 
+A runtime per-label τ (`--label-attention-temperature`, one encoding pooled at several τ; branch `label-attention-temperature`, 2026-10-12) was never merged: the final bundles bake one τ per member, and both per-label rules tried on the board lost. Its uncommitted code is archived in the main checkout at `outputs/archive/removed-worktrees-20261023/label-temperature.patch`.
+
 Routing temperature is one value shared by all labels, so a per-label τ only scales that label's
 own scorer, bias and prior: Contusion's own row at τ 0.93 with routing at 0.4 reaches the width of
 a uniform τ 0.85 (2.1× training).
