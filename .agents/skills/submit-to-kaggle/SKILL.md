@@ -43,7 +43,7 @@ Commands run with `uv run --locked python -m`. Five submissions a day, reset at
    (`compile_cache_running`), adds the cache to the local bundle and re-verifies it
    (`compile_cache_built`). It then submits the notebook version itself and ends at
    `submission_complete` with the public score.
-5. **Record.** `scripts.tools.update_submission_ledger`, then the score in `docs/ongoing/` and the
+5. **Record.** `scripts.tools.update_submission_ledger`, then the score in the
    run's result document.
 
 ## Relaunch
