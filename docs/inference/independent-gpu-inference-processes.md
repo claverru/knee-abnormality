@@ -23,9 +23,16 @@ Start order and GPU-side work since 2026-09-22 on branch `inference-opt`
   prepare the first batches. The optional `wandb` import that `timm` attempts is skipped.
 - **CUDA:** each worker sets blocking synchronization on the primary context before creating it,
   so the main thread sleeps rather than spinning a core while the GPU works.
-- **Backbone:** under FP16, `use_fixed_backbone_chunks(model, image_size)` warms the 64-image
-  channels-last chunk on a side stream and captures it as a CUDA graph; each chunk copies into the
-  graph's fixed input, replays and copies out.
+- **Backbone:** under FP16 each member's backbone is held in FP16 (`model.backbone.half()`; the
+  rest of the model, whose side head takes FP32 tokens, stays FP32). A bundle exported with
+  `--backbone eager` stops there. With the default `graph`, `use_fixed_backbone_chunks(model,
+  image_size)` compiles the backbone
+  with `torch.compile` (default mode, static shapes), warms the 64-image channels-last chunk on a
+  side stream, which runs the compile, and captures it as a CUDA graph; each chunk copies into the
+  graph's fixed input, replays and copies out. A cold compile costs about 14–30 s for a family's
+  first member at model load and about 0.05 s for each later member of the same family; a
+  `compile-cache.bin` shipped in the bundle (`inference.compile_cache`) removes most of it
+  ([compile](2026-10-19-torch-compile-backbone.md)).
 - **Images:** the prediction worker's loader skips loader-side preparation
   (`prepare_on_loader=False`), so its batches carry the shared buffers of raw 16-bit rows.
   `predict_loader` page-locks them in place (`cudaHostRegister`), copies them asynchronously,

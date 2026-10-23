@@ -30,7 +30,7 @@ BACKBONE_CHUNK_IMAGES = 64
 
 
 def use_fixed_backbone_chunks(model: KneeAbnormalityModel, image_size: int) -> None:
-    features = model._backbone_features
+    features = torch.compile(model._backbone_features, dynamic=False)
     model.channels_last = True
     model.backbone.to(memory_format=torch.channels_last)
     device = next(model.parameters()).device

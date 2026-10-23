@@ -12,11 +12,16 @@ from pydantic import Field
 
 from knee_abnormality.cli import CLISettings, describe
 from knee_abnormality.inference.bundle import (
+    bundle_hashes,
     bundle_validation_multiplier,
     submission_description,
     submission_settings,
     submission_validation,
     verify_bundle,
+)
+from knee_abnormality.inference.compile_cache import (
+    COMPILE_CACHE,
+    COMPILE_CACHE_OUTPUT,
 )
 from knee_abnormality.kaggle import (
     COMPETITION,
@@ -250,6 +255,170 @@ def _poll_submission(
         time.sleep(args.poll_seconds)
 
 
+def _upload_bundle(
+    api: KaggleApi,
+    bundle: Path,
+    args: SubmitCLI,
+    title: str,
+    description: str,
+    manifest_sha256: str,
+    dataset_dir: Path,
+) -> tuple[str, object, int]:
+    dataset_dir.mkdir()
+    shutil.copytree(bundle, dataset_dir / "bundle")
+    metadata = {
+        "id": args.dataset,
+        "title": title,
+        "licenses": [{"name": args.dataset_license}],
+        "description": f"{description}\nPrivate inference bundle {manifest_sha256}",
+    }
+    (dataset_dir / "dataset-metadata.json").write_text(
+        json.dumps(metadata, indent=2) + "\n", encoding="utf-8"
+    )
+    if _dataset_exists(api, args.dataset):
+        existing_identity = _dataset_identity(api, args.dataset)
+        existing_metadata_path = Path(
+            api.dataset_metadata(
+                args.dataset, str(dataset_dir.parent / f"{dataset_dir.name}-existing")
+            )
+        )
+        existing_metadata = json.loads(
+            existing_metadata_path.read_text(encoding="utf-8")
+        )
+        if (
+            existing_metadata.get("info", {}).get("description")
+            == metadata["description"]
+        ):
+            return "reuse", {"reused_version": True}, existing_identity["version"]
+        response = api.dataset_create_version(
+            str(dataset_dir), f"Bundle {manifest_sha256}", quiet=False, dir_mode="zip"
+        )
+        action, expected = "version", existing_identity["version"] + 1
+    else:
+        response = api.dataset_create_new(
+            str(dataset_dir), public=False, quiet=False, dir_mode="zip"
+        )
+        action, expected = "create", 1
+    if response is None or getattr(response, "error", None):
+        raise RuntimeError(f"Dataset upload failed: {_jsonable(response)}")
+    return action, response, expected
+
+
+def _push_notebook(
+    api: KaggleApi,
+    notebook: dict,
+    reference: str,
+    title: str,
+    args: SubmitCLI,
+    notebook_dir: Path,
+) -> tuple[object, int]:
+    notebook_dir.mkdir()
+    (notebook_dir / "inference.ipynb").write_text(
+        json.dumps(notebook, indent=1) + "\n", encoding="utf-8"
+    )
+    notebook_metadata = {
+        "id": reference,
+        "title": title,
+        "code_file": "inference.ipynb",
+        "language": "python",
+        "kernel_type": "notebook",
+        "is_private": True,
+        "enable_gpu": True,
+        "enable_internet": False,
+        "competition_sources": [COMPETITION],
+        "dataset_sources": [args.dataset],
+    }
+    (notebook_dir / "kernel-metadata.json").write_text(
+        json.dumps(notebook_metadata, indent=2) + "\n", encoding="utf-8"
+    )
+    response = api.kernels_push(
+        str(notebook_dir), str(args.notebook_timeout_seconds), args.accelerator
+    )
+    version_number = getattr(response, "versionNumber", None)
+    if response is None or getattr(response, "error", None) or not version_number:
+        raise RuntimeError(f"Notebook push failed: {_jsonable(response)}")
+    return response, version_number
+
+
+def _build_compile_cache(
+    api: KaggleApi,
+    bundle: Path,
+    args: SubmitCLI,
+    title: str,
+    record_path: Path,
+    record: dict,
+    temporary: Path,
+) -> None:
+    manifest_sha256 = sha256_file(bundle / "manifest.json")
+    _, _, expected_version = _upload_bundle(
+        api,
+        bundle,
+        args,
+        title,
+        "Compile cache build",
+        manifest_sha256,
+        temporary / "cache-dataset",
+    )
+    _poll_dataset(api, args.dataset, expected_version, args)
+    _update(record_path, record, state="compile_cache_dataset_ready")
+    notebook = json.loads((bundle / "inference.ipynb").read_text(encoding="utf-8"))
+    notebook["cells"].insert(
+        0,
+        {
+            "cell_type": "code",
+            "metadata": {},
+            "execution_count": None,
+            "outputs": [],
+            "source": (
+                "import os\n"
+                f'os.environ["{COMPILE_CACHE_OUTPUT}"] = "/kaggle/working/{COMPILE_CACHE}"\n'
+            ),
+        },
+    )
+    owner, slug = args.notebook.split("/", 1)
+    requested = f"{owner}/{slug[:44]}-cache"
+    response, _ = _push_notebook(
+        api,
+        notebook,
+        requested,
+        f"{title[:44]} cache",
+        args,
+        temporary / "cache-notebook",
+    )
+    cache_notebook = _notebook_reference(response, requested)
+    _update(
+        record_path,
+        record,
+        state="compile_cache_running",
+        compile_cache_notebook=cache_notebook,
+    )
+    _poll_kernel(api, cache_notebook, args)
+    output_dir = temporary / "cache-output"
+    output_dir.mkdir()
+    api.kernels_output(cache_notebook, path=str(output_dir), force=True, quiet=True)
+    matches = sorted(output_dir.rglob(COMPILE_CACHE))
+    if len(matches) != 1:
+        raise ValueError(
+            f"Expected one {COMPILE_CACHE} in the notebook output, found {matches}"
+        )
+    shutil.copy2(matches[0], bundle / COMPILE_CACHE)
+    manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+    manifest["files"] = bundle_hashes(bundle)
+    (bundle / "manifest.json").write_text(
+        json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+    )
+    verify_bundle(bundle)
+    _update(
+        record_path,
+        record,
+        state="compile_cache_built",
+        compile_cache={
+            "sha256": sha256_file(bundle / COMPILE_CACHE),
+            "bytes": (bundle / COMPILE_CACHE).stat().st_size,
+        },
+    )
+
+
 def submit(args: SubmitCLI) -> dict:
     bundle = args.bundle.expanduser().resolve()
     record_path = args.record.expanduser().resolve()
@@ -281,20 +450,7 @@ def submit(args: SubmitCLI) -> dict:
         api.authenticate()
         sequence = args.sequence or _submission_sequence(api, COMPETITION)
         title = f"S{sequence:02d} {label}"
-        description = submission_description(
-            sequence,
-            label,
-            submission_settings(manifest),
-            submission_validation(manifest, bundle_validation_multiplier(bundle)),
-            record["bundle_manifest_sha256"],
-        )
-        _update(
-            record_path,
-            record,
-            sequence=sequence,
-            title=title,
-            description=description,
-        )
+        _update(record_path, record, sequence=sequence, title=title)
         if _kernel_exists(api, args.notebook):
             current_status, current = _kernel_status(api, args.notebook)
             if not any(
@@ -307,54 +463,32 @@ def submit(args: SubmitCLI) -> dict:
             record["previous_notebook_status"] = _jsonable(current)
         with tempfile.TemporaryDirectory(prefix="knee-submit-") as temporary_name:
             temporary = Path(temporary_name)
-            dataset_dir = temporary / "dataset"
-            dataset_dir.mkdir()
-            shutil.copytree(bundle, dataset_dir / "bundle")
-            metadata = {
-                "id": args.dataset,
-                "title": title,
-                "licenses": [{"name": args.dataset_license}],
-                "description": (
-                    f"{description}\n"
-                    f"Private inference bundle {record['bundle_manifest_sha256']}"
-                ),
-            }
-            (dataset_dir / "dataset-metadata.json").write_text(
-                json.dumps(metadata, indent=2) + "\n", encoding="utf-8"
+            if (
+                manifest["runtime"].get("backbone") == "graph"
+                and not (bundle / COMPILE_CACHE).is_file()
+            ):
+                _build_compile_cache(
+                    api, bundle, args, title, record_path, record, temporary
+                )
+                manifest = verify_bundle(bundle)
+            record["bundle_manifest_sha256"] = sha256_file(bundle / "manifest.json")
+            description = submission_description(
+                sequence,
+                label,
+                submission_settings(manifest),
+                submission_validation(manifest, bundle_validation_multiplier(bundle)),
+                record["bundle_manifest_sha256"],
             )
-            if _dataset_exists(api, args.dataset):
-                existing_identity = _dataset_identity(api, args.dataset)
-                existing_metadata_dir = temporary / "existing-dataset-metadata"
-                existing_metadata_path = Path(
-                    api.dataset_metadata(args.dataset, str(existing_metadata_dir))
-                )
-                existing_metadata = json.loads(
-                    existing_metadata_path.read_text(encoding="utf-8")
-                )
-                description = existing_metadata.get("info", {}).get("description")
-                if description == metadata["description"]:
-                    dataset_response = {"reused_version": True}
-                    dataset_action = "reuse"
-                    expected_dataset_version = existing_identity["version"]
-                else:
-                    dataset_response = api.dataset_create_version(
-                        str(dataset_dir),
-                        f"Bundle {record['bundle_manifest_sha256']}",
-                        quiet=False,
-                        dir_mode="zip",
-                    )
-                    dataset_action = "version"
-                    expected_dataset_version = existing_identity["version"] + 1
-            else:
-                dataset_response = api.dataset_create_new(
-                    str(dataset_dir), public=False, quiet=False, dir_mode="zip"
-                )
-                dataset_action = "create"
-                expected_dataset_version = 1
-            if dataset_response is None or getattr(dataset_response, "error", None):
-                raise RuntimeError(
-                    f"Dataset upload failed: {_jsonable(dataset_response)}"
-                )
+            _update(record_path, record, description=description)
+            dataset_action, dataset_response, expected_dataset_version = _upload_bundle(
+                api,
+                bundle,
+                args,
+                title,
+                description,
+                record["bundle_manifest_sha256"],
+                temporary / "dataset",
+            )
             _update(
                 record_path,
                 record,
@@ -384,38 +518,14 @@ def submit(args: SubmitCLI) -> dict:
                     dataset_metadata_path.read_text(encoding="utf-8")
                 ),
             )
-            notebook_dir = temporary / "notebook"
-            notebook_dir.mkdir()
-            shutil.copy2(bundle / "inference.ipynb", notebook_dir / "inference.ipynb")
-            notebook_metadata = {
-                "id": args.notebook,
-                "title": title,
-                "code_file": "inference.ipynb",
-                "language": "python",
-                "kernel_type": "notebook",
-                "is_private": True,
-                "enable_gpu": True,
-                "enable_internet": False,
-                "competition_sources": [COMPETITION],
-                "dataset_sources": [args.dataset],
-            }
-            (notebook_dir / "kernel-metadata.json").write_text(
-                json.dumps(notebook_metadata, indent=2) + "\n", encoding="utf-8"
+            kernel_response, version_number = _push_notebook(
+                api,
+                json.loads((bundle / "inference.ipynb").read_text(encoding="utf-8")),
+                args.notebook,
+                title,
+                args,
+                temporary / "notebook",
             )
-            kernel_response = api.kernels_push(
-                str(notebook_dir),
-                str(args.notebook_timeout_seconds),
-                args.accelerator,
-            )
-            version_number = getattr(kernel_response, "versionNumber", None)
-            if (
-                kernel_response is None
-                or getattr(kernel_response, "error", None)
-                or not version_number
-            ):
-                raise RuntimeError(
-                    f"Notebook push failed: {_jsonable(kernel_response)}"
-                )
             notebook = _notebook_reference(kernel_response, args.notebook)
             _update(
                 record_path,

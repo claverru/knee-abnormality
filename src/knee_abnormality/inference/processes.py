@@ -16,6 +16,8 @@ from knee_abnormality.config import ExperimentConfig, Fold, PositiveFiniteFloat
 
 CU_CTX_SCHED_BLOCKING_SYNC = 4
 
+BackboneMode = Literal["graph", "eager"]
+
 
 class PredictionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -27,6 +29,7 @@ class PredictionRequest(BaseModel):
     image_multiplier: int = Field(gt=0)
     attention_temperature: PositiveFiniteFloat
     reflection_tta: bool
+    backbone: BackboneMode
     batch_size: int = Field(gt=0)
     num_workers: int = Field(ge=0)
     io_threads: int = Field(gt=0)

@@ -137,6 +137,7 @@ def main() -> None:
             if args.attention_temperature is None
             else args.attention_temperature,
             "reflection_tta": False,
+            "backbone": "graph",
             "batch_size": INFERENCE_BATCH_SIZE,
             "num_workers": INFERENCE_NUM_WORKERS,
         }
@@ -203,6 +204,7 @@ def main() -> None:
                 image_multiplier=image_multiplier,
                 attention_temperature=runtime["attention_temperature"],
                 reflection_tta=runtime["reflection_tta"],
+                backbone=runtime["backbone"],
                 batch_size=batch_size,
                 num_workers=num_workers // worker_count
                 + int(index < num_workers % worker_count),
@@ -260,6 +262,7 @@ def main() -> None:
             "image_multiplier": image_multiplier,
             "attention_temperature": runtime["attention_temperature"],
             "reflection_tta": runtime["reflection_tta"],
+            "backbone": runtime["backbone"],
             "batch_size": batch_size,
             "batch_size_scope": "per_device",
             "num_workers": num_workers,

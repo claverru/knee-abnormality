@@ -1,7 +1,9 @@
 import json
 from pathlib import Path
+from typing import get_args
 
 from knee_abnormality.config import validate_attention_temperature
+from knee_abnormality.inference.processes import BackboneMode
 from knee_abnormality.provenance import sha256_file
 
 BUNDLE_SCHEMA_VERSION = 1
@@ -89,6 +91,12 @@ def verify_bundle(root: Path) -> dict:
         or reflection_tta != manifest["runtime"]["reflection_tta"]
     ):
         raise ValueError("Bundle inference reflection TTA differs from the manifest")
+    backbone = config["inference"]["backbone"]
+    if (
+        backbone not in get_args(BackboneMode)
+        or backbone != manifest["runtime"]["backbone"]
+    ):
+        raise ValueError("Bundle inference backbone mode differs from the manifest")
     return manifest
 
 
@@ -112,6 +120,8 @@ def submission_settings(manifest: dict) -> str:
     ]
     if runtime.get("reflection_tta"):
         settings.append("+mirrorTTA")
+    if runtime.get("backbone") == "eager":
+        settings.append("eager")
     return " ".join(settings)
 
 
