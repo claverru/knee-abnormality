@@ -8,7 +8,7 @@ description: Free disk space by fixed rules, without asking, across every worktr
 Run it to the end without asking the user. The rules decide; whatever no rule covers stays and
 is reported.
 
-- **Run:** `rtk proxy uv run --locked python -m scripts.tools.free_disk` from the repository
+- **Run:** `uv run --locked python -m scripts.tools.free_disk` from the repository
   root. It scans every worktree's `outputs/` and `data/raw/.download`, the Hugging Face cache,
   `~/.codex` and the session scratchpads, deletes, and writes
   `outputs/archive/maintenance/disk-cleanup-<UTC>/manifest.json` with every deleted and kept
@@ -28,15 +28,16 @@ is reported.
 ## Rules
 
 Every row also requires that no live process uses the path (working directory, open file, or a
-command line naming it). There is no grace period: `docs/ongoing/` is the list of runs still
-needed, so a run to keep must be named there before the cleanup runs.
+command line naming it). There is no grace period: `docs/ongoing/` and the "Runs to keep" section of
+`docs/final-solution.md` are the list of runs still needed, so a run to keep must be named in one of
+them before the cleanup runs.
 
 | Deleted | When |
 |---|---|
-| `last.ckpt` and non-selected checkpoints | The fold has a `selected_checkpoint.json` and its campaign, if any, is `stopped` |
-| Selected checkpoint | Same, and the run is named in no worktree's `docs/ongoing/`, while its result is recorded: the run is named somewhere in `docs/` or in its campaign's `state.json` |
-| Export weights (`model.ckpt`, `models/*.ckpt`, `wheels/`) | The bundle is absent from `kaggle-ledger.json`, and neither it nor its source run is named in `docs/ongoing/`; checkpoints also need the bundle or its source run named somewhere in `docs/` |
-| Arrays of 50 MiB or more (`.npy`, `.npz`, `.pt`, `.pkl`) in `outputs/analysis`, `profiling`, `previews` | The investigation folder is named neither in `docs/ongoing/` nor in `scripts/`, `src/` or `configs/` |
+| `last.ckpt` and non-selected checkpoints | The fold has a `selected_checkpoint.json` and its campaign, if any, is `stopped`; a pretraining's `last.ckpt` (run name ending in `-pretrain`) is kept as the start weights of later stages |
+| Selected checkpoint | Same, and the run is named in no worktree's `docs/ongoing/` or `docs/final-solution.md`, while its result is recorded: the run is named somewhere in `docs/` or in its campaign's `state.json` |
+| Export weights (`model.ckpt`, `models/*.ckpt`, `wheels/`) | The bundle is absent from `kaggle-ledger.json`, and neither it nor its source run is named in `docs/ongoing/` or `docs/final-solution.md`; checkpoints also need the bundle or its source run named somewhere in `docs/` |
+| Arrays of 50 MiB or more (`.npy`, `.npz`, `.pt`, `.pkl`) in `outputs/analysis`, `profiling`, `previews` | The investigation folder is named neither in `docs/ongoing/`, `docs/final-solution.md` nor in `scripts/`, `src/` or `configs/` |
 | `data/raw/.download/chunks` | `complete.json` exists |
 | Cached Hugging Face models | No file in `scripts/`, `src/`, `configs/` or `z_labels/` of any worktree names the model |
 | Codex package releases | Not the target of `current` |
