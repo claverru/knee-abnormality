@@ -75,7 +75,9 @@ def run(settings: Settings) -> dict:
         raise ValueError("Predictions and frozen targets cover different studies")
     truth = (truth_frame.select(targets).to_numpy() >= TARGET_THRESHOLD).astype(int)
     groups = truth_frame["report_group"].to_numpy()
-    scores = {name: frame.select(targets).to_numpy() for name, frame in predictions.items()}
+    scores = {
+        name: frame.select(targets).to_numpy() for name, frame in predictions.items()
+    }
     columns = [*targets, MACRO]
 
     def point(values: np.ndarray) -> np.ndarray:
@@ -100,7 +102,10 @@ def run(settings: Settings) -> dict:
 
     reference = json.loads(settings.reference_metrics.read_text())
     local = np.asarray(
-        [*(reference["per_target_auc"][target] for target in targets), reference["macro_auc"]]
+        [
+            *(reference["per_target_auc"][target] for target in targets),
+            reference["macro_auc"],
+        ]
     )
     parity = pl.DataFrame(
         {
@@ -115,7 +120,9 @@ def run(settings: Settings) -> dict:
     unique, inverse = np.unique(groups, return_inverse=True)
     rng = np.random.default_rng(settings.bootstrap_seed)
     draws = rng.multinomial(
-        len(unique), np.full(len(unique), 1 / len(unique)), size=settings.bootstrap_draws
+        len(unique),
+        np.full(len(unique), 1 / len(unique)),
+        size=settings.bootstrap_draws,
     )[:, inverse].astype(float)
 
     def bootstrap(values: np.ndarray) -> np.ndarray:
@@ -154,7 +161,11 @@ def run(settings: Settings) -> dict:
         if counts[STUDY].to_list() != ids:
             raise ValueError(f"{name} traced different studies than it predicted")
         change = [
-            float((counts[f"triplets_{slot}"] - baseline_counts[f"triplets_{slot}"]).mean())
+            float(
+                (
+                    counts[f"triplets_{slot}"] - baseline_counts[f"triplets_{slot}"]
+                ).mean()
+            )
             for slot in range(slots)
         ]
         realised.append(
@@ -176,9 +187,7 @@ def run(settings: Settings) -> dict:
         if name == "baseline":
             continue
         slot = record["slot"]
-        others = max(
-            abs(value) for index, value in enumerate(change) if index != slot
-        )
+        others = max(abs(value) for index, value in enumerate(change) if index != slot)
         if others:
             raise ValueError(f"{name} changed the triplets of another series type")
         difference = bootstrap(scores[name]) - check

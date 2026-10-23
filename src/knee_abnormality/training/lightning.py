@@ -582,10 +582,14 @@ class KneeModule(L.LightningModule):
         reduce_fx: str = "mean",
     ) -> None:
         weight = (
-            batch_size.detach().float()
-            if isinstance(batch_size, torch.Tensor)
-            else float(batch_size)
-        ) if reduce_fx == "mean" else 1.0
+            (
+                batch_size.detach().float()
+                if isinstance(batch_size, torch.Tensor)
+                else float(batch_size)
+            )
+            if reduce_fx == "mean"
+            else 1.0
+        )
         entry = self.epoch_totals[self.validating].setdefault(
             name, [0.0, 0.0, reduce_fx, [], []]
         )

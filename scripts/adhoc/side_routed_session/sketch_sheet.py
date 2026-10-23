@@ -17,9 +17,7 @@ from knee_abnormality.inference.engine import move_batch
 
 OUT = Path(sys.argv[1])
 ROWS = [int(v) for v in sys.argv[2].split(",")]
-CONFIGS = [
-    tuple(float(v) for v in item.split(":")) for item in sys.argv[3].split(",")
-]
+CONFIGS = [tuple(float(v) for v in item.split(":")) for item in sys.argv[3].split(",")]
 OUT.mkdir(parents=True, exist_ok=True)
 
 
@@ -47,7 +45,12 @@ names = [
 ]
 planes = [kind.plane for kind in data.series_types]
 device = torch.device("cpu")
-sheet, sheet_axes = plt.subplots(len(CONFIGS), len(ROWS), figsize=(3.0 * len(ROWS), 3.0 * len(CONFIGS)), squeeze=False)
+sheet, sheet_axes = plt.subplots(
+    len(CONFIGS),
+    len(ROWS),
+    figsize=(3.0 * len(ROWS), 3.0 * len(CONFIGS)),
+    squeeze=False,
+)
 for study_number, row in enumerate(ROWS):
     batch = with_images(move_batch(collate_studies([dataset[row]]), device))
     mask = batch["slice_mask"]
@@ -95,9 +98,12 @@ for study_number, row in enumerate(ROWS):
                 "Axial": np.abs(offsets[:, 2] - 15.0),
             }[planes[kind]]
             item = members[int(distance.argmin())]
-            position = np.einsum(
-                "ij,hwj->hwi", maps[item], np.stack((xs, ys, np.ones_like(xs)), -1)
-            ) - centre[item]
+            position = (
+                np.einsum(
+                    "ij,hwj->hwi", maps[item], np.stack((xs, ys, np.ones_like(xs)), -1)
+                )
+                - centre[item]
+            )
             u = position[..., 0] * axis[0] + position[..., 1] * axis[1]
             a = position[..., 0] * axis[1] - position[..., 1] * axis[0]
             z = position[..., 2]

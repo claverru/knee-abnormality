@@ -24,7 +24,12 @@ def digest(path):
     if dataset.file_meta.TransferSyntaxUID.is_compressed:
         dataset.pixel_array_options(decoding_plugin="pillow")
     pixels = np.asarray(dataset.pixel_array)
-    return [str(pixels.dtype), list(pixels.shape), hashlib.sha256(pixels.tobytes()).hexdigest(), str(dataset.SOPInstanceUID)]
+    return [
+        str(pixels.dtype),
+        list(pixels.shape),
+        hashlib.sha256(pixels.tobytes()).hexdigest(),
+        str(dataset.SOPInstanceUID),
+    ]
 
 
 def convert(directory):
@@ -36,7 +41,10 @@ def convert(directory):
             continue
         try:
             dataset = pydicom.dcmread(path)
-            if "PixelData" not in dataset or not dataset.file_meta.TransferSyntaxUID.is_compressed:
+            if (
+                "PixelData" not in dataset
+                or not dataset.file_meta.TransferSyntaxUID.is_compressed
+            ):
                 skipped += 1
                 continue
             dataset.decompress(decoding_plugin="pillow", generate_instance_uid=False)
@@ -53,7 +61,10 @@ def convert(directory):
 def files(directories, count):
     random.seed(11)
     chosen = random.sample(directories, min(len(directories), count))
-    return [os.path.join(directory, random.choice(sorted(os.listdir(directory)))) for directory in chosen]
+    return [
+        os.path.join(directory, random.choice(sorted(os.listdir(directory))))
+        for directory in chosen
+    ]
 
 
 directories = sorted(set(pl.read_parquet(CATALOG)["directory"].to_list()))
@@ -63,7 +74,13 @@ if mode == "sample":
     with ProcessPoolExecutor(60) as pool:
         values = list(pool.map(digest, paths, chunksize=50))
     json.dump(dict(zip(paths, values)), open(SAMPLE, "w"))
-    print("sampled", len(paths), "with pixels", sum(value is not None for value in values), flush=True)
+    print(
+        "sampled",
+        len(paths),
+        "with pixels",
+        sum(value is not None for value in values),
+        flush=True,
+    )
 elif mode == "convert":
     started = time.time()
     totals = [0, 0, 0]
@@ -80,14 +97,22 @@ elif mode == "convert":
                     totals[1] += skipped
                     totals[2] += failed
         except BrokenProcessPool:
-            print("worker crash in block at", position, "; block will be retried once", flush=True)
+            print(
+                "worker crash in block at",
+                position,
+                "; block will be retried once",
+                flush=True,
+            )
             with ProcessPoolExecutor(8) as pool:
                 for done, skipped, failed in pool.map(convert, block, chunksize=1):
                     totals[0] += done
                     totals[1] += skipped
                     totals[2] += failed
         position += len(block)
-        print(f"{position}/{len(directories)} series, converted {totals[0]}, already raw {totals[1]}, failed {totals[2]}, free {shutil.disk_usage('/').free / 1e9:.0f} GB, {time.time() - started:.0f} s", flush=True)
+        print(
+            f"{position}/{len(directories)} series, converted {totals[0]}, already raw {totals[1]}, failed {totals[2]}, free {shutil.disk_usage('/').free / 1e9:.0f} GB, {time.time() - started:.0f} s",
+            flush=True,
+        )
     print("CONVERT_DONE", totals, flush=True)
 elif mode == "verify":
     sample = json.load(open(SAMPLE))
@@ -98,4 +123,13 @@ elif mode == "verify":
     for path in list(sample)[:1500]:
         dataset = pydicom.dcmread(path, stop_before_pixels=True)
         compressed += bool(dataset.file_meta.TransferSyntaxUID.is_compressed)
-    print("verified", len(sample), "different", len(different), different[:3], "| still compressed among 1500:", compressed, flush=True)
+    print(
+        "verified",
+        len(sample),
+        "different",
+        len(different),
+        different[:3],
+        "| still compressed among 1500:",
+        compressed,
+        flush=True,
+    )

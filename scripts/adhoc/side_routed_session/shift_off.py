@@ -27,9 +27,13 @@ studies = studies.sort(STUDY)
 names = studies[STUDY].to_list()
 index = build_series_index(config.paths.data_root, config.data, split, names)
 dataset = KneeStudyDataset(studies, index, config.data, targets, None, 1)
-selected = json.loads((RUN / "training" / "fold_1" / "selected_checkpoint.json").read_text())
+selected = json.loads(
+    (RUN / "training" / "fold_1" / "selected_checkpoint.json").read_text()
+)
 gpu = torch.device("cuda")
-model = load_checkpoint_model(config, targets, Path(selected["path"]), gpu, expected_fold=1).eval()
+model = load_checkpoint_model(
+    config, targets, Path(selected["path"]), gpu, expected_fold=1
+).eval()
 locator = model.shift_locator
 
 
@@ -46,7 +50,9 @@ class Switch(torch.nn.Module):
 
 switch = Switch(locator)
 model.shift_locator = switch
-loader = DataLoader(dataset, batch_size=4, shuffle=False, num_workers=8, collate_fn=collate_studies)
+loader = DataLoader(
+    dataset, batch_size=4, shuffle=False, num_workers=8, collate_fn=collate_studies
+)
 on, off = [], []
 for batch in loader:
     batch = with_images(move_batch(batch, gpu))
@@ -56,11 +62,23 @@ for batch in loader:
         switch.enabled = False
         off.append(torch.sigmoid(model(batch).float()).cpu().numpy())
 on, off = np.concatenate(on), np.concatenate(off)
-saved = pl.read_csv(RUN / "training" / "fold_1" / "validation_predictions.csv").sort(STUDY)
+saved = pl.read_csv(RUN / "training" / "fold_1" / "validation_predictions.csv").sort(
+    STUDY
+)
 labels = [c for c in saved.columns if c not in (STUDY, "fold")]
 assert on.shape[1] == len(labels), (on.shape, labels)
-truth = studies.select(STUDY).join(pl.read_csv(Path("data/folds/all_5fold_scanner_v2") / "targets.csv"), on=STUDY, how="left")
-np.savez(OUT / "shift-on-off.npz", on=on, off=off, names=np.array(names), labels=np.array(labels))
+truth = studies.select(STUDY).join(
+    pl.read_csv(Path("data/folds/all_5fold_scanner_v2") / "targets.csv"),
+    on=STUDY,
+    how="left",
+)
+np.savez(
+    OUT / "shift-on-off.npz",
+    on=on,
+    off=off,
+    names=np.array(names),
+    labels=np.array(labels),
+)
 print(f"{'label':28}{'shift on':>10}{'shift off':>11}{'on - off':>10}")
 total = []
 for i, label in enumerate(labels):
@@ -70,4 +88,7 @@ for i, label in enumerate(labels):
     print(f"{label:28}{a:10.4f}{b:11.4f}{a - b:+10.4f}")
 a, b = np.mean(total, 0)
 print(f"{'macro':28}{a:10.4f}{b:11.4f}{a - b:+10.4f}")
-print("check, saved x? MCL:", roc_auc_score(truth["MCL"].to_numpy() >= 0.5, saved["MCL"].to_numpy()))
+print(
+    "check, saved x? MCL:",
+    roc_auc_score(truth["MCL"].to_numpy() >= 0.5, saved["MCL"].to_numpy()),
+)

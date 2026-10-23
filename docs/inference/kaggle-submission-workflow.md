@@ -188,7 +188,7 @@ notebook stuck in the queue, since every sample started within 8 seconds.
    [Kaggle submission instructions](https://www.kaggle.com/docs/competitions).
 7. Record notebook version, bundle version, submission ID, processing status,
    score and reported runtime. Inspect failed-run logs before retrying and
-   keep final selections explicit before the deadline.
+   choose the final selections explicitly.
 
 Before uploading a bundle that lacks `compile-cache.bin`, `scripts.pipeline.submit` builds it on
 Kaggle: it uploads the bundle, runs its notebook on the visible test as `NOTEBOOK-cache`

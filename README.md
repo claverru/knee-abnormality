@@ -11,7 +11,7 @@ From the repository root:
 ```bash
 uv sync --locked
 uv run --locked python -m knee_abnormality.config configs/resnet50.yaml
-uv run --locked python -m scripts.tools.validation prepare
+uv run --locked python -m scripts.tools.validation prepare --config configs/resnet50.yaml
 uv run --locked python -m scripts.pipeline.train configs/resnet50.yaml
 ```
 
@@ -20,16 +20,16 @@ Shared Python code lives in `src/knee_abnormality/` (`data/`, `modeling/`,
 editable mode, so scripts and notebooks can import `knee_abnormality` while
 source edits take effect immediately. Select `.venv/bin/python` in your editor
 or notebook.
-The config command prints the selected inputs and resolved paths. The default
-config selects fold 0 for quick development; use `--validation.folds '[0,1,2,3,4]'` to
+The config command prints the selected inputs and resolved paths. Each model
+config selects fold 2; use `--validation.folds '[0,1,2,3,4]'` to
 inspect or train a full comparison. Reload a checkpoint for offline test prediction with
 `python -m scripts.pipeline.predict`; see the [pipeline index](scripts/pipeline/INDEX.md)
 and each script's `--help` for complete commands.
 Experiment YAML is validated with Pydantic; `pydantic-settings` parses explicit
 CLI overrides. Environment variables and `.env` files do not override experiments.
 
-The root `justfile` exposes the maintained four-command workflow. All artifact
-and remote identities are explicit:
+The root `justfile` wraps the maintained commands ([recipes](docs/inference/justfile-recipes.md)); the
+main four train, export, run and submit a model. All artifact and remote identities are explicit:
 
 ```bash
 uv run --locked just train configs/resnet50.yaml --run-id RUN_ID

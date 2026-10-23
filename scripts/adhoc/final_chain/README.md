@@ -5,7 +5,8 @@ teacher predictions behind the 60 S188 members. They ran on the rented Vast.ai m
 2026-10-13 and 2026-10-20. The machine was destroyed on 2026-10-20. The files are a **frozen
 record** of what ran there. They were copied byte for byte from
 `outputs/rented-machine-archive-20261020/root/`, and `dispatch/jobs.tsv` came from the archive's
-`dispatch/`. They were not refactored to current conventions, and they assume the host layout
+`dispatch/`; on 2026-10-23 the Python files were reformatted with `ruff format`, which changed
+layout only (the unformatted copies are in commit `b3f3f62` and in the archive). They were not refactored to current conventions, and they assume the host layout
 described below. The chain itself is described in the
 [teacher-student chain](../../../docs/modeling/external-data-and-distillation/teacher-student-chain.md),
 the external studies in [external data](../../../docs/modeling/external-data-and-distillation/external-data.md),

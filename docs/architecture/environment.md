@@ -213,10 +213,26 @@ for name in ("git_commit", "build_date"):
     path = Path("/etc") / name
     print(name, path.read_text().strip() if path.exists() else "unavailable")
 for name in (
-    "torch", "torchvision", "timm", "numpy", "polars", "pydicom",
-    "scikit-learn", "scipy", "pillow", "tqdm", "matplotlib",
-    "ipykernel", "jupyterlab", "kaggle", "lightning", "pytorch-lightning",
-    "torchmetrics", "lightning-utilities", "pydantic", "pydantic-settings",
+    "torch",
+    "torchvision",
+    "timm",
+    "numpy",
+    "polars",
+    "pydicom",
+    "scikit-learn",
+    "scipy",
+    "pillow",
+    "tqdm",
+    "matplotlib",
+    "ipykernel",
+    "jupyterlab",
+    "kaggle",
+    "lightning",
+    "pytorch-lightning",
+    "torchmetrics",
+    "lightning-utilities",
+    "pydantic",
+    "pydantic-settings",
     "pyyaml",
 ):
     try:

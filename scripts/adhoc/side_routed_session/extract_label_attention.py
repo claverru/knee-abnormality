@@ -20,8 +20,10 @@ from knee_abnormality.inference.engine import move_batch
 
 TOP = 20
 run = experiment / "training"
-text = (run / "effective_config.json").read_text().replace(
-    "/home/claudio/src/knee-abnormality-fixes-and-removals", str(Path.cwd())
+text = (
+    (run / "effective_config.json")
+    .read_text()
+    .replace("/home/claudio/src/knee-abnormality-fixes-and-removals", str(Path.cwd()))
 )
 local = out.parent / f"{kind}-effective_config.json"
 local.parent.mkdir(parents=True, exist_ok=True)
@@ -30,16 +32,38 @@ config = load_config(local)
 targets, studies, split = prediction_studies(config, "validation", 1)
 studies = studies.sort(STUDY)
 device = torch.device("cuda")
-checkpoint = Path(json.loads((run / "fold_1" / "selected_checkpoint.json").read_text())["path"])
+checkpoint = Path(
+    json.loads((run / "fold_1" / "selected_checkpoint.json").read_text())["path"]
+)
 if kind == "old":
-    model = load_checkpoint_model(config, targets, checkpoint, device, expected_fold=1, attention_temperature=1.0)
+    model = load_checkpoint_model(
+        config, targets, checkpoint, device, expected_fold=1, attention_temperature=1.0
+    )
 else:
     from knee_abnormality.modeling.model import ROUTING_MINIMUM_WEIGHT
 
     model = load_checkpoint_model(config, targets, checkpoint, device, expected_fold=1)
-index = build_series_index(config.paths.data_root, config.data, split, studies[STUDY].to_list())
+index = build_series_index(
+    config.paths.data_root, config.data, split, studies[STUDY].to_list()
+)
 dataset = KneeStudyDataset(studies, index, config.data, targets, None, 1)
-store = {key: [] for key in ("region", "index", "weight", "tokens", "study", "axis_a", "axis_b", "position", "frame", "valid_count", "image_sum", "logit")}
+store = {
+    key: []
+    for key in (
+        "region",
+        "index",
+        "weight",
+        "tokens",
+        "study",
+        "axis_a",
+        "axis_b",
+        "position",
+        "frame",
+        "valid_count",
+        "image_sum",
+        "logit",
+    )
+}
 with torch.inference_mode():
     for row in range(studies.height):
         batch = with_images(move_batch(collate_studies([dataset[row]]), device))
@@ -48,14 +72,22 @@ with torch.inference_mode():
         if kind == "old":
             tokens, _ = model._pooling_tokens(encoded)
             scores = model.attention(tokens).transpose(0, 1).float()
-            view = encoded["view_index"][:, None].expand_as(encoded["visual_valid"]).flatten()
+            view = (
+                encoded["view_index"][:, None]
+                .expand_as(encoded["visual_valid"])
+                .flatten()
+            )
             if model.view_label_bias is not None:
                 scores = scores + model.view_label_bias.float()[view].transpose(0, 1)
             medial_axis = encoded["medial_axis"].flatten().float()
             signs = model.meniscus_mask_signs[:, None]
             own_side = (signs == 0) | (signs * medial_axis[None] > -10.0)
             restricted = valid[None] & own_side
-            allowed = torch.where(restricted.any(-1, keepdim=True), restricted, valid[None].expand_as(restricted))
+            allowed = torch.where(
+                restricted.any(-1, keepdim=True),
+                restricted,
+                valid[None].expand_as(restricted),
+            )
             attention = scores.masked_fill(~allowed, -torch.inf).softmax(-1)
             axis_a = medial_axis
             axis_b = encoded["anterior_axis"].flatten().float()
@@ -64,32 +96,54 @@ with torch.inference_mode():
             region = allowed
         else:
             own = model.attention(model.study_tokens(encoded)).transpose(0, 1).float()
-            shared = model.attention(model.study_tokens(encoded, shared=True)).transpose(0, 1).float()
+            shared = (
+                model.attention(model.study_tokens(encoded, shared=True))
+                .transpose(0, 1)
+                .float()
+            )
             scores = torch.where(model.shared_channel[:, None], shared, own)
-            view = encoded["view_index"][:, None].expand_as(encoded["visual_valid"]).flatten()
+            view = (
+                encoded["view_index"][:, None]
+                .expand_as(encoded["visual_valid"])
+                .flatten()
+            )
             if model.view_label_bias is not None:
                 scores = scores + model.view_label_bias.float()[view].transpose(0, 1)
-            prior = torch.where(
-                model.shared_channel[model.target_channel][:, None, None],
-                model.position_priors(encoded["position"], encoded["routable"]),
-                model.position_priors(encoded["fitted_position"], encoded["routable"]),
-            ).flatten(1).float()
+            prior = (
+                torch.where(
+                    model.shared_channel[model.target_channel][:, None, None],
+                    model.position_priors(encoded["position"], encoded["routable"]),
+                    model.position_priors(
+                        encoded["fitted_position"], encoded["routable"]
+                    ),
+                )
+                .flatten(1)
+                .float()
+            )
             routing = model.routing_weights(encoded).flatten(1).float()
             weights = torch.cat((routing, torch.ones_like(routing[:1])))
             routed = (valid.float()[None] @ weights.T >= 1)[0, model.target_route]
-            log_weights = weights.clamp_min(ROUTING_MINIMUM_WEIGHT).log() / model.routing_temperature
+            log_weights = (
+                weights.clamp_min(ROUTING_MINIMUM_WEIGHT).log()
+                / model.routing_temperature
+            )
             attention = (
-                scores[model.target_channel]
-                + prior
-                + torch.where(routed[:, None], log_weights[model.target_route], 0.0)
-            ).masked_fill(~valid[None], -torch.inf).softmax(-1)
+                (
+                    scores[model.target_channel]
+                    + prior
+                    + torch.where(routed[:, None], log_weights[model.target_route], 0.0)
+                )
+                .masked_fill(~valid[None], -torch.inf)
+                .softmax(-1)
+            )
             position = encoded["fitted_position"].float().flatten(0, 1)
             frame = encoded["position"].float().flatten(0, 1)
             axis_a = position[:, 0]
             axis_b = position[:, 1]
-            region = torch.where(
-                routed[:, None], weights[model.target_route] > 0.5, True
-            ) & valid[None]
+            region = (
+                torch.where(routed[:, None], weights[model.target_route] > 0.5, True)
+                & valid[None]
+            )
         chosen = attention.topk(TOP, dim=-1)
         store["index"].append(chosen.indices.cpu().numpy())
         store["weight"].append(chosen.values.cpu().numpy())

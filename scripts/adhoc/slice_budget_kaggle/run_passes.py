@@ -142,9 +142,9 @@ def summarise_trace(trace_dir: Path, experiment: dict, counts_path: Path) -> dic
             }
         )
     total = frame.select(
-        pl.sum_horizontal(
-            f"triplets_{slot}" for slot in range(len(types))
-        ).alias("total")
+        pl.sum_horizontal(f"triplets_{slot}" for slot in range(len(types))).alias(
+            "total"
+        )
     )["total"]
     return {
         "traced_studies": frame.height,

@@ -369,7 +369,9 @@ def _meta_end(buffer: memoryview, values: dict) -> int:
             size = int.from_bytes(buffer[offset + 6 : offset + 8], "little")
             body = offset + 8
         if (group, element) == (0x0002, 0x0010):
-            values["syntax"] = bytes(buffer[body : body + size]).decode("ascii").rstrip("\x00 ")
+            values["syntax"] = (
+                bytes(buffer[body : body + size]).decode("ascii").rstrip("\x00 ")
+            )
         offset = body + size
     return end
 
@@ -574,6 +576,7 @@ def run_cell(implementation: str, threads: int, split: bool, paths: list[Path]) 
                 except PREPARATION_ERRORS:
                     failures += 1
         else:
+
             def safe(path):
                 try:
                     reader(path)

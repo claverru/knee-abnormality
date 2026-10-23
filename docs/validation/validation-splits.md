@@ -47,7 +47,12 @@ by `MagneticFieldStrength` into 3T (>= 2), 1.5T (< 2) and unknown; Toshiba, Cano
 Hitachi are pooled as `minor`, one English-reporting site
 ([vendor associations](../metadata/vendor-label-associations.md)). The groups come from
 `outputs/analysis/s/sharing-disagreement-20260914/study_headers.parquet`, whose hash
-`protocol.json` records. Studies are grouped by SHA-256 of the report text with whitespace
+`protocol.json` records. The table holds the headers of one representative series per study; its
+generator is `collect_headers` in
+`038c8a1:docs/history/sharing-sources/audit_sharing_disagreements.py.txt`. Regenerated from
+`data/raw` on 2026-10-23 after a disk cleanup removed it, the file hash changed (Polars writer
+metadata) but `validation prepare` with seed 1533697213 on `rebuild_state_v2` reproduced every
+fold assignment and the manifest hash `4b4563c3…` of `all_5fold_scanner_v2`. Studies are grouped by SHA-256 of the report text with whitespace
 collapsed and case folded; sorting the groups first makes assignments independent of row order.
 Gold and report-derived members of one group always share a fold. No seed search or model score
 selected the split. Groups stay intact and several targets are balanced, so fold sizes are
@@ -75,7 +80,9 @@ or scanner independence. The smallest scanner group, GE 3T (88 studies), lands u
   2423726674; the largest overlap of a fold with a fold of another split is 0.23-0.26 against 0.20
   by chance), `_r6` is NextViT-S (seed 1624582548), and `_r7`-`_r12` (generation 2) and
   `_r13`-`_r18` (generation 3) are the twelve splits of the next rebuild cycle (one per family and
-  generation, 2026-10-18). `all_5fold_scanner_v3_r1`-`_r6` (2026-10-19; ConvNeXt, ResNet-50, NextViT
+  generation, 2026-10-18), in the order ConvNeXt, ResNet-50, MambaVision, FocalNet, EfficientViT,
+  NextViT: seeds 2996044505, 3441970943, 2713293905, 1849822671, 699789740, 1354557035 (`_r7`-`_r12`)
+  and 1414796935, 812711473, 736900440, 2494529008, 188336390, 3138283888 (`_r13`-`_r18`). `all_5fold_scanner_v3_r1`-`_r6` (2026-10-19; ConvNeXt, ResNet-50, NextViT
   generation 2 as `_r1`-`_r3`, generation 3 as `_r4`-`_r6`) carry the same design on
   `rebuild_state_v3`: seeds 4128928322, 399542449, 1938279604, 1167487895, 1086511012, 3081832232,
   picked from 300 candidates to minimise the worst fold-overlap chi-squared against each other and all

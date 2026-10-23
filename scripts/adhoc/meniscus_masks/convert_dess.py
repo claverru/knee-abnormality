@@ -8,7 +8,9 @@ import SimpleITK as sitk
 
 ROOT = Path(__file__).resolve().parents[3]
 CACHE = Path.home() / ".cache/knee-segmenters"
-CENSUS = ROOT / "outputs/analysis/s/soft-tissue-segmenters/3d-series/census_3d_series.csv"
+CENSUS = (
+    ROOT / "outputs/analysis/s/soft-tissue-segmenters/3d-series/census_3d_series.csv"
+)
 SERIES = ROOT / "data/raw/train_series"
 ORIENTATION = "PIR"
 FINEST_MM = 0.5

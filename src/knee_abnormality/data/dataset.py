@@ -539,9 +539,7 @@ def collate_studies(items: list[dict]) -> dict:
     source_image_index = torch.cat(
         [
             torch.arange(series.triplet_count, dtype=torch.long) + image_starts[source]
-            for (_, _, series), source in zip(
-                entries, source_series, strict=True
-            )
+            for (_, _, series), source in zip(entries, source_series, strict=True)
         ]
     )
     primary_image_index = torch.arange(image_starts[len(primary)], dtype=torch.long)

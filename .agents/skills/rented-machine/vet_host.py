@@ -35,7 +35,9 @@ def gpu() -> None:
     print(f"bf16 matmul: {2 * 8192**3 / timed(lambda: a @ a, 20) / 1e12:.0f} TFLOPS")
     x = torch.empty(512 * 2**20, dtype=torch.uint8, device=device)
     y = torch.empty_like(x)
-    print(f"device copy: {2 * x.numel() / timed(lambda: y.copy_(x), 50) / 1e9:.0f} GB/s")
+    print(
+        f"device copy: {2 * x.numel() / timed(lambda: y.copy_(x), 50) / 1e9:.0f} GB/s"
+    )
     host = torch.empty(512 * 2**20, dtype=torch.uint8).pin_memory()
     seconds = timed(lambda: x.copy_(host, non_blocking=True), 20)
     print(f"host to device: {host.numel() / seconds / 1e9:.1f} GB/s")
@@ -46,7 +48,9 @@ def gpu() -> None:
     print(f"small-kernel launch: {(time.perf_counter() - start) / 20000 * 1e6:.1f} us")
     model = timm.create_model("convnext_tiny", pretrained=False).to(device).eval()
     model = model.to(memory_format=torch.channels_last)
-    batch = torch.randn(128, 3, 224, 224, device=device).to(memory_format=torch.channels_last)
+    batch = torch.randn(128, 3, 224, 224, device=device).to(
+        memory_format=torch.channels_last
+    )
     query = "power.draw,power.limit,clocks.sm,temperature.gpu,clocks_event_reasons.sw_power_cap"
     start = time.perf_counter()
     with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
@@ -56,8 +60,16 @@ def gpu() -> None:
                 model(batch)
             torch.cuda.synchronize()
             rate = 20 * len(batch) / (time.perf_counter() - tick)
-            state = subprocess.run(["nvidia-smi", f"--query-gpu={query}", "--format=csv,noheader"], capture_output=True, text=True, check=False).stdout.strip()
-            print(f"t={time.perf_counter() - start:4.0f}s {rate:6.0f} img/s | {state}", flush=True)
+            state = subprocess.run(
+                ["nvidia-smi", f"--query-gpu={query}", "--format=csv,noheader"],
+                capture_output=True,
+                text=True,
+                check=False,
+            ).stdout.strip()
+            print(
+                f"t={time.perf_counter() - start:4.0f}s {rate:6.0f} img/s | {state}",
+                flush=True,
+            )
 
 
 def cpu() -> None:

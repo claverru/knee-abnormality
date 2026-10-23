@@ -187,9 +187,11 @@ def main() -> None:
             (~pl.col("inside")).sum().alias("outside_series"),
             pl.col(STUDY).n_unique().alias("studies"),
             pl.col(STUDY).filter(~pl.col("inside")).n_unique().alias("outside_studies"),
-            pl.col("miss_mm").filter(~pl.col("inside")).abs().median().alias(
-                "median_abs_miss_mm"
-            ),
+            pl.col("miss_mm")
+            .filter(~pl.col("inside"))
+            .abs()
+            .median()
+            .alias("median_abs_miss_mm"),
         )
         .with_columns(
             (pl.col("outside_series") / pl.col("series")).alias("outside_rate")

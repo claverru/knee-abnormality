@@ -24,4 +24,11 @@ with ProcessPoolExecutor(60) as pool:
     rows = list(pool.map(header, studies, chunksize=32))
 frame = pl.DataFrame(rows)
 frame.write_parquet("/workspace/data/fastmri/study_headers.parquet")
-print(frame.height, frame.group_by("Manufacturer", "ManufacturerModelName", "MagneticFieldStrength").len().sort("len", descending=True).head(8).rows())
+print(
+    frame.height,
+    frame.group_by("Manufacturer", "ManufacturerModelName", "MagneticFieldStrength")
+    .len()
+    .sort("len", descending=True)
+    .head(8)
+    .rows(),
+)

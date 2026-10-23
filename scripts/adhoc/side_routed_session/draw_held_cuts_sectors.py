@@ -17,9 +17,21 @@ LABELS = {
     "Lateral Meniscus": ("#3a7ca5", ("lateral",), "the lateral sector, below the cut"),
     "Medial OA": ("#e07a5f", ("medial",), "the medial sector, below the cut"),
     "Lateral OA": ("#5b8fb9", ("lateral",), "the lateral sector, below the cut"),
-    "PF OA": ("#f2c14e", ("upper medial", "upper lateral"), "both sectors, above the cut"),
-    "Effusion": ("#e9a03b", ("upper medial", "upper lateral"), "both sectors, above the cut"),
-    "Synovitis": ("#c77dba", ("upper medial", "upper lateral"), "both sectors, above the cut"),
+    "PF OA": (
+        "#f2c14e",
+        ("upper medial", "upper lateral"),
+        "both sectors, above the cut",
+    ),
+    "Effusion": (
+        "#e9a03b",
+        ("upper medial", "upper lateral"),
+        "both sectors, above the cut",
+    ),
+    "Synovitis": (
+        "#c77dba",
+        ("upper medial", "upper lateral"),
+        "both sectors, above the cut",
+    ),
     "Baker's": ("#2a9d8f", ("medial",), "the medial sector, below the cut"),
     "Contusion": ("#7a8b99", None, "everything (not routed)"),
     "Fracture": ("#7a8b99", None, "everything (not routed)"),
@@ -38,21 +50,36 @@ def wedge(inner, outer, start, stop, low, high, steps=14):
         if value == 0:
             continue
         for a, b in zip(angles[:-1], angles[1:]):
-            faces.append([
-                (value * np.cos(a), value * np.sin(a), low), (value * np.cos(b), value * np.sin(b), low),
-                (value * np.cos(b), value * np.sin(b), high), (value * np.cos(a), value * np.sin(a), high),
-            ])
+            faces.append(
+                [
+                    (value * np.cos(a), value * np.sin(a), low),
+                    (value * np.cos(b), value * np.sin(b), low),
+                    (value * np.cos(b), value * np.sin(b), high),
+                    (value * np.cos(a), value * np.sin(a), high),
+                ]
+            )
     for a in (angles[0], angles[-1]):
-        faces.append([
-            (inner * np.cos(a), inner * np.sin(a), low), (outer * np.cos(a), outer * np.sin(a), low),
-            (outer * np.cos(a), outer * np.sin(a), high), (inner * np.cos(a), inner * np.sin(a), high),
-        ])
+        faces.append(
+            [
+                (inner * np.cos(a), inner * np.sin(a), low),
+                (outer * np.cos(a), outer * np.sin(a), low),
+                (outer * np.cos(a), outer * np.sin(a), high),
+                (inner * np.cos(a), inner * np.sin(a), high),
+            ]
+        )
     return faces
 
 
 def nod(faces):
     return [
-        [(x, y * np.cos(TILT) + z * np.sin(TILT), z * np.cos(TILT) - y * np.sin(TILT)) for x, y, z in face]
+        [
+            (
+                x,
+                y * np.cos(TILT) + z * np.sin(TILT),
+                z * np.cos(TILT) - y * np.sin(TILT),
+            )
+            for x, y, z in face
+        ]
         for face in faces
     ]
 

@@ -15,10 +15,10 @@ are described in [external data](external-data.md).
 
 | Step | What | Configs | Outputs |
 |---|---|---|---|
-| Gen 1 (teachers) | Each family × five folds on Kaggle labels only (teacher share 0), on the shared split, one seed per run | `configs/{convnext,resnet50,nextvit}.yaml` (v2), the same with the v3 label manifest, source and split (v3) | `outputs/training/{family}-gen1-fold-{k}`, `{family}-v3-gen1-fold-{k}` |
+| Gen 1 (teachers) | Each family × five folds on Kaggle labels only (teacher share 0), on the shared split, one seed per run | `configs/{convnext,resnet50,nextvit}.yaml` (v2); for v3 the same configs with the v3 label manifest, source and split passed as overrides (no committed config; the rows of [`jobs.tsv`](../../../scripts/adhoc/final_chain/dispatch/jobs.tsv) named `*-v3-gen1-fold-*`) | `outputs/training/{family}-gen1-fold-{k}` (the v2 NextViT teachers were `nextvit-silver-fold-{0,1,3,4}` and `nextvit-gen1-fold-2`), `{family}-v3-gen1-fold-{k}` |
 | Kaggle teacher table T2 | Each gen-1 model predicts its own validation fold at ×4, τ 0.85, mirror TTA; the table is the logit of the mean probability of the chosen teachers | | `data/labels/prepared/rebuild-t2-x4-tau085-tta`, `rebuild-v3-t2-x4-tau085-tta` |
 | External table | The same teachers predict all 19,265 fastMRI + OAI studies (×4, τ 0.85, TTA); OAI keeps only menisci and OA ([rule](external-data.md#oai)) | | `rebuild-gen1-x4-tau085-tta-oai-soft-tissue`, `rebuild-v3-gen1-x4-tau085-tta-oai-soft-tissue` |
-| Pretraining | One run per family on the external studies only, nominal fold 0, ten epochs | `configs/{family}-{rebuild,v3}-pretrain.yaml` | `{family}-rebuild-pretrain`, `{family}-v3-pretrain` (their `last.ckpt` starts every later stage and is kept) |
+| Pretraining | One run per family on the external studies only, ten epochs; fold 0 was passed on the command line (the configs list fold 2), and `--extra-training.data-root` must point at the external studies (the configs keep the rented machine's `/workspace/data/external`) | `configs/{family}-{rebuild,v3}-pretrain.yaml` | `{family}-rebuild-pretrain`, `{family}-v3-pretrain` (their `last.ckpt` starts every later stage and is kept) |
 | Gen 2 | Kaggle-only fine-tune from the pretraining, targets (1 − share) × silver + share × sigmoid(T2 logit), gold studies keep gold targets | `configs/{family}-{rebuild,v3}-gen2.yaml` | `{family}-gen2-fold-{k}`, `{family}-v3-gen2-fold-{k}` |
 | Mixed table | Half the gen-1 table, half the mean of the gen-2 students' own-fold predictions (probabilities averaged) | | `rebuild-mixed-x4-tau085-tta`, `rebuild-v3-mixed-x4-tau085-tta` |
 | Gen 3 | As gen 2 with the mixed table | `configs/{family}-{rebuild,v3}-gen3.yaml` | `{family}-gen3-fold-{k}`, `{family}-v3-gen3-fold-{k}` |
@@ -74,8 +74,8 @@ The rented-machine code of these steps is kept as a frozen record in
   rescoring of the gen-1 teachers on the v3.1 silver labels left the choice unchanged (first on
   gold and silver).
 - **Student families from the board:** with ConvNeXt + ResNet-50 + NextViT as the core (S178,
-  0.965, first of six 0.965s), adding EfficientViT (S179) ranked 5th and MambaVision (S180) 7th of
-  the 0.965s, and all six families (S177) last; FocalNet added to a 15-model ensemble had cost a
+  0.965, 2nd of the eleven 0.965s by final rank), adding EfficientViT (S179) ranked 6th and
+  MambaVision (S180) 10th, and all six families (S177) last; FocalNet added to a 15-model ensemble had cost a
   step earlier (S166). MambaVision, EfficientViT and FocalNet were dropped after gen 1.
 - **Recipes per family:** [ConvNeXt-Tiny](../backbones/convnext-tiny-backbone.md),
   [ResNet-50](../backbones/resnet-radimagenet-backbones.md),

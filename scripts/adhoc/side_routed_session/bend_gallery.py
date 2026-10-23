@@ -31,7 +31,9 @@ def wide_data(data: DataConfig) -> DataConfig:
 config = load_config(RUN / "effective_config.json")
 targets, studies, split = prediction_studies(config, "validation", 1)
 studies = studies.sort(STUDY)
-index = build_series_index(config.paths.data_root, config.data, split, studies[STUDY].to_list())
+index = build_series_index(
+    config.paths.data_root, config.data, split, studies[STUDY].to_list()
+)
 wide = wide_data(config.data)
 planes = [kind.plane for kind in wide.series_types]
 fluid = [kind.fluid_sensitive for kind in wide.series_types]
@@ -43,19 +45,25 @@ drawn = 0
 for row in rows:
     if drawn == len(axes):
         break
-    w = with_images(move_batch(collate_studies([dataset[int(row)]]), torch.device("cpu")))
+    w = with_images(
+        move_batch(collate_studies([dataset[int(row)]]), torch.device("cpu"))
+    )
     kinds = w["series_type_index"].numpy()
     best = None
     for n in range(len(kinds)):
         if planes[kinds[n]] != "Sagittal":
             continue
-        centre = np.array([float(w[key][n]) for key in ("knee_center_x_mm", "knee_center_y_mm")])
+        centre = np.array(
+            [float(w[key][n]) for key in ("knee_center_x_mm", "knee_center_y_mm")]
+        )
         for t in np.flatnonzero(w["slice_mask"][n].numpy()):
             maps = w["patient_maps"][n, t, 1].float().numpy()
             if not np.isfinite(maps).all() or not np.isfinite(centre).all():
                 continue
             middle = maps @ np.array([111.5, 111.5, 1.0])
-            distance = abs(np.hypot(*(middle[:2] - centre)) - 18.0) + (20.0 if fluid[kinds[n]] else 0.0)
+            distance = abs(np.hypot(*(middle[:2] - centre)) - 18.0) + (
+                20.0 if fluid[kinds[n]] else 0.0
+            )
             if best is None or distance < best[0]:
                 best = (distance, n, t)
     if best is None:
@@ -69,7 +77,10 @@ for row in rows:
     panel.set_xticks([])
     panel.set_yticks([])
     drawn += 1
-figure.suptitle("Sagittal slices through a condyle, 120 mm field, vertical guide lines every 15 mm", fontsize=12)
+figure.suptitle(
+    "Sagittal slices through a condyle, 120 mm field, vertical guide lines every 15 mm",
+    fontsize=12,
+)
 figure.tight_layout(rect=(0, 0, 1, 0.97))
 figure.savefig(OUT / "sagittal-gallery.png", dpi=75)
 print("saved", OUT / "sagittal-gallery.png", drawn)

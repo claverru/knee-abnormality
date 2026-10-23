@@ -36,21 +36,34 @@ def closed(mask, zooms):
     mask = (ndimage.distance_transform_edt(grown, sampling=zooms) > CLOSING_MM) | mask
     for axis in range(3):
         moved = np.moveaxis(mask, axis, 0)
-        mask = np.moveaxis(np.stack([ndimage.binary_fill_holes(plane) for plane in moved]), 0, axis)
+        mask = np.moveaxis(
+            np.stack([ndimage.binary_fill_holes(plane) for plane in moved]), 0, axis
+        )
     return mask
 
 
 def nearest(bone, zooms):
-    distance, index = ndimage.distance_transform_edt(~bone, sampling=zooms, return_indices=True)
-    return distance, (index - np.indices(bone.shape)) * np.array(zooms)[:, None, None, None]
+    distance, index = ndimage.distance_transform_edt(
+        ~bone, sampling=zooms, return_indices=True
+    )
+    return distance, (index - np.indices(bone.shape)) * np.array(zooms)[
+        :, None, None, None
+    ]
 
 
 def export(study):
     target = OUT / "volumes" / f"{study}.npz"
-    image = nib.as_closest_canonical(nib.load(str(SOURCE / "mrannotator" / f"{study}.nii.gz")))
+    image = nib.as_closest_canonical(
+        nib.load(str(SOURCE / "mrannotator" / f"{study}.nii.gz"))
+    )
     raw = np.asarray(image.dataobj)
     zooms = np.array(image.header.get_zooms()[:3], dtype=float)
-    stride = np.array([max(1, int(round(WORKING_MM / z))) if z < 0.7 * WORKING_MM else 1 for z in zooms])
+    stride = np.array(
+        [
+            max(1, int(round(WORKING_MM / z))) if z < 0.7 * WORKING_MM else 1
+            for z in zooms
+        ]
+    )
     raw = raw[:: stride[0], :: stride[1], :: stride[2]]
     affine = image.affine.copy()
     affine[:3, :3] = affine[:3, :3] * stride
@@ -59,12 +72,18 @@ def export(study):
     solid = np.zeros(raw.shape, bool)
     for mask in bones.values():
         solid |= mask
-    fields = {name: nearest(bones[name], zooms) for name in ("femur", "tibia", "kneecap") if bones[name].any()}
+    fields = {
+        name: nearest(bones[name], zooms)
+        for name in ("femur", "tibia", "kneecap")
+        if bones[name].any()
+    }
 
     def between(first, second):
         if first not in fields or second not in fields:
             return np.zeros(raw.shape, bool)
-        cosine = (fields[first][1] * fields[second][1]).sum(0) / np.maximum(fields[first][0] * fields[second][0], 1e-6)
+        cosine = (fields[first][1] * fields[second][1]).sum(0) / np.maximum(
+            fields[first][0] * fields[second][0], 1e-6
+        )
         return closed(~solid & (cosine <= np.cos(np.radians(ANGLE))), zooms) & ~solid
 
     joint = between("femur", "tibia")
@@ -74,19 +93,42 @@ def export(study):
     labels[joint] = JOINT
     for name, _, value in BONES[::-1]:
         labels[bones[name]] = value
-    corners = np.array([[i, j, k] for i in (0, raw.shape[0] - 1) for j in (0, raw.shape[1] - 1) for k in (0, raw.shape[2] - 1)])
+    corners = np.array(
+        [
+            [i, j, k]
+            for i in (0, raw.shape[0] - 1)
+            for j in (0, raw.shape[1] - 1)
+            for k in (0, raw.shape[2] - 1)
+        ]
+    )
     world = (corners @ affine[:3, :3].T + affine[:3, 3]) * FLIP
     origin = np.floor(world.min(0) / SPACING) * SPACING
     shape = np.ceil((world.max(0) - origin) / SPACING).astype(int) + 1
-    grid = np.stack(np.meshgrid(*[origin[a] + SPACING * np.arange(shape[a]) for a in range(3)], indexing="ij"), -1)
+    grid = np.stack(
+        np.meshgrid(
+            *[origin[a] + SPACING * np.arange(shape[a]) for a in range(3)],
+            indexing="ij",
+        ),
+        -1,
+    )
     inverse = np.linalg.inv(affine)
     voxel = np.rint((grid * FLIP) @ inverse[:3, :3].T + inverse[:3, 3]).astype(int)
     inside = ((voxel >= 0) & (voxel < np.array(raw.shape))).all(-1)
     volume = np.full(tuple(shape), 255, np.uint8)
     volume[inside] = labels[tuple(voxel[inside].T)]
-    np.savez_compressed(target, labels=volume, origin=origin.astype(np.float32), spacing=np.float32(SPACING))
+    np.savez_compressed(
+        target,
+        labels=volume,
+        origin=origin.astype(np.float32),
+        spacing=np.float32(SPACING),
+    )
     size = float(np.prod(zooms)) / 1000.0
-    return {"study": study, "joint_ml": float(joint.sum() * size), "kneecap_joint_ml": float(behind.sum() * size), **{f"{name}_ml": float(mask.sum() * size) for name, mask in bones.items()}}
+    return {
+        "study": study,
+        "joint_ml": float(joint.sum() * size),
+        "kneecap_joint_ml": float(behind.sum() * size),
+        **{f"{name}_ml": float(mask.sum() * size) for name, mask in bones.items()},
+    }
 
 
 def main():
@@ -98,16 +140,37 @@ def main():
     (OUT / "classes.json").write_text(
         json.dumps(
             {
-                "classes": ["other", "femur", "tibia", "kneecap", "fibula", "joint", "kneecap_joint"],
-                "closing_mm": CLOSING_MM, "angle_degrees": ANGLE, "spacing_mm": SPACING, "working_mm": WORKING_MM, "knees": rows,
+                "classes": [
+                    "other",
+                    "femur",
+                    "tibia",
+                    "kneecap",
+                    "fibula",
+                    "joint",
+                    "kneecap_joint",
+                ],
+                "closing_mm": CLOSING_MM,
+                "angle_degrees": ANGLE,
+                "spacing_mm": SPACING,
+                "working_mm": WORKING_MM,
+                "knees": rows,
             },
             indent=1,
         )
     )
     print("knees", len(rows))
-    for key in ("joint_ml", "kneecap_joint_ml", "femur_ml", "tibia_ml", "kneecap_ml", "fibula_ml"):
+    for key in (
+        "joint_ml",
+        "kneecap_joint_ml",
+        "femur_ml",
+        "tibia_ml",
+        "kneecap_ml",
+        "fibula_ml",
+    ):
         v = np.array([r[key] for r in rows])
-        print(f"  {key:17} median {np.median(v):6.1f} 5th percentile {np.percentile(v, 5):6.1f} 95th {np.percentile(v, 95):6.1f} smallest {v.min():6.1f} largest {v.max():6.1f} | empty in {(v < 0.5).sum()}")
+        print(
+            f"  {key:17} median {np.median(v):6.1f} 5th percentile {np.percentile(v, 5):6.1f} 95th {np.percentile(v, 95):6.1f} smallest {v.min():6.1f} largest {v.max():6.1f} | empty in {(v < 0.5).sum()}"
+        )
 
 
 if __name__ == "__main__":

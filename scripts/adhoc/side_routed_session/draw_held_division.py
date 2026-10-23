@@ -17,9 +17,18 @@ LEVELS = ((-1.9, -0.75), (-0.45, 0.35), (0.65, 1.8))
 SCALE = 1.5 / 45.0
 CORE = division["radii"][0] * SCALE
 COLOURS = {
-    "ACL": "#5aa469", "MCL": "#8e5ea2", "Medial Meniscus": "#d1495b", "Lateral Meniscus": "#3a7ca5",
-    "Medial OA": "#e07a5f", "Lateral OA": "#5b8fb9", "PF OA": "#f2c14e", "Effusion": "#e9a03b",
-    "Synovitis": "#c77dba", "Baker's": "#2a9d8f", "Contusion": "#7a8b99", "Fracture": "#7a8b99",
+    "ACL": "#5aa469",
+    "MCL": "#8e5ea2",
+    "Medial Meniscus": "#d1495b",
+    "Lateral Meniscus": "#3a7ca5",
+    "Medial OA": "#e07a5f",
+    "Lateral OA": "#5b8fb9",
+    "PF OA": "#f2c14e",
+    "Effusion": "#e9a03b",
+    "Synovitis": "#c77dba",
+    "Baker's": "#2a9d8f",
+    "Contusion": "#7a8b99",
+    "Fracture": "#7a8b99",
 }
 
 
@@ -36,15 +45,23 @@ def wedge(inner, outer, start, stop, low, high):
         if value == 0:
             continue
         for a, b in zip(angles[:-1], angles[1:]):
-            faces.append([
-                (value * np.cos(a), value * np.sin(a), low), (value * np.cos(b), value * np.sin(b), low),
-                (value * np.cos(b), value * np.sin(b), high), (value * np.cos(a), value * np.sin(a), high),
-            ])
+            faces.append(
+                [
+                    (value * np.cos(a), value * np.sin(a), low),
+                    (value * np.cos(b), value * np.sin(b), low),
+                    (value * np.cos(b), value * np.sin(b), high),
+                    (value * np.cos(a), value * np.sin(a), high),
+                ]
+            )
     for a in (angles[0], angles[-1]):
-        faces.append([
-            (inner * np.cos(a), inner * np.sin(a), low), (outer * np.cos(a), outer * np.sin(a), low),
-            (outer * np.cos(a), outer * np.sin(a), high), (inner * np.cos(a), inner * np.sin(a), high),
-        ])
+        faces.append(
+            [
+                (inner * np.cos(a), inner * np.sin(a), low),
+                (outer * np.cos(a), outer * np.sin(a), low),
+                (outer * np.cos(a), outer * np.sin(a), high),
+                (inner * np.cos(a), inner * np.sin(a), high),
+            ]
+        )
     return faces
 
 
@@ -53,8 +70,15 @@ for band, (low, high) in enumerate(LEVELS):
     SECTIONS.append((("core", band), wedge(0.0, CORE - 0.03, 0.0, 360.0, low, high)))
     for number in range(len(ANGLES)):
         start = ANGLES[number]
-        stop = ANGLES[(number + 1) % len(ANGLES)] + (360.0 if number == len(ANGLES) - 1 else 0.0)
-        SECTIONS.append((("ring", band, number), wedge(CORE + 0.03, 1.5, start + 2.0, stop - 2.0, low, high)))
+        stop = ANGLES[(number + 1) % len(ANGLES)] + (
+            360.0 if number == len(ANGLES) - 1 else 0.0
+        )
+        SECTIONS.append(
+            (
+                ("ring", band, number),
+                wedge(CORE + 0.03, 1.5, start + 2.0, stop - 2.0, low, high),
+            )
+        )
 figure = plt.figure(figsize=(22, 18))
 for number, (label, colour) in enumerate(COLOURS.items(), 1):
     axis = figure.add_subplot(3, 4, number, projection="3d")
@@ -66,7 +90,11 @@ for number, (label, colour) in enumerate(COLOURS.items(), 1):
         elif key[0] == "core":
             inside = 0 in reads["radii"] and key[1] in reads["heights"]
         else:
-            inside = 1 in reads["radii"] and key[1] in reads["heights"] and key[2] in reads["sectors"]
+            inside = (
+                1 in reads["radii"]
+                and key[1] in reads["heights"]
+                and key[2] in reads["sectors"]
+            )
         used += inside
         axis.add_collection3d(
             Poly3DCollection(
@@ -96,7 +124,9 @@ for number, (label, colour) in enumerate(COLOURS.items(), 1):
     axis.set_zticks([(low + high) / 2 for low, high in LEVELS], list(BANDS))
     axis.tick_params(labelsize=8, pad=0)
     axis.view_init(elev=30, azim=-58)
-    axis.set_title(f"{label}: {used} of {len(SECTIONS)} sections\n{text}", fontsize=9, pad=0)
+    axis.set_title(
+        f"{label}: {used} of {len(SECTIONS)} sections\n{text}", fontsize=9, pad=0
+    )
 figure.suptitle(
     "The finest division in which labels hold every cut from both sides, medial and lateral mirrored: three heights (cuts at +9 and +27 mm), a core of 21 mm and four sectors.\n"
     "Coloured sections are read by the target (at least 20% of its free attention), grey ones are not. Schematic; the heights are drawn apart.",

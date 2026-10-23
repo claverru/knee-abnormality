@@ -138,13 +138,19 @@ topic id:
 ```python
 from kaggle.api.kaggle_api_extended import KaggleApi
 from kagglesdk.discussions.services.discussions_api_service import (
-    ApiGetTopicRequest, ApiListCommentsRequest)
+    ApiGetTopicRequest,
+    ApiListCommentsRequest,
+)
 
-api = KaggleApi(); api.authenticate()
+api = KaggleApi()
+api.authenticate()
 with api.build_kaggle_client() as kc:
-    request = ApiGetTopicRequest(); request.id = 733343
+    request = ApiGetTopicRequest()
+    request.id = 733343
     topic = kc.discussions.discussion_api_client.get_topic(request).topic
-    request = ApiListCommentsRequest(); request.topic_id = 733343; request.page_size = 50
+    request = ApiListCommentsRequest()
+    request.topic_id = 733343
+    request.page_size = 50
     comments = kc.discussions.discussion_api_client.list_comments(request).comments
 ```
 

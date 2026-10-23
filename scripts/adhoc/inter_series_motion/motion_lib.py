@@ -64,7 +64,9 @@ def load_series(folder):
             continue
     if len(recs) < 3:
         return None
-    keys = [(tuple(np.round(r[2], 3)), tuple(np.round(r[3], 4)), r[4], r[5]) for r in recs]
+    keys = [
+        (tuple(np.round(r[2], 3)), tuple(np.round(r[3], 4)), r[4], r[5]) for r in recs
+    ]
     modal = max(set(keys), key=keys.count)
     recs = [r for r, k in zip(recs, keys) if k == modal]
     if len(recs) < 3:
@@ -110,7 +112,9 @@ def read_pixels(path):
 
 
 def grid_shape(s):
-    return int(np.floor((s.rows - 1) * s.ps[0])) + 1, int(np.floor((s.cols - 1) * s.ps[1])) + 1
+    return int(np.floor((s.rows - 1) * s.ps[0])) + 1, int(
+        np.floor((s.cols - 1) * s.ps[1])
+    ) + 1
 
 
 def sample_on_grid(ref, ref_index, src, src_index, shape, offset=(0.0, 0.0)):
@@ -132,7 +136,11 @@ def sample_on_grid(ref, ref_index, src, src_index, shape, offset=(0.0, 0.0)):
 
 
 def nearest_slice(ref, ref_index, src):
-    centre = ref.ipp[ref_index] + ref.u * (ref.cols - 1) * ref.ps[1] / 2 + ref.v * (ref.rows - 1) * ref.ps[0] / 2
+    centre = (
+        ref.ipp[ref_index]
+        + ref.u * (ref.cols - 1) * ref.ps[1] / 2
+        + ref.v * (ref.rows - 1) * ref.ps[0] / 2
+    )
     dist = (centre - src.ipp) @ src.n
     k = int(np.argmin(np.abs(dist)))
     return k, float(dist[k])
@@ -153,7 +161,10 @@ def features(img, mask):
 
 
 def _corr_factory(shape):
-    size = (sfft.next_fast_len(shape[0] + SEARCH + 2), sfft.next_fast_len(shape[1] + SEARCH + 2))
+    size = (
+        sfft.next_fast_len(shape[0] + SEARCH + 2),
+        sfft.next_fast_len(shape[1] + SEARCH + 2),
+    )
 
     def f(x):
         return sfft.rfft2(x, size)
@@ -208,9 +219,18 @@ def estimate(fa, fb):
     out = {}
     for name, score in (("ngf", ngf), ("ncc", ncc)):
         sy, sx, peak, second, z, edge = _peak(score, valid)
-        out[name] = {"sy": sy, "sx": sx, "peak": peak, "second": second, "z": z, "edge": edge}
+        out[name] = {
+            "sy": sy,
+            "sx": sx,
+            "peak": peak,
+            "second": second,
+            "z": z,
+            "edge": edge,
+        }
         vals = score[valid]
-        out[name]["map"] = np.where(valid, (score - vals.mean()) / (vals.std() + 1e-12), 0.0)
+        out[name]["map"] = np.where(
+            valid, (score - vals.mean()) / (vals.std() + 1e-12), 0.0
+        )
     out["valid"] = valid
     out["overlap"] = float(count[SEARCH, SEARCH] / fa["mask"].sum())
     return out
@@ -218,7 +238,11 @@ def estimate(fa, fb):
 
 def pair_slice(a, ia, b, offset=(0.0, 0.0), force_b=None):
     shape = grid_shape(a)
-    ib, dist = nearest_slice(a, ia, b) if force_b is None else (force_b, float((a.ipp[ia] - b.ipp[force_b]) @ b.n))
+    ib, dist = (
+        nearest_slice(a, ia, b)
+        if force_b is None
+        else (force_b, float((a.ipp[ia] - b.ipp[force_b]) @ b.n))
+    )
     img_a, mask_a = sample_on_grid(a, ia, a, ia, shape)
     img_b, mask_b = sample_on_grid(a, ia, b, ib, shape, offset)
     fa, fb = features(img_a, mask_a), features(img_b, mask_b)

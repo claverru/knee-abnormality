@@ -70,7 +70,9 @@ def safe_status(api: KaggleApi, notebook: str) -> tuple[str | None, object]:
     return None, None
 
 
-def harvest(api: KaggleApi, args: ProbeCLI, status: dict, status_path: Path, active: dict) -> None:
+def harvest(
+    api: KaggleApi, args: ProbeCLI, status: dict, status_path: Path, active: dict
+) -> None:
     output = args.output_dir.expanduser().resolve()
     while active:
         time.sleep(args.poll_seconds)
@@ -90,7 +92,9 @@ def harvest(api: KaggleApi, args: ProbeCLI, status: dict, status_path: Path, act
                 shutil.rmtree(run_dir)
             run_dir.mkdir(parents=True)
             try:
-                api.kernels_output(item["notebook"], path=str(run_dir), force=True, quiet=True)
+                api.kernels_output(
+                    item["notebook"], path=str(run_dir), force=True, quiet=True
+                )
                 (run_dir / "kernel.log").write_text(api.kernels_logs(item["notebook"]))
             except Exception as error:
                 status["runs"][probe]["download_error"] = str(error)
@@ -125,7 +129,9 @@ def launch(args: ProbeCLI) -> dict:
     output = args.output_dir.expanduser().resolve()
     output.mkdir(parents=True, exist_ok=True)
     status_path = output / "status.json"
-    status = json.loads(status_path.read_text()) if status_path.exists() else {"runs": {}}
+    status = (
+        json.loads(status_path.read_text()) if status_path.exists() else {"runs": {}}
+    )
     api = KaggleApi()
     api.authenticate()
     pending = list(args.probes)
@@ -138,7 +144,9 @@ def launch(args: ProbeCLI) -> dict:
             build_script(probe, directory)
             write_metadata(probe, slug, directory, args.owner)
             response = api.kernels_push(str(directory), str(args.timeout_seconds), None)
-            error = getattr(response, "error", None) if response is not None else "empty"
+            error = (
+                getattr(response, "error", None) if response is not None else "empty"
+            )
             if error and "Maximum batch" in str(error):
                 break
             pending.pop(0)

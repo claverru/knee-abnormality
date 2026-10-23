@@ -59,7 +59,9 @@ def run_metrics(run: Path, settings: CompareCLI) -> dict:
     )
     if len(frame) != len(predictions):
         raise ValueError(f"Validation studies missing from the frozen split: {run}")
-    probability = np.clip(frame.select(targets).to_numpy().astype(float), 1e-7, 1 - 1e-7)
+    probability = np.clip(
+        frame.select(targets).to_numpy().astype(float), 1e-7, 1 - 1e-7
+    )
     truth = frame.select([f"y_{t}" for t in targets]).to_numpy().astype(float)
     hard = (truth >= TARGET_THRESHOLD).astype(np.int8)
     gold = frame["is_gold"].to_numpy().astype(bool)
@@ -169,8 +171,7 @@ def compare(settings: CompareCLI) -> None:
         if row["excluded"] is None
         and row["split"] == cohort["split"]
         and row["labels"] == cohort["labels"]
-        and row["validation_image_multiplier"]
-        == cohort["validation_image_multiplier"]
+        and row["validation_image_multiplier"] == cohort["validation_image_multiplier"]
     ]
     excluded = [row["name"] for row in rows if row not in comparable]
 
@@ -196,7 +197,9 @@ def compare(settings: CompareCLI) -> None:
         ]
         noise[metric] = float(np.sqrt(np.square(deviations).sum() / degrees))
 
-    plateau = [row for row in comparable if row["submitted"] >= manifest["plateau_from"]]
+    plateau = [
+        row for row in comparable if row["submitted"] >= manifest["plateau_from"]
+    ]
     earlier = [row for row in comparable if row["submitted"] < manifest["plateau_from"]]
     summary = {
         "created_at": datetime.now(UTC).isoformat(),
@@ -206,7 +209,11 @@ def compare(settings: CompareCLI) -> None:
         },
         "comparable_cohort": cohort,
         "excluded": excluded,
-        "replicate_noise": {"degrees_of_freedom": degrees, "sd": noise, "groups": groups},
+        "replicate_noise": {
+            "degrees_of_freedom": degrees,
+            "sd": noise,
+            "groups": groups,
+        },
         "cohorts": {
             "comparable": cohort_summary(comparable, noise, settings),
             f"comparable_from_{manifest['plateau_from']}": cohort_summary(
@@ -226,7 +233,13 @@ def compare(settings: CompareCLI) -> None:
     print(
         table.filter(pl.col("comparable"))
         .select(
-            "name", "public", "macro_auc", "report_auc", "gold_auc", "soft_bce", "gold_bce"
+            "name",
+            "public",
+            "macro_auc",
+            "report_auc",
+            "gold_auc",
+            "soft_bce",
+            "gold_bce",
         )
         .sort("public", descending=True)
     )

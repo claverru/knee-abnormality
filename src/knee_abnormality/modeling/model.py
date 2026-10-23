@@ -1459,9 +1459,12 @@ class KneeAbnormalityModel(nn.Module):
             offset = torch.where(
                 valid_position[:, None, None], patient_position - center[:, None], 0.0
             ).detach()
-            source_middle = middle @ torch.linalg.inv_ex(
-                batch["crop_affine"].flatten(0, 1)[flat_indices].float()
-            )[0]
+            source_middle = (
+                middle
+                @ torch.linalg.inv_ex(
+                    batch["crop_affine"].flatten(0, 1)[flat_indices].float()
+                )[0]
+            )
             row = source_middle[:, :2, 0]
             row = torch.where(row[:, :1] < 0, -row, row)
             length = row.norm(dim=-1)
