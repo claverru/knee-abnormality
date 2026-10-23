@@ -1,0 +1,42 @@
+ideas:
+- id: kaggle-only-final-epochs-rerun
+  mechanism_id: joint-schedule
+  parent_idea_id: null
+  title: Train the last three of the ten epochs on Kaggle alone (rerun after a loader crash)
+  opportunity: 'KEEPER, 2026-10-12: the run of this seed (kaggle-only-final-epochs-20261012T193043Z-5a402039)
+    was lost to a segmentation fault in a data-loader worker at batch 145 of its fifth epoch, before the
+    Kaggle-only phase began, an infrastructure failure and not a result. This entry runs the same mechanism
+    again. The first joint run led the plain control in every epoch, but the lead fell with the learning
+    rate: +0.0082, +0.0063, +0.0018, +0.0017, +0.0033, +0.0018, +0.0006, +0.0008, +0.0002, +0.0006 at
+    x1, and x4 ended at -0.0003 (prior-work.md, the reference). The user''s proposal: finish on the real
+    labels. The cosine schedule ends at 1% of its peak, so a single last epoch would barely move the weights;
+    the last three epochs cover the part where the rate still averages about a tenth of the peak. Guess,
+    low-medium: +0 to +0.001 macro at x4, PF OA, MCL, Effusion and Fracture first.'
+  mechanism: 'Today every epoch has 2 * ceil(n / batch_size) batches, Kaggle and fastMRI alternating,
+    with accumulate_grad_batches doubled and the returned loss multiplied by EXTRA_BATCHES. Change: epochs
+    0 to 6 are unchanged; in epochs 7, 8 and 9 the sampler emits the Kaggle batches only, one optimizer
+    step per batch, and the loss is not multiplied. The number of optimizer steps and the learning-rate
+    schedule are unchanged (441 steps per epoch in both phases). The fastMRI permutation simply stops
+    after epoch 6. The switch epoch is fixed at 7 by the schedule''s shape, not by a sweep.'
+  precedents:
+  - 'prior-work.md, the reference: the per-epoch lead of the first joint run.'
+  novelty: First run with a Kaggle-only phase.
+  coverage: Every fastMRI study is still drawn about 2.5 times in epochs 0 to 6 (3,087 batches of 8 over
+    9,828 studies).
+  exploitation: 'Read x1 per epoch against the incumbent and the plain control, then x4 and the per-label
+    table with PF OA, MCL, Effusion and Fracture named apart. Activation: train_extra_loss_epoch is logged
+    for epochs 0 to 6 and absent for 7 to 9, and the optimizer steps of the run equal the reference''s.
+    Shown wrong by: the macro below the incumbent at both multipliers.'
+  budget: About 0.85 of the reference's training time, since three epochs have half the batches.
+  implementation: 'Follow the environment paragraph of the developer instructions. File: training/lightning.py
+    only (scripts/ is not editable; the module owns the accumulation, see the campaign index). PairedBatches
+    emits only the Kaggle batches from epoch 7 on and its length follows; the accumulation schedule the
+    module returns becomes per epoch (2 for epochs 0 to 6, 1 after); training_step treats a batch as extra
+    only in a paired epoch and multiplies the loss only there. The constant 7 lives beside EXTRA_BATCHES;
+    no option, no config field. Check without a GPU: the sampler''s lengths and index ranges for epochs
+    6 and 7 on a tiny dataset, and the total of optimizer steps. The earlier candidate''s implementation
+    was approved by the review; reproduce the same change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Requeued by the keeper after a harness failure, not after a result.
+exhausted_directions: None; a rerun of a forced seed lost to a loader crash.

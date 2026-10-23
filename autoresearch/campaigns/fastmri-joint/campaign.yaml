@@ -1,0 +1,102 @@
+id: fastmri-joint
+recipe: configs/training.yaml
+reference_run: outputs/training/rn50-joint-fastmri-fold-3
+reference_equivalences: {}
+reference_config_exceptions:
+- extra_training.data_root
+- extra_training.labels
+- paths.anatomy_targets
+- paths.data_root
+- paths.label_manifest
+- paths.meniscus_targets
+- paths.report_attribute_manifest
+reference_identity_exceptions: []
+additional_evidence_runs:
+- outputs/training/rn50-main-0bd598f-folds-3-4
+training_host:
+  address: 82.169.119.213
+  port: 55084
+  user: root
+  key: ~/.ssh/vast_knee
+  root: /workspace/campaign-host
+backlog:
+  refill_below: 3
+  refill_to: 5
+  seed_order: forced
+  rotate_after: 1000000
+budget:
+  mode: range
+  min_fraction: 0.75
+  max_fraction: 1.25
+policy:
+  editable_files:
+  - configs/training.yaml
+  - src/knee_abnormality/config.py
+  - src/knee_abnormality/training/lightning.py
+  editable_directories: []
+  config_keys:
+  - optimizer.anchor_alpha_early
+  - optimizer.anchor_alpha_late
+  config_prefixes: []
+  list_item_fields: {}
+  input_identity_keys: []
+  require_source_change: false
+  configuration_only_ideas: true
+  developer_instructions: 'Environment, read this first. (1) You have no GPU and must not use one, and the trainings
+    of this campaign run on a rented machine you cannot reach: the fastMRI studies and their label table exist only
+    there, so never try to open them. Allowed checks: static checks with the existing Python environment, loading
+    configs/training.yaml through the config model, and tiny no-gradient checks of the changed functions on synthetic
+    tensors or tiny synthetic datasets; never build the ResNet-50 with its weights and never run a forward-and-backward
+    pass of the whole model on the CPU. Never return blocked for lack of a GPU or of the fastMRI data. (2) Make every
+    change inside the candidate workspace you were assigned and nowhere else. Do not stage the candidate under /tmp,
+    and do not write source/ or changes.diff in the experiment directory: it is read-only to you by design, and the
+    supervisor freezes the source and the diff from your workspace after you return. (3) When the change is complete
+    and the checks pass, return status prepared with the integration and activation declarations in the report.
+    The incumbent starts as fold 3 of rn50-joint-fastmri-fold-3 (prior-work.md, The reference): a Refined-RadImageNet
+    ResNet-50 on main''s recipe that follows every Kaggle batch with a fastMRI batch labelled by the fold''s held-out
+    teacher (extra_training in the config; PairedStudies, PairedBatches and EXTRA_BATCHES in training/lightning.py).
+    Read contract.md before writing code. Each seed is one mechanism and says exactly what changes and what it replaces;
+    apply it to the incumbent you are assigned and leave everything outside it byte-identical. Replace what a seed
+    supersedes: no flag, option or config field selects the old behaviour. Every seed names the metrics that prove
+    it active; the review requires such a proof, so never return a candidate without one. Do not change the backbone,
+    the weights it starts from, the label table, the pseudo-label table or which teacher''s row a fold reads, the
+    validation frame or its targets, distillation.teacher_share, paths, the epochs, the views, slices or image size,
+    or the prediction settings. The Kaggle half of a paired step and the validation and prediction paths must stay
+    byte-identical unless the seed names them. Keep the speed rules of the recipe: epoch metrics go through _log_epoch_metric,
+    model.channels_last stays true. New parameters or buffers initialise under torch.random.fork_rng so the incumbent''s
+    random stream is unchanged. Validation and prediction stay deterministic. Nothing from the pseudo-labels may
+    be needed at validation or prediction, and no trained model runs in the loader. Cost discipline: a seed adds
+    no training time its mechanism does not need. Add no diagnostic to the training step: what a seed asks to be
+    known is reported once in your report or logged on validation only, at most six new metrics per seed. In code
+    that runs every training step write no .item(), .cpu(), bool() or int() of a tensor, no nonzero, unique or new
+    boolean-mask indexing, no Python loop over studies, series or views, and no torch.tensor built from Python values.
+    Add no forward pass beyond what the seed states. State in the report the expected training time and GPU memory.
+    Training time must stay within 0.75 to 1.25 of the reference''s; never fewer epochs. No weight averaging. No
+    tests.'
+  researcher_instructions: 'The campaign has no end: it runs until the user stops it. Never return an empty report
+    and never declare the directions exhausted. Research starts after the forced seeds. Your first product after
+    every completed run is its analysis: both multipliers against the incumbent and against the plain control (fold
+    3 of rn50-main-0bd598f-folds-3-4), the x1 change per epoch, the per-label AUC changes from the runs'' fold_3/validation_predictions.csv
+    sorted from largest gain to largest loss with PF OA, MCL, Effusion and Fracture named apart, the step from x1
+    to x4, the two training losses per epoch, the training and prediction seconds and the peak GPU memory. Adoption
+    is by the runtime: strictly above the incumbent at both multipliers; say which side of that rule the run falls
+    on. One run is a starting point, never a verdict on a mechanism: for a run that was not adopted list what it
+    shares with the other runs that moved the same labels, name candidate causes and look for a bug in the candidate
+    before anything else; do not write that a reference was lucky or that a difference is noise. Only then propose.
+    The scope is how the pseudo-labelled fastMRI half enters the training (contract.md): in which epochs and steps
+    it is used and in what proportion, how its cells are weighted or selected by rules fixed before the run, what
+    it does to the regularisation and to statistics shared with the Kaggle half, and which fastMRI studies or series
+    are drawn. Each idea is one training run, marks every claim as evidence-backed or a guess, cites its numbers
+    from prior-work.md or a run, and states its expected training time and its GPU and RAM estimate. Numbers set
+    by hand come from a cited measurement or the mechanism''s definition, never from a sweep on the validation labels;
+    a per-label rule is never chosen from the campaign fold''s validation result. An idea that only measures is
+    not allowed: put the measurement in what the run logs. Start every implementation text with the sentence ''Follow
+    the environment paragraph of the developer instructions.'' and name the metrics that prove the idea active.
+    Out of bounds: everything in the contract''s out-of-bounds list, among it another backbone, another label table
+    or teacher share, new pseudo-labels or teachers, training on the fold''s validation studies, changes to gold
+    or to the evaluation targets, other image sizes, fields, slices or views, fewer epochs, new routing, attention
+    or readout structure, ensembling, weight averaging, test-time augmentation, reflection probabilities, gold-study
+    weighting, trained models in the loader, fixed measured offsets on the joint centre or pose, per-run controls
+    and confirmation or multi-seed runs. Read results as the contract says: AUC and never the loss; per-label effects
+    on the x1 AUC averaged over epochs 6 to 10 together with x4; reruns of one recipe land within 0.0003 at x4.
+    L2-SP, class weights and cell weights can disagree with the public board: say so when one is adopted.'

@@ -218,6 +218,26 @@ holds the deletion rules, and
 [`free_disk`](../../scripts/tools/free_disk.py), which applies them and writes the manifest under
 `outputs/archive/maintenance/disk-cleanup-<UTC>/`. Record each run below.
 
+**2026-10-16:** the skill freed **1.59 GiB**
+([manifest](../../outputs/archive/maintenance/disk-cleanup-20261016T172321Z/manifest.json)):
+eight finished-session scratchpads (1.633 GiB listed), 11 unnamed Hugging Face models (1.2 GiB)
+and the weights of 28 export bundles (0.394 GiB); `uv cache prune` removed 0.1 GiB more. The
+fastMRI joint line's local runs were named in
+[its ongoing document](../ongoing/fastmri-joint-training.md#local-runs-to-keep-main-checkout-outputstraining)
+first, and the six pretraining `last.ckpt` files (start weights of the joint runs, 2.6 GiB) were
+moved aside during the run, since the resume-checkpoint rule ignores `docs/ongoing/`. Kept for a
+decision: 30 selected checkpoints whose result is recorded nowhere (12.28 GiB), 6 runs without a
+selection record (2.5 GiB), 7 export bundles (1.467 GiB). Outside the rules:
+`~/.cache/knee-segmenters` (31 GiB, 21 of them `nnunet_data`), `~/.cache/uv` (24 GiB),
+`outputs/analysis/pooling-token-cache` (23 GiB), closed campaigns under `outputs/autoresearch`
+(23 GiB) and about 66 GiB that `du` without root does not see.
+Then, by the user's decision, `~/.cache/knee-segmenters` (31 GiB, segmenter line not pursued; main's
+`meniscus_targets` and `balance_anatomy_targets` need its environment and weights set up again),
+`outputs/analysis/pooling-token-cache` (23 GiB) and the `source/`, `workspace/` and `jobs/` folders
+of every stopped campaign under `outputs/autoresearch` (1,097 folders, 15.23 GiB; each experiment
+keeps `changes.diff`, `training/source_snapshot.zip`, predictions, configs and states) were deleted
+by hand: WSL free space went from 166 to 230 GiB.
+
 **2026-10-06:** a cleanup limited to `outputs/autoresearch/fixes-and-removals/` (user
 instruction: nothing outside the campaign), done by hand under the checkpoint rules, without
 `free_disk` and without a manifest: **25 `.ckpt` files (4.25 GiB)** removed, 14 `last.ckpt` and

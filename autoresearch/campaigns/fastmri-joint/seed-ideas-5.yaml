@@ -1,0 +1,37 @@
+ideas:
+- id: fastmri-weight-follows-learning-rate-on-incumbent
+  mechanism_id: joint-schedule
+  parent_idea_id: null
+  title: Weigh the fastMRI batch by the learning-rate curve, applied to the incumbent
+  opportunity: 'KEEPER, 2026-10-13, evidence from this campaign: on the first incumbent this mechanism
+    gave x4 0.932544 against 0.930745 (+0.0018, 80% interval +0.0011 to +0.0025; ten labels up, Synovitis
+    +0.0049, Lateral Meniscus +0.0040, Lateral OA +0.0037, ACL +0.0035, MCL +0.0026) and x1 0.926148 against
+    0.926211, and was rejected on the x1 side by 0.0001. The user has since adopted batch-norm-statistics-from-kaggle
+    (x4 0.931370, x1 0.926095) as the incumbent. The earlier run is above that incumbent at both multipliers,
+    but it was not trained on it. This entry applies the same mechanism to the incumbent, so the two changes
+    are tested together and the runtime''s rule can decide. Expected, medium: x4 above the incumbent by
+    0.0005 to 0.0015 if the two effects add.'
+  mechanism: 'Today the fastMRI batch''s loss enters the paired step at weight one. Change: it is multiplied
+    by the schedule''s current multiplier after warm-up, that is the learning rate divided by its peak,
+    and by one during warm-up. The Kaggle batch is unchanged. With the cosine ending at 1% of the peak,
+    the fastMRI half fades to 1% of its weight in the last steps. Every fastMRI batch is still loaded
+    and forwarded.'
+  precedents:
+  - 'prior-work.md, the reference: the per-epoch lead of the first joint run.'
+  novelty: First run combining the scheduled fastMRI weight with Kaggle-only running statistics.
+  coverage: Every fastMRI batch; the weight is above 0.5 for about the first half of training.
+  exploitation: 'Read x1 per epoch against the incumbent and the plain control, then x4 and the per-label
+    table with PF OA, MCL, Effusion and Fracture named apart. Activation: one training-side epoch metric
+    through _log_epoch_metric, the mean weight applied in the epoch (near 1 in epoch 0, near 0.02 in epoch
+    9). Shown wrong by: the macro below the incumbent at both multipliers.'
+  budget: The reference's training time.
+  implementation: 'Follow the environment paragraph of the developer instructions. File: training/lightning.py,
+    training_step only. Read the multiplier from the schedule the module already builds in configure_optimizers
+    (a Python float per step, no tensor operation); apply it to the loss of an extra batch before the
+    EXTRA_BATCHES multiplication. No option, no config field. If kaggle-only-final-epochs is in the incumbent,
+    apply the weight to the paired epochs only. The earlier candidate''s implementation (experiment fastmri-weight-follows-learning-rate-20261012T214811Z-76841b3f)
+    was approved by the review; reproduce the same change on the incumbent''s source.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The best x4 result of the campaign so far, retested on the incumbent the user adopted.
+exhausted_directions: None; a keeper seed that retests the best run on the adopted incumbent.

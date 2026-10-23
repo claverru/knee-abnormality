@@ -1,0 +1,35 @@
+ideas:
+- id: batch-norm-statistics-from-kaggle-on-incumbent
+  mechanism_id: normalisation-statistics
+  parent_idea_id: null
+  title: Keep the fastMRI batches out of the batch-norm running statistics, applied to the incumbent
+  opportunity: 'USER, message on the monitor page, 2026-10-13 06:46 CEST: ''Add kaggle norm statistics
+    again to the queue''. Evidence from this campaign: on the first incumbent this mechanism gave x4 0.931370
+    against 0.930745 (+0.0006, 80% interval +0.0001 to +0.0012) and x1 0.926095 against 0.926211; Lateral
+    OA +0.0035, ACL +0.0018, Fracture +0.0015, MCL +0.0014, PF OA -0.0014. The user has since made fastmri-weight-follows-learning-rate
+    the incumbent (x4 0.932544, x1 0.926148), which does not carry it. This entry applies it to that incumbent.
+    Expected, low-medium: x4 +0 to +0.0006 if the two effects add; the scheduled weight already reduces
+    fastMRI''s part late in training, so they may overlap.'
+  mechanism: 'Today every training batch updates the running mean and variance of the batch-norm layers
+    that are in training mode. Change: on a fastMRI batch those layers still normalise with the batch''s
+    own statistics, but their running statistics are not updated (momentum 0 for that forward pass). Kaggle
+    batches are unchanged, so the statistics used at validation come from Kaggle studies alone, as in
+    the plain recipe.'
+  precedents: []
+  novelty: First run combining Kaggle-only running statistics with the scheduled fastMRI weight alone.
+  coverage: Every batch-norm layer that updates running statistics in the recipe.
+  exploitation: 'Read the step from x1 to x4 against the incumbent''s, then the macro and the per-label
+    table. Activation: the number of layers affected, in the report, and the mean absolute difference
+    between the run''s and the reference''s running means at the end, logged once on validation. Shown
+    wrong by: the macro below the incumbent at both multipliers.'
+  budget: The reference's training time.
+  implementation: 'Follow the environment paragraph of the developer instructions. File: training/lightning.py.
+    In training_step, around the forward pass of an extra batch, set the momentum of the affected layers
+    to 0 and restore it after; collect the layers once. If no batch-norm layer updates running statistics
+    in this recipe, return blocked and say so. No option, no config field. The earlier candidate''s implementation
+    (experiment batch-norm-statistics-from-kaggle-20261012T200100Z-5451d8ca) was approved by the review;
+    reproduce the same change on the incumbent''s source.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Requested by the user.
+exhausted_directions: None; a seed the user asked for.

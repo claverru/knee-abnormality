@@ -266,3 +266,14 @@ campaign's [run notes](../../autoresearch/campaigns/anatomy-masks/run-notes.md).
 - **Cleaning rules checked against the masks** (guess, from the same notes): series in which no
   knee is found point at wrong body parts or bad scans; rule-based checks designed against the
   masks, with no trained model in the loader.
+
+## Hydra-style gen-3 student: one head per teacher (planned 2026-10-20, user to supervise)
+
+Keep the teachers' disagreement in training instead of averaging it away: a gen-3 student with a shared body and one
+small head per teacher (the three gen-1 families and the three gen-2 families of the mixed table), each head trained on
+its own teacher's out-of-fold predictions (0.25 silver + 0.75 teacher, gold rows keep gold), the heads averaged at
+inference. Literature: Hydra (Tran et al. 2020, arXiv 2001.04694) reports better distillation than average-only
+targets; ensemble distribution distillation mainly improves calibration at equal accuracy; predicting annotator
+disagreement as an auxiliary target gave +4.2% balanced accuracy in dermoscopy (ISIC 2025 workshop). Test: ConvNeXt only,
+5 gen-3 runs on a new split with new seeds, against the regular ConvNeXt gen 3 on the board. Build in its own worktree
+(the rebuild trains from this worktree). Expected gain small (model disagreement is weaker than human disagreement).
