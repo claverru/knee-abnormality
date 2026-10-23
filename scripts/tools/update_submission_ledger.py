@@ -7,6 +7,7 @@ from functools import partial
 from pathlib import Path
 
 from kaggle.api.kaggle_api_extended import KaggleApi
+from kagglesdk.competitions.types.competition_enums import SubmissionSortBy
 from kagglesdk.kernels.types.kernels_api_service import ApiSaveKernelRequest
 from kagglesdk.kernels.types.kernels_enums import KernelExecutionType
 from pydantic import Field
@@ -98,12 +99,22 @@ def _jsonable(value: object) -> dict:
     return {key: item for key, item in vars(value).items() if not key.startswith("_")}
 
 
-def _submissions(api: KaggleApi, competition: str) -> list[dict]:
+def _listed(api: KaggleApi, sort: SubmissionSortBy, args: "RelabelCLI") -> list[dict]:
     rows: dict[int, dict] = {}
     page = 1
     while True:
         batch = (
-            api.competition_submissions(competition, page_number=page, page_size=100)
+            _throttled(
+                partial(
+                    api.competition_submissions,
+                    COMPETITION,
+                    sort=sort,
+                    page_number=page,
+                    page_size=100,
+                ),
+                args.pause_seconds,
+                args.retry_attempts,
+            )
             or []
         )
         known = len(rows)
@@ -113,7 +124,18 @@ def _submissions(api: KaggleApi, competition: str) -> list[dict]:
         if len(batch) < 100 or len(rows) == known:
             break
         page += 1
-    return sorted(rows.values(), key=lambda value: str(value["date"]))
+    return list(rows.values())
+
+
+def _submissions(api: KaggleApi, args: "RelabelCLI") -> list[dict]:
+    rows = _listed(api, SubmissionSortBy.SUBMISSION_SORT_BY_DATE, args)
+    return sorted(rows, key=lambda value: str(value["date"]))
+
+
+def _public_ranks(api: KaggleApi, args: "RelabelCLI") -> dict[int, int]:
+    rows = _listed(api, SubmissionSortBy.SUBMISSION_SORT_BY_PUBLIC_SCORE, args)
+    scored = [row["ref"] for row in rows if row.get("publicScore")]
+    return {reference: rank for rank, reference in enumerate(scored, start=1)}
 
 
 def _bundle_path(recorded: str, exports: Path) -> Path | None:
@@ -228,8 +250,9 @@ def _fallback_label(slug: str) -> str:
 
 def build_ledger(args: RelabelCLI, api: KaggleApi) -> list[dict]:
     local = _local_records(args.records, args.exports)
+    ranks = _public_ranks(api, args)
     entries = []
-    live = _submissions(api, COMPETITION)
+    live = _submissions(api, args)
     for position, submission in enumerate(live, start=1):
         numbered = re.match(r"S(\d+)\b", submission.get("description") or "")
         sequence = int(numbered.group(1)) if numbered else position
@@ -273,6 +296,7 @@ def build_ledger(args: RelabelCLI, api: KaggleApi) -> list[dict]:
                 ),
                 "previous_description": submission.get("description"),
                 "public_score": submission.get("publicScore"),
+                "public_rank": ranks.get(submission["ref"]),
                 "status": str(submission.get("status")),
                 "notebook": notebook,
                 "notebook_version": match.group(3) if match else "",

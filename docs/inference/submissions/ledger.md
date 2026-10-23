@@ -54,7 +54,10 @@ rtk proxy uv run --locked python -m scripts.tools.update_submission_ledger
 rtk proxy uv run --locked python -m scripts.tools.update_submission_ledger --apply
 ```
 
-Without `--apply` it writes only the ledger JSON and prints the planned titles. Labels for S01–S37
+Without `--apply` it writes only the ledger JSON and prints the planned titles. Each JSON entry
+carries `public_rank`, the submission's position in Kaggle's public-score order (1 is best, absent
+for unscored ones): Kaggle sorts on the full score, so the rank orders submissions that tie at
+three decimals, without giving the size of the gap. Labels for S01–S37
 come from a table in the script; later ones are recovered from the notebook slug. With `--apply` it:
 
 - rewrites each private bundle dataset's title, subtitle and description, refusing any dataset
