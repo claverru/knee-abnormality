@@ -1,0 +1,34 @@
+ideas:
+- id: confident-pseudo-labels-weigh-more-rerun
+  mechanism_id: pseudo-label-weight
+  parent_idea_id: null
+  title: Weigh a fastMRI cell by how far its pseudo-label is from 0.5 (rerun after a loader crash)
+  opportunity: 'KEEPER, 2026-10-12: the first run of this seed (confident-pseudo-labels-weigh-more-20261012T192501Z-9d00ce4f)
+    was lost to a segmentation fault in a data-loader worker at batch 791 of its fourth epoch, an infrastructure
+    failure and not a result; it stood at 0.917954 against the incumbent''s 0.916586 at epoch 3. This
+    entry runs the same mechanism again. A pseudo-label near 0.5 is the teacher saying it does not know,
+    and it enters the loss with the weight of a confident one. PF OA has the mean pseudo-label closest
+    to 0.5 (0.481) and the largest spread between teachers (0.029), and it is the first run''s largest
+    loss (-0.0060); MCL and ACL have the most confident labels (prior-work.md). Guess, low-medium: +0
+    to +0.001 macro, PF OA and Effusion first. Keeper''s proposal, not the user''s.'
+  mechanism: 'Today a fastMRI cell has weight one times its class weight. Change: it is also multiplied
+    by c / mean_label(c), with c = abs(2 * target - 1) and mean_label(c) the mean of c over the label''s
+    fastMRI training cells, computed once per fold, so each label keeps its total weight and only the
+    cells inside it are redistributed. Kaggle cells are unchanged.'
+  precedents:
+  - 'targets-and-inputs, uncertain-report-targets-weigh-less: the same rule on report-derived Kaggle cells.'
+  novelty: First confidence weighting of pseudo-labelled cells.
+  coverage: Every fastMRI cell; the redistribution is largest on PF OA, Effusion and Medial Meniscus.
+  exploitation: 'Read PF OA and Effusion, then the macro, at both multipliers. Activation: the twelve
+    mean_label(c) values in the report and train_extra_loss_epoch against the reference''s. Shown wrong
+    by: the macro below the incumbent at both multipliers with PF OA not improved.'
+  budget: The reference's training time; one multiplication per fastMRI batch.
+  implementation: 'Follow the environment paragraph of the developer instructions. File: training/lightning.py.
+    The twelve means are a buffer computed in setup from the fastMRI training rows and initialised under
+    torch.random.fork_rng; the weight is applied in the loss of extra batches only. No option, no config
+    field. If hard-pseudo-labels is in the incumbent the weight is constant: return blocked and say so.
+    The earlier candidate''s implementation was approved by the review; reproduce the same change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Requeued by the keeper after a harness failure, not after a result.
+exhausted_directions: None; a rerun of a forced seed lost to a loader crash.

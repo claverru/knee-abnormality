@@ -1,0 +1,39 @@
+ideas:
+- id: fastmri-loss-weight-doubled-rerun
+  mechanism_id: fastmri-share
+  parent_idea_id: null
+  title: Give the fastMRI batch twice the weight of the Kaggle batch in a paired step (rerun after a decoder
+    crash)
+  opportunity: 'KEEPER, 2026-10-13: the first run of this seed (fastmri-loss-weight-doubled-20261013T074522Z-5aac5942)
+    was lost at batch 581 of its fifth epoch to a segmentation fault in the JPEG 2000 decoder of a loader
+    worker, an infrastructure failure and not a result; it stood at +0.0006, +0.0013, -0.0010, +0.0004
+    against the reference in its four epochs. The decoder has been replaced by one that gives identical
+    pixels. This entry runs the same mechanism again. USER DIRECTION, 2026-10-13: the incumbent is the
+    starting reference again (S148, 0.962 public); S149, the scheduled fastMRI weight, gained +0.0018
+    at x4 on the fold and scored 0.961. Seeds now keep or increase what fastMRI contributes. Increases
+    fastMRI''s part. The paired step weighs the two batches equally, a choice never tested; fastMRI is
+    2.8 times the Kaggle training set and is what the public gain of S148 is attributed to, while every
+    change that reduced its part gained on the fold and the one submitted lost publicly. Guess, low: -0.001
+    to +0.0005 macro on the fold, which cannot see unseen sites; the run''s use is as a candidate for
+    a public check.'
+  mechanism: 'Today the fastMRI batch''s loss enters the paired step at weight one. Change: it is multiplied
+    by two, the weight of one more fastMRI batch per step, in every epoch. The Kaggle batch, the anchor
+    and the schedule are unchanged.'
+  precedents:
+  - 'run-notes.md, public check of the incumbent: reducing fastMRI''s part gained on the fold and lost
+    publicly.'
+  novelty: First run that increases the fastMRI share.
+  coverage: Every fastMRI batch.
+  exploitation: 'Read x4 and x1 against the incumbent and the plain control, per label, PF OA, MCL, Effusion
+    and Fracture named apart (the labels the first joint run lost on). Activation: train_extra_loss_epoch
+    is logged unscaled as now, and one training-side epoch metric through _log_epoch_metric holds the
+    weight applied (2.0). Shown wrong by: x4 more than 0.001 below the incumbent.'
+  budget: The reference's training time.
+  implementation: 'Follow the environment paragraph of the developer instructions. File: training/lightning.py,
+    training_step only: multiply the loss of an extra batch by a module constant of 2 beside EXTRA_BATCHES
+    before the EXTRA_BATCHES multiplication. No option, no config field. The earlier candidate''s implementation
+    was approved by the review; reproduce the same change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Requeued by the keeper after a harness failure, not after a result.
+exhausted_directions: None; a rerun of a forced seed lost to a decoder crash.

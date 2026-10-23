@@ -1,0 +1,114 @@
+ideas:
+- id: no-loader-augmentation-on-fastmri
+  mechanism_id: pseudo-label-inputs
+  parent_idea_id: null
+  title: Load the fastMRI studies without contrast mixing, intensity and noise augmentation
+  opportunity: 'A pseudo-label is the teacher''s reading of the clean study. In training the fastMRI studies
+    go through the same loader augmentations as the Kaggle ones (contrast mixing at probability 0.3, intensity
+    and noise augmentation), which can make the image and its soft label disagree; a real label does not
+    depend on the teacher''s view of the image. Guess, low-medium: -0.0005 to +0.001 macro. Keeper''s
+    proposal.'
+  mechanism: 'Today the fastMRI dataset is built with the recipe''s data settings. Change: it is built
+    with a copy in which data.contrast_mixing_augmentation.probability, data.intensity_augmentation.probability
+    and data.noise_augmentation.probability are 0. Sampling of slices, reflection and series dropping
+    are unchanged, and so are the augmentations inside the model (GIN, feature statistics), which a campaign
+    seed cannot reach. The Kaggle dataset is unchanged.'
+  precedents: []
+  novelty: First run separating the augmentation of real and pseudo-labelled studies.
+  coverage: Every fastMRI study drawn.
+  exploitation: 'Read the macro and the per-label table at both multipliers, and train_extra_loss_epoch
+    against the reference''s (expected lower). Activation: the three probabilities of the fastMRI dataset''s
+    settings, listed in the report. No new metric. Shown wrong by: the macro below the incumbent at both
+    multipliers.'
+  budget: The reference's training time or slightly less.
+  implementation: 'Follow the environment paragraph of the developer instructions. File: training/lightning.py,
+    KneeDataModule.setup only: pass a model_copy of config.data with the three probabilities at 0 to the
+    fastMRI KneeStudyDataset and its series index. No option, no config field. Check without a GPU: the
+    two datasets'' settings printed side by side.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Removes a mismatch between the pseudo-label and the image it is trained on.
+- id: label-rate-matching-by-sampling
+  mechanism_id: pseudo-label-sampling
+  parent_idea_id: null
+  title: Draw the fastMRI studies so their label rates match the Kaggle fold's
+  opportunity: 'fastMRI''s label mix differs from Kaggle''s: mean pseudo-labels of 0.48 for PF OA and
+    0.41 for Effusion against 0.12 for MCL and 0.16 for ACL (prior-work.md, the pseudo-labels), and its
+    studies are drawn uniformly. class-weights-over-both-datasets answers this through the weights; this
+    answers it through which studies are seen, leaving the weights alone. Guess, low-medium: -0.001 to
+    +0.001 macro. Keeper''s proposal.'
+  mechanism: 'Today PairedBatches draws the fastMRI studies from a seeded permutation that cycles through
+    all of them. Change: each study gets a sampling weight fitted once per fold by iterative proportional
+    fitting, so that the weighted fraction of positives (pseudo-label >= 0.5) of each of the twelve labels
+    equals the fraction among the fold''s Kaggle training cells (the positive fractions of class_balance.json).
+    Each epoch draws its fastMRI studies without replacement with those weights, from the run''s seed
+    and the epoch.'
+  precedents:
+  - 'prior-work.md, precedents: class weighting has moved the public score against the fold before.'
+  novelty: First run matching the external set's label mix by sampling.
+  coverage: Fewer distinct fastMRI studies over the run than the uniform draw; the report states how many.
+  exploitation: 'Read PF OA, Effusion, MCL and ACL, then the macro, at both multipliers. Activation, in
+    the report: the twelve weighted fractions beside Kaggle''s and the uniform ones, the effective sample
+    size of the weights, and the number of distinct fastMRI studies drawn over ten epochs. No new metric.
+    Shown wrong by: the macro below the incumbent at both multipliers.'
+  budget: The reference's training time; the weights are fitted once per fold.
+  implementation: 'Follow the environment paragraph of the developer instructions. File: training/lightning.py:
+    the weights are computed in KneeDataModule.setup from the fastMRI training rows and the Kaggle training
+    frame and passed to PairedBatches, which draws with torch.multinomial without replacement from a generator
+    seeded by the run''s seed and the epoch. No option, no config field. Check without a GPU: the fit
+    on synthetic label tables and the fractions reached. If the fit does not converge for a label, return
+    blocked and name it.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The sampling form of the class-weight seed; the most code of the list.
+- id: hard-pseudo-labels
+  mechanism_id: pseudo-label-targets
+  parent_idea_id: null
+  title: Train on fastMRI pseudo-labels thresholded at 0.5
+  opportunity: 'The pseudo-labels are averages over four image sets and a mirrored pass, which pulls them
+    toward the middle, and the model is asked to reproduce that hedging. Thresholding needs no hand-set
+    number. Guess, low: -0.001 to +0.001 macro; it discards the teacher''s confidence, the opposite bet
+    to confident-pseudo-labels-weigh-more. Keeper''s proposal.'
+  mechanism: 'Today a fastMRI cell''s target is the teacher''s probability. Change: it is 1 when that
+    probability is >= 0.5 and 0 otherwise, set once when the label table is read. Kaggle targets are unchanged.'
+  precedents:
+  - 'targets-and-inputs, hard-report-targets: the same rule on report-derived Kaggle cells.'
+  novelty: First run on hard pseudo-labels.
+  coverage: Every fastMRI cell; the change is largest on PF OA, Effusion and Medial Meniscus.
+  exploitation: 'Read the macro and the per-label table at both multipliers, PF OA first. Activation:
+    the share of fastMRI cells per label that were between 0.25 and 0.75 before thresholding, in the report.
+    No new metric. Shown wrong by: the macro below the incumbent at both multipliers.'
+  budget: The reference's training time.
+  implementation: 'Follow the environment paragraph of the developer instructions. File: training/lightning.py,
+    KneeDataModule.setup only, where the fastMRI frame''s target columns are built. No option, no config
+    field. If confident-pseudo-labels-weigh-more is in the incumbent its weights become constant: return
+    blocked and say so.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: One line; the opposite bet to the confidence weighting.
+- id: l2-sp-off
+  mechanism_id: anchor
+  parent_idea_id: null
+  title: Train the joint recipe without the anchor to the pretrained weights
+  opportunity: 'L2-SP was adopted on the ResNet-18 for unseen sites and is level on fold validation; it
+    was never tested on the ResNet-50 (prior-work.md, L2-SP). The joint run adds a second scanner population
+    of 9,828 studies, which regularises against site-specific features directly, the job the anchor was
+    given. Guess, low: -0.001 to +0.001 macro on the fold. The fold holds seen sites only, so an adoption
+    is provisional until the user checks it publicly.'
+  mechanism: 'Config only: optimizer.anchor_alpha_early 0.01 -> 0 and optimizer.anchor_alpha_late 0.001
+    -> 0, both together as one mechanism. With alpha 0 the backbone convolution weights are no longer
+    anchored and get the recipe''s weight decay again, as in the site-generalization removal run.'
+  precedents:
+  - 'prior-work.md, L2-SP: held-out sites +0.0009 to +0.0023 with it, fold validation level, halving level.'
+  novelty: First run without L2-SP on a ResNet-50, and the first with a second population in training.
+  coverage: Every backbone convolution weight.
+  exploitation: 'Read x4 and x1 against the incumbent, per label, and the backbone drift per stage if
+    the recipe logs it. Activation: the anchor penalty logged as zero or absent, and the two config values
+    in the run''s effective config. Shown wrong by: the macro below the incumbent at both multipliers.'
+  budget: The reference's training time.
+  implementation: 'Follow the environment paragraph of the developer instructions. Configuration only:
+    configs/training.yaml, the two keys. No source change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Asked by the user; one config change. Last because the fold cannot see unseen sites.
+exhausted_directions: None; these are the last four of nine forced seeds.

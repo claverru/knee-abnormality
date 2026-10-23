@@ -1,0 +1,105 @@
+ideas:
+- id: fastmri-loss-weight-doubled
+  mechanism_id: fastmri-share
+  parent_idea_id: null
+  title: Give the fastMRI batch twice the weight of the Kaggle batch in a paired step
+  opportunity: 'USER DIRECTION, 2026-10-13: the incumbent is the starting reference again (S148, 0.962
+    public); S149, the scheduled fastMRI weight, gained +0.0018 at x4 on the fold and scored 0.961. Seeds
+    now keep or increase what fastMRI contributes. Increases fastMRI''s part. The paired step weighs the
+    two batches equally, a choice never tested; fastMRI is 2.8 times the Kaggle training set and is what
+    the public gain of S148 is attributed to, while every change that reduced its part gained on the fold
+    and the one submitted lost publicly. Guess, low: -0.001 to +0.0005 macro on the fold, which cannot
+    see unseen sites; the run''s use is as a candidate for a public check.'
+  mechanism: 'Today the fastMRI batch''s loss enters the paired step at weight one. Change: it is multiplied
+    by two, the weight of one more fastMRI batch per step, in every epoch. The Kaggle batch, the anchor
+    and the schedule are unchanged.'
+  precedents:
+  - 'run-notes.md, public check of the incumbent: reducing fastMRI''s part gained on the fold and lost
+    publicly.'
+  novelty: First run that increases the fastMRI share.
+  coverage: Every fastMRI batch.
+  exploitation: 'Read x4 and x1 against the incumbent and the plain control, per label, PF OA, MCL, Effusion
+    and Fracture named apart (the labels the first joint run lost on). Activation: train_extra_loss_epoch
+    is logged unscaled as now, and one training-side epoch metric through _log_epoch_metric holds the
+    weight applied (2.0). Shown wrong by: x4 more than 0.001 below the incumbent.'
+  budget: The reference's training time.
+  implementation: 'Follow the environment paragraph of the developer instructions. File: training/lightning.py,
+    training_step only: multiply the loss of an extra batch by a module constant of 2 beside EXTRA_BATCHES
+    before the EXTRA_BATCHES multiplication. No option, no config field.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The direct test of more fastMRI, at no cost in time.
+- id: no-loader-augmentation-on-fastmri-on-reference
+  mechanism_id: pseudo-label-inputs
+  parent_idea_id: null
+  title: Load the fastMRI studies without contrast mixing, intensity and noise augmentation, applied to
+    the reference
+  opportunity: 'USER DIRECTION, 2026-10-13: the incumbent is the starting reference again (S148, 0.962
+    public); S149, the scheduled fastMRI weight, gained +0.0018 at x4 on the fold and scored 0.961. Seeds
+    now keep or increase what fastMRI contributes. Keeps fastMRI''s part and cleans its supervision. Evidence
+    from this campaign, on an incumbent with Kaggle-only statistics and Kaggle-only final epochs: x1 0.926511
+    against 0.926178 (+0.0003), the highest x1 at the time, and x4 0.931334 against 0.931686 (-0.0004);
+    that incumbent''s per-label profile was not repeated by any of four candidates. This entry applies
+    the change to the reference, where fastMRI is used in all ten epochs and the change therefore acts
+    throughout.'
+  mechanism: 'Today the fastMRI dataset is built with the recipe''s data settings. Change: it is built
+    with a copy in which data.contrast_mixing_augmentation.probability, data.intensity_augmentation.probability
+    and data.noise_augmentation.probability are 0. Sampling of slices, reflection and series dropping
+    are unchanged, and so are the augmentations inside the model (GIN, feature statistics), which a campaign
+    seed cannot reach. The Kaggle dataset is unchanged.'
+  precedents: []
+  novelty: First run separating the augmentation of real and pseudo-labelled studies.
+  coverage: Every fastMRI study drawn.
+  exploitation: 'Read the macro and the per-label table at both multipliers, and train_extra_loss_epoch
+    against the reference''s (expected lower). Activation: the three probabilities of the fastMRI dataset''s
+    settings, listed in the report. No new metric. Shown wrong by: the macro below the incumbent at both
+    multipliers.'
+  budget: The reference's training time or slightly less.
+  implementation: 'Follow the environment paragraph of the developer instructions. File: training/lightning.py,
+    KneeDataModule.setup only: pass a model_copy of config.data with the three probabilities at 0 to the
+    fastMRI KneeStudyDataset and its series index. No option, no config field. Check without a GPU: the
+    two datasets'' settings printed side by side. The earlier candidate (experiment no-loader-augmentation-on-fastmri-20261013T022015Z-9db9d241)
+    was approved by the review; reproduce the same change on the reference''s source.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A seed that does not reduce fastMRI, retested on the reference after the reset.
+- id: label-rate-matching-by-sampling-on-reference
+  mechanism_id: pseudo-label-sampling
+  parent_idea_id: null
+  title: Draw the fastMRI studies so their label rates match the Kaggle fold's, applied to the reference
+  opportunity: 'USER DIRECTION, 2026-10-13: the incumbent is the starting reference again (S148, 0.962
+    public); S149, the scheduled fastMRI weight, gained +0.0018 at x4 on the fold and scored 0.961. Seeds
+    now keep or increase what fastMRI contributes. Keeps fastMRI''s part and changes which studies are
+    drawn. Evidence from this campaign, on the scheduled-weight incumbent: x1 0.927656 against 0.926148
+    (+0.0015, the highest x1 of the campaign) and x4 0.932420 against 0.932544 (-0.0001); PF OA +0.0029
+    and Fracture +0.0042 at x4; all twelve label rates matched with an effective sample size of 7,660
+    of 9,828 and 9,066 distinct studies over ten epochs. This entry applies it to the reference, where
+    the fastMRI weight does not fade, so the matched draws count in the late epochs too.'
+  mechanism: 'Today PairedBatches draws the fastMRI studies from a seeded permutation that cycles through
+    all of them. Change: each study gets a sampling weight fitted once per fold by iterative proportional
+    fitting, so that the weighted fraction of positives (pseudo-label >= 0.5) of each of the twelve labels
+    equals the fraction among the fold''s Kaggle training cells (the positive fractions of class_balance.json).
+    Each epoch draws its fastMRI studies without replacement with those weights, from the run''s seed
+    and the epoch.'
+  precedents:
+  - 'prior-work.md, precedents: class weighting has moved the public score against the fold before.'
+  novelty: First run matching the external set's label mix by sampling.
+  coverage: Fewer distinct fastMRI studies over the run than the uniform draw; the report states how many.
+  exploitation: 'Read PF OA, Effusion, MCL and ACL, then the macro, at both multipliers. Activation, in
+    the report: the twelve weighted fractions beside Kaggle''s and the uniform ones, the effective sample
+    size of the weights, and the number of distinct fastMRI studies drawn over ten epochs. No new metric.
+    Shown wrong by: the macro below the incumbent at both multipliers.'
+  budget: The reference's training time; the weights are fitted once per fold.
+  implementation: 'Follow the environment paragraph of the developer instructions. File: training/lightning.py:
+    the weights are computed in KneeDataModule.setup from the fastMRI training rows and the Kaggle training
+    frame and passed to PairedBatches, which draws with torch.multinomial without replacement from a generator
+    seeded by the run''s seed and the epoch. No option, no config field. Check without a GPU: the fit
+    on synthetic label tables and the fractions reached. If the fit does not converge for a label, return
+    blocked and name it. The earlier candidate (experiment label-rate-matching-by-sampling-20261013T042402Z-e3f8db6d)
+    drew with replacement and was approved by the review; reproduce the same change on the reference''s
+    source.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The strongest x1 result of the campaign, retested where fastMRI keeps its full weight.
+exhausted_directions: 'Reducing fastMRI''s part (a fading weight, Kaggle-only final epochs, Kaggle-only
+  statistics): gains on the fold, lost on the public board.'

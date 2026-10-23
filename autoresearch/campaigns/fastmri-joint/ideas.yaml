@@ -1,0 +1,804 @@
+revision: 361
+ideas:
+- id: kaggle-only-final-epochs
+  mechanism_id: joint-schedule
+  parent_idea_id: null
+  title: Train the last three of the ten epochs on Kaggle alone
+  opportunity: 'The first joint run led the plain control in every epoch, but the
+    lead fell with the learning rate: +0.0082, +0.0063, +0.0018, +0.0017, +0.0033,
+    +0.0018, +0.0006, +0.0008, +0.0002, +0.0006 at x1, and x4 ended at -0.0003 (prior-work.md,
+    the reference). The user''s proposal: finish on the real labels. The cosine schedule
+    ends at 1% of its peak, so a single last epoch would barely move the weights;
+    the last three epochs cover the part where the rate still averages about a tenth
+    of the peak. Guess, low-medium: +0 to +0.001 macro at x4, PF OA, MCL, Effusion
+    and Fracture first.'
+  mechanism: 'Today every epoch has 2 * ceil(n / batch_size) batches, Kaggle and fastMRI
+    alternating, with accumulate_grad_batches doubled and the returned loss multiplied
+    by EXTRA_BATCHES. Change: epochs 0 to 6 are unchanged; in epochs 7, 8 and 9 the
+    sampler emits the Kaggle batches only, one optimizer step per batch, and the loss
+    is not multiplied. The number of optimizer steps and the learning-rate schedule
+    are unchanged (441 steps per epoch in both phases). The fastMRI permutation simply
+    stops after epoch 6. The switch epoch is fixed at 7 by the schedule''s shape,
+    not by a sweep.'
+  precedents:
+  - 'prior-work.md, the reference: the per-epoch lead of the first joint run.'
+  novelty: First run with a Kaggle-only phase.
+  coverage: Every fastMRI study is still drawn about 2.5 times in epochs 0 to 6 (3,087
+    batches of 8 over 9,828 studies).
+  exploitation: 'Read x1 per epoch against the incumbent and the plain control, then
+    x4 and the per-label table with PF OA, MCL, Effusion and Fracture named apart.
+    Activation: train_extra_loss_epoch is logged for epochs 0 to 6 and absent for
+    7 to 9, and the optimizer steps of the run equal the reference''s. Shown wrong
+    by: the macro below the incumbent at both multipliers.'
+  budget: About 0.85 of the reference's training time, since three epochs have half
+    the batches.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    File: training/lightning.py only (scripts/ is not editable; the module owns the
+    accumulation, see the campaign index). PairedBatches emits only the Kaggle batches
+    from epoch 7 on and its length follows; the accumulation schedule the module returns
+    becomes per epoch (2 for epochs 0 to 6, 1 after); training_step treats a batch
+    as extra only in a paired epoch and multiplies the loss only there. The constant
+    7 lives beside EXTRA_BATCHES; no option, no config field. Check without a GPU:
+    the sampler''s lengths and index ranges for epochs 6 and 7 on a tiny dataset,
+    and the total of optimizer steps.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The user's proposal, aimed at the epochs where the first run's
+    lead faded.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-fastmri-pretraining/autoresearch/campaigns/fastmri-joint/seed-ideas.yaml
+  experiments:
+  - kaggle-only-final-epochs-20261012T191310Z-5e1f2b0a
+  - kaggle-only-final-epochs-20261012T191909Z-5dc1f1b9
+  - kaggle-only-final-epochs-20261012T193043Z-5a402039
+  blocked_reason: 'Block and park the reviewed seed: its launch gate failed after
+    its one bounded repair. The traceback identifies an output-directory collision
+    before training, which the supervisor owns resolving; it does not justify another
+    candidate repair. Supply the full remaining queue, preserving every other user
+    seed''s order, to resolve the previous ranking rejection.'
+  decision: invalid
+- id: confident-pseudo-labels-weigh-more
+  mechanism_id: pseudo-label-weight
+  parent_idea_id: null
+  title: Weigh a fastMRI cell by how far its pseudo-label is from 0.5
+  opportunity: 'A pseudo-label near 0.5 is the teacher saying it does not know, and
+    it enters the loss with the weight of a confident one. PF OA has the mean pseudo-label
+    closest to 0.5 (0.481) and the largest spread between teachers (0.029), and it
+    is the first run''s largest loss (-0.0060); MCL and ACL have the most confident
+    labels (prior-work.md). Guess, low-medium: +0 to +0.001 macro, PF OA and Effusion
+    first. Keeper''s proposal, not the user''s.'
+  mechanism: 'Today a fastMRI cell has weight one times its class weight. Change:
+    it is also multiplied by c / mean_label(c), with c = abs(2 * target - 1) and mean_label(c)
+    the mean of c over the label''s fastMRI training cells, computed once per fold,
+    so each label keeps its total weight and only the cells inside it are redistributed.
+    Kaggle cells are unchanged.'
+  precedents:
+  - 'targets-and-inputs, uncertain-report-targets-weigh-less: the same rule on report-derived
+    Kaggle cells.'
+  novelty: First confidence weighting of pseudo-labelled cells.
+  coverage: Every fastMRI cell; the redistribution is largest on PF OA, Effusion and
+    Medial Meniscus.
+  exploitation: 'Read PF OA and Effusion, then the macro, at both multipliers. Activation:
+    the twelve mean_label(c) values in the report and train_extra_loss_epoch against
+    the reference''s. Shown wrong by: the macro below the incumbent at both multipliers
+    with PF OA not improved.'
+  budget: The reference's training time; one multiplication per fastMRI batch.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    File: training/lightning.py. The twelve means are a buffer computed in setup from
+    the fastMRI training rows and initialised under torch.random.fork_rng; the weight
+    is applied in the loss of extra batches only. No option, no config field. If hard-pseudo-labels
+    is in the incumbent the weight is constant: return blocked and say so.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Aims at the label the first run lost most on, by a rule fixed
+    before the run.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-fastmri-pretraining/autoresearch/campaigns/fastmri-joint/seed-ideas.yaml
+  ranking_rationale: 'Block and park the reviewed seed: its launch gate failed after
+    its one bounded repair. The traceback identifies an output-directory collision
+    before training, which the supervisor owns resolving; it does not justify another
+    candidate repair. Supply the full remaining queue, preserving every other user
+    seed''s order, to resolve the previous ranking rejection.'
+  experiments:
+  - confident-pseudo-labels-weigh-more-20261012T192501Z-9d00ce4f
+  decision: invalid
+- id: batch-norm-statistics-from-kaggle
+  mechanism_id: normalisation-statistics
+  parent_idea_id: null
+  title: Keep the fastMRI batches out of the batch-norm running statistics
+  opportunity: 'Half of the training batches now come from another scanner population
+    (no T1-weighted series, fields of 140 to 150 mm, mostly 1.5 T in its second part),
+    and they update the same running statistics the model uses at validation and prediction
+    on Kaggle studies. The first run gained at x1 and lost at x4, where the statistics
+    are applied to many more images per study. Guess, low: -0.0005 to +0.001 macro.
+    Keeper''s proposal, not the user''s.'
+  mechanism: 'Today every training batch updates the running mean and variance of
+    the batch-norm layers that are in training mode. Change: on a fastMRI batch those
+    layers still normalise with the batch''s own statistics, but their running statistics
+    are not updated (momentum 0 for that forward pass). Kaggle batches are unchanged,
+    so the statistics used at validation come from Kaggle studies alone, as in the
+    plain recipe.'
+  precedents: []
+  novelty: First run separating the two populations' statistics.
+  coverage: Every batch-norm layer that updates running statistics in the recipe.
+  exploitation: 'Read the step from x1 to x4 against the incumbent''s, then the macro
+    and the per-label table. Activation: the number of layers affected, in the report,
+    and the mean absolute difference between the run''s and the reference''s running
+    means at the end, logged once on validation. Shown wrong by: the macro below the
+    incumbent at both multipliers.'
+  budget: The reference's training time.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    File: training/lightning.py. In training_step, around the forward pass of an extra
+    batch, set the momentum of the affected layers to 0 and restore it after; collect
+    the layers once. If no batch-norm layer updates running statistics in this recipe,
+    return blocked and say so. No option, no config field.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A population effect the other seeds do not touch.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-fastmri-pretraining/autoresearch/campaigns/fastmri-joint/seed-ideas.yaml
+  ranking_rationale: 'Block and park the reviewed seed: its launch gate failed after
+    its one bounded repair. The traceback identifies an output-directory collision
+    before training, which the supervisor owns resolving; it does not justify another
+    candidate repair. Supply the full remaining queue, preserving every other user
+    seed''s order, to resolve the previous ranking rejection.'
+  experiments:
+  - batch-norm-statistics-from-kaggle-20261012T200100Z-5451d8ca
+  decision: provisional_accept
+- id: fastmri-weight-follows-learning-rate
+  mechanism_id: joint-schedule
+  parent_idea_id: null
+  title: Weigh the fastMRI batch by the learning-rate curve
+  opportunity: 'The first joint run''s lead over the plain control was largest early
+    and gone by the end: +0.0082, +0.0063, +0.0018, +0.0017, +0.0033, +0.0018, +0.0006,
+    +0.0008, +0.0002, +0.0006 at x1 (prior-work.md, the reference). kaggle-only-final-epochs
+    cuts the fastMRI half at one epoch; this is its smooth form with no hand-set number.
+    Guess, medium-low: +0 to +0.001 macro at x4. Keeper''s proposal.'
+  mechanism: 'Today the fastMRI batch''s loss enters the paired step at weight one.
+    Change: it is multiplied by the schedule''s current multiplier after warm-up,
+    that is the learning rate divided by its peak, and by one during warm-up. The
+    Kaggle batch is unchanged. With the cosine ending at 1% of the peak, the fastMRI
+    half fades to 1% of its weight in the last steps. Every fastMRI batch is still
+    loaded and forwarded.'
+  precedents:
+  - 'prior-work.md, the reference: the per-epoch lead of the first joint run.'
+  novelty: First run with a scheduled weight on the pseudo-labelled half.
+  coverage: Every fastMRI batch; the weight is above 0.5 for about the first half
+    of training.
+  exploitation: 'Read x1 per epoch against the incumbent and the plain control, then
+    x4 and the per-label table with PF OA, MCL, Effusion and Fracture named apart.
+    Activation: one training-side epoch metric through _log_epoch_metric, the mean
+    weight applied in the epoch (near 1 in epoch 0, near 0.02 in epoch 9). Shown wrong
+    by: the macro below the incumbent at both multipliers.'
+  budget: The reference's training time.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    File: training/lightning.py, training_step only. Read the multiplier from the
+    schedule the module already builds in configure_optimizers (a Python float per
+    step, no tensor operation); apply it to the loss of an extra batch before the
+    EXTRA_BATCHES multiplication. No option, no config field. If kaggle-only-final-epochs
+    is in the incumbent, apply the weight to the paired epochs only.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The smooth form of the first seed; most informative after its
+    result.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-fastmri-pretraining/autoresearch/campaigns/fastmri-joint/seed-ideas.yaml
+  ranking_rationale: 'Block and park the reviewed seed: its launch gate failed after
+    its one bounded repair. The traceback identifies an output-directory collision
+    before training, which the supervisor owns resolving; it does not justify another
+    candidate repair. Supply the full remaining queue, preserving every other user
+    seed''s order, to resolve the previous ranking rejection.'
+  experiments:
+  - fastmri-weight-follows-learning-rate-20261012T214811Z-76841b3f
+  decision: provisional_accept
+- id: class-weights-over-both-datasets
+  mechanism_id: class-weights
+  parent_idea_id: null
+  title: Count the fastMRI cells in the class weights
+  opportunity: 'The class weights are computed from the fold''s Kaggle training rows
+    and applied to both halves. fastMRI has another label mix: mean pseudo-labels
+    of 0.48 for PF OA and 0.41 for Effusion against 0.12 for MCL and 0.16 for ACL
+    (prior-work.md, the pseudo-labels), and it is 2.8 times the Kaggle training set.
+    PF OA, the first run''s largest loss (-0.0060), is the label whose fastMRI rate
+    is furthest from a rare label''s. Guess, low: -0.001 to +0.001 macro. Class weighting
+    has disagreed with the public board before, so an adoption is provisional.'
+  mechanism: 'Today fixed_class_balance receives the Kaggle training frame. Change:
+    it receives the Kaggle training rows and the fastMRI training rows of the fold''s
+    teacher together, counted the same way (a cell is positive at target >= 0.5).
+    Everything after the fraction is unchanged, and the one set of weights still applies
+    to every batch.'
+  precedents:
+  - 'prior-work.md, precedents: soft-prevalence class weights on the plain recipe,
+    x1 +0.0013 and x4 +0.0005.'
+  novelty: First class weights that see the pseudo-labelled rows.
+  coverage: Every training cell of every label.
+  exploitation: 'Read PF OA, Effusion, MCL and ACL, then the macro, at both multipliers.
+    Activation: the twelve positive fractions and weights of the run''s fold_3/class_balance.json
+    beside the reference''s, listed in the report. No new metric. Shown wrong by:
+    the macro below the incumbent at both multipliers.'
+  budget: The reference's training time; the weights are computed once per fold.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    File: training/lightning.py only: the data module''s frame for the class balance
+    (see the campaign index) returns the Kaggle and the fastMRI training rows together;
+    keep the dictionary''s keys and version. No option, no config field. Check without
+    a GPU: print the twelve fractions and weights before and after from the two label
+    tables.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Raised by the user's question on the first run.
+  status: completed
+  created_revision: 0
+  seeded: /home/claudio/src/knee-abnormality-fastmri-pretraining/autoresearch/campaigns/fastmri-joint/seed-ideas.yaml
+  ranking_rationale: 'Block and park the reviewed seed: its launch gate failed after
+    its one bounded repair. The traceback identifies an output-directory collision
+    before training, which the supervisor owns resolving; it does not justify another
+    candidate repair. Supply the full remaining queue, preserving every other user
+    seed''s order, to resolve the previous ranking rejection.'
+  experiments:
+  - class-weights-over-both-datasets-20261013T011627Z-a649cd4f
+  decision: reject
+- id: no-loader-augmentation-on-fastmri
+  mechanism_id: pseudo-label-inputs
+  parent_idea_id: null
+  title: Load the fastMRI studies without contrast mixing, intensity and noise augmentation
+  opportunity: 'A pseudo-label is the teacher''s reading of the clean study. In training
+    the fastMRI studies go through the same loader augmentations as the Kaggle ones
+    (contrast mixing at probability 0.3, intensity and noise augmentation), which
+    can make the image and its soft label disagree; a real label does not depend on
+    the teacher''s view of the image. Guess, low-medium: -0.0005 to +0.001 macro.
+    Keeper''s proposal.'
+  mechanism: 'Today the fastMRI dataset is built with the recipe''s data settings.
+    Change: it is built with a copy in which data.contrast_mixing_augmentation.probability,
+    data.intensity_augmentation.probability and data.noise_augmentation.probability
+    are 0. Sampling of slices, reflection and series dropping are unchanged, and so
+    are the augmentations inside the model (GIN, feature statistics), which a campaign
+    seed cannot reach. The Kaggle dataset is unchanged.'
+  precedents: []
+  novelty: First run separating the augmentation of real and pseudo-labelled studies.
+  coverage: Every fastMRI study drawn.
+  exploitation: 'Read the macro and the per-label table at both multipliers, and train_extra_loss_epoch
+    against the reference''s (expected lower). Activation: the three probabilities
+    of the fastMRI dataset''s settings, listed in the report. No new metric. Shown
+    wrong by: the macro below the incumbent at both multipliers.'
+  budget: The reference's training time or slightly less.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    File: training/lightning.py, KneeDataModule.setup only: pass a model_copy of config.data
+    with the three probabilities at 0 to the fastMRI KneeStudyDataset and its series
+    index. No option, no config field. Check without a GPU: the two datasets'' settings
+    printed side by side.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Removes a mismatch between the pseudo-label and the image it
+    is trained on.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-fastmri-pretraining/autoresearch/campaigns/fastmri-joint/seed-ideas-2.yaml
+  ranking_rationale: 'Block and park the reviewed seed: its launch gate failed after
+    its one bounded repair. The traceback identifies an output-directory collision
+    before training, which the supervisor owns resolving; it does not justify another
+    candidate repair. Supply the full remaining queue, preserving every other user
+    seed''s order, to resolve the previous ranking rejection.'
+  experiments:
+  - no-loader-augmentation-on-fastmri-20261013T022015Z-9db9d241
+  decision: reject
+- id: label-rate-matching-by-sampling
+  mechanism_id: pseudo-label-sampling
+  parent_idea_id: null
+  title: Draw the fastMRI studies so their label rates match the Kaggle fold's
+  opportunity: 'fastMRI''s label mix differs from Kaggle''s: mean pseudo-labels of
+    0.48 for PF OA and 0.41 for Effusion against 0.12 for MCL and 0.16 for ACL (prior-work.md,
+    the pseudo-labels), and its studies are drawn uniformly. class-weights-over-both-datasets
+    answers this through the weights; this answers it through which studies are seen,
+    leaving the weights alone. Guess, low-medium: -0.001 to +0.001 macro. Keeper''s
+    proposal.'
+  mechanism: 'Today PairedBatches draws the fastMRI studies from a seeded permutation
+    that cycles through all of them. Change: each study gets a sampling weight fitted
+    once per fold by iterative proportional fitting, so that the weighted fraction
+    of positives (pseudo-label >= 0.5) of each of the twelve labels equals the fraction
+    among the fold''s Kaggle training cells (the positive fractions of class_balance.json).
+    Each epoch draws its fastMRI studies without replacement with those weights, from
+    the run''s seed and the epoch.'
+  precedents:
+  - 'prior-work.md, precedents: class weighting has moved the public score against
+    the fold before.'
+  novelty: First run matching the external set's label mix by sampling.
+  coverage: Fewer distinct fastMRI studies over the run than the uniform draw; the
+    report states how many.
+  exploitation: 'Read PF OA, Effusion, MCL and ACL, then the macro, at both multipliers.
+    Activation, in the report: the twelve weighted fractions beside Kaggle''s and
+    the uniform ones, the effective sample size of the weights, and the number of
+    distinct fastMRI studies drawn over ten epochs. No new metric. Shown wrong by:
+    the macro below the incumbent at both multipliers.'
+  budget: The reference's training time; the weights are fitted once per fold.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    File: training/lightning.py: the weights are computed in KneeDataModule.setup
+    from the fastMRI training rows and the Kaggle training frame and passed to PairedBatches,
+    which draws with torch.multinomial without replacement from a generator seeded
+    by the run''s seed and the epoch. No option, no config field. Check without a
+    GPU: the fit on synthetic label tables and the fractions reached. If the fit does
+    not converge for a label, return blocked and name it.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The sampling form of the class-weight seed; the most code of
+    the list.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-fastmri-pretraining/autoresearch/campaigns/fastmri-joint/seed-ideas-2.yaml
+  ranking_rationale: 'Block and park the reviewed seed: its launch gate failed after
+    its one bounded repair. The traceback identifies an output-directory collision
+    before training, which the supervisor owns resolving; it does not justify another
+    candidate repair. Supply the full remaining queue, preserving every other user
+    seed''s order, to resolve the previous ranking rejection.'
+  experiments:
+  - label-rate-matching-by-sampling-20261013T032256Z-c3e0806e
+  - label-rate-matching-by-sampling-20261013T033108Z-e4e885f9
+  - label-rate-matching-by-sampling-20261013T042402Z-e3f8db6d
+  decision: reject
+- id: hard-pseudo-labels
+  mechanism_id: pseudo-label-targets
+  parent_idea_id: null
+  title: Train on fastMRI pseudo-labels thresholded at 0.5
+  opportunity: 'The pseudo-labels are averages over four image sets and a mirrored
+    pass, which pulls them toward the middle, and the model is asked to reproduce
+    that hedging. Thresholding needs no hand-set number. Guess, low: -0.001 to +0.001
+    macro; it discards the teacher''s confidence, the opposite bet to confident-pseudo-labels-weigh-more.
+    Keeper''s proposal.'
+  mechanism: 'Today a fastMRI cell''s target is the teacher''s probability. Change:
+    it is 1 when that probability is >= 0.5 and 0 otherwise, set once when the label
+    table is read. Kaggle targets are unchanged.'
+  precedents:
+  - 'targets-and-inputs, hard-report-targets: the same rule on report-derived Kaggle
+    cells.'
+  novelty: First run on hard pseudo-labels.
+  coverage: Every fastMRI cell; the change is largest on PF OA, Effusion and Medial
+    Meniscus.
+  exploitation: 'Read the macro and the per-label table at both multipliers, PF OA
+    first. Activation: the share of fastMRI cells per label that were between 0.25
+    and 0.75 before thresholding, in the report. No new metric. Shown wrong by: the
+    macro below the incumbent at both multipliers.'
+  budget: The reference's training time.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    File: training/lightning.py, KneeDataModule.setup only, where the fastMRI frame''s
+    target columns are built. No option, no config field. If confident-pseudo-labels-weigh-more
+    is in the incumbent its weights become constant: return blocked and say so.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: One line; the opposite bet to the confidence weighting.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-fastmri-pretraining/autoresearch/campaigns/fastmri-joint/seed-ideas-2.yaml
+  ranking_rationale: 'Block and park the reviewed seed: its launch gate failed after
+    its one bounded repair. The traceback identifies an output-directory collision
+    before training, which the supervisor owns resolving; it does not justify another
+    candidate repair. Supply the full remaining queue, preserving every other user
+    seed''s order, to resolve the previous ranking rejection.'
+  experiments:
+  - hard-pseudo-labels-20261013T042915Z-d22a2840
+  decision: reject
+- id: l2-sp-off
+  mechanism_id: anchor
+  parent_idea_id: null
+  title: Train the joint recipe without the anchor to the pretrained weights
+  opportunity: 'L2-SP was adopted on the ResNet-18 for unseen sites and is level on
+    fold validation; it was never tested on the ResNet-50 (prior-work.md, L2-SP).
+    The joint run adds a second scanner population of 9,828 studies, which regularises
+    against site-specific features directly, the job the anchor was given. Guess,
+    low: -0.001 to +0.001 macro on the fold. The fold holds seen sites only, so an
+    adoption is provisional until the user checks it publicly.'
+  mechanism: 'Config only: optimizer.anchor_alpha_early 0.01 -> 0 and optimizer.anchor_alpha_late
+    0.001 -> 0, both together as one mechanism. With alpha 0 the backbone convolution
+    weights are no longer anchored and get the recipe''s weight decay again, as in
+    the site-generalization removal run.'
+  precedents:
+  - 'prior-work.md, L2-SP: held-out sites +0.0009 to +0.0023 with it, fold validation
+    level, halving level.'
+  novelty: First run without L2-SP on a ResNet-50, and the first with a second population
+    in training.
+  coverage: Every backbone convolution weight.
+  exploitation: 'Read x4 and x1 against the incumbent, per label, and the backbone
+    drift per stage if the recipe logs it. Activation: the anchor penalty logged as
+    zero or absent, and the two config values in the run''s effective config. Shown
+    wrong by: the macro below the incumbent at both multipliers.'
+  budget: The reference's training time.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    Configuration only: configs/training.yaml, the two keys. No source change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Asked by the user; one config change. Last because the fold
+    cannot see unseen sites.
+  status: completed
+  created_revision: 1
+  seeded: /home/claudio/src/knee-abnormality-fastmri-pretraining/autoresearch/campaigns/fastmri-joint/seed-ideas-2.yaml
+  ranking_rationale: 'Block and park the reviewed seed: its launch gate failed after
+    its one bounded repair. The traceback identifies an output-directory collision
+    before training, which the supervisor owns resolving; it does not justify another
+    candidate repair. Supply the full remaining queue, preserving every other user
+    seed''s order, to resolve the previous ranking rejection.'
+  experiments:
+  - l2-sp-off-20261013T070045Z-c392cb40
+  - l2-sp-off-20261013T074036Z-19b288ad
+  decision: reject
+- id: confident-pseudo-labels-weigh-more-rerun
+  mechanism_id: pseudo-label-weight
+  parent_idea_id: null
+  title: Weigh a fastMRI cell by how far its pseudo-label is from 0.5 (rerun after
+    a loader crash)
+  opportunity: 'KEEPER, 2026-10-12: the first run of this seed (confident-pseudo-labels-weigh-more-20261012T192501Z-9d00ce4f)
+    was lost to a segmentation fault in a data-loader worker at batch 791 of its fourth
+    epoch, an infrastructure failure and not a result; it stood at 0.917954 against
+    the incumbent''s 0.916586 at epoch 3. This entry runs the same mechanism again.
+    A pseudo-label near 0.5 is the teacher saying it does not know, and it enters
+    the loss with the weight of a confident one. PF OA has the mean pseudo-label closest
+    to 0.5 (0.481) and the largest spread between teachers (0.029), and it is the
+    first run''s largest loss (-0.0060); MCL and ACL have the most confident labels
+    (prior-work.md). Guess, low-medium: +0 to +0.001 macro, PF OA and Effusion first.
+    Keeper''s proposal, not the user''s.'
+  mechanism: 'Today a fastMRI cell has weight one times its class weight. Change:
+    it is also multiplied by c / mean_label(c), with c = abs(2 * target - 1) and mean_label(c)
+    the mean of c over the label''s fastMRI training cells, computed once per fold,
+    so each label keeps its total weight and only the cells inside it are redistributed.
+    Kaggle cells are unchanged.'
+  precedents:
+  - 'targets-and-inputs, uncertain-report-targets-weigh-less: the same rule on report-derived
+    Kaggle cells.'
+  novelty: First confidence weighting of pseudo-labelled cells.
+  coverage: Every fastMRI cell; the redistribution is largest on PF OA, Effusion and
+    Medial Meniscus.
+  exploitation: 'Read PF OA and Effusion, then the macro, at both multipliers. Activation:
+    the twelve mean_label(c) values in the report and train_extra_loss_epoch against
+    the reference''s. Shown wrong by: the macro below the incumbent at both multipliers
+    with PF OA not improved.'
+  budget: The reference's training time; one multiplication per fastMRI batch.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    File: training/lightning.py. The twelve means are a buffer computed in setup from
+    the fastMRI training rows and initialised under torch.random.fork_rng; the weight
+    is applied in the loss of extra batches only. No option, no config field. If hard-pseudo-labels
+    is in the incumbent the weight is constant: return blocked and say so. The earlier
+    candidate''s implementation was approved by the review; reproduce the same change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Requeued by the keeper after a harness failure, not after a
+    result.
+  status: completed
+  created_revision: 53
+  seeded: /home/claudio/src/knee-abnormality-fastmri-pretraining/autoresearch/campaigns/fastmri-joint/seed-ideas-3.yaml
+  experiments:
+  - confident-pseudo-labels-weigh-more-rerun-20261013T001334Z-2d503994
+  decision: reject
+- id: kaggle-only-final-epochs-rerun
+  mechanism_id: joint-schedule
+  parent_idea_id: null
+  title: Train the last three of the ten epochs on Kaggle alone (rerun after a loader
+    crash)
+  opportunity: 'KEEPER, 2026-10-12: the run of this seed (kaggle-only-final-epochs-20261012T193043Z-5a402039)
+    was lost to a segmentation fault in a data-loader worker at batch 145 of its fifth
+    epoch, before the Kaggle-only phase began, an infrastructure failure and not a
+    result. This entry runs the same mechanism again. The first joint run led the
+    plain control in every epoch, but the lead fell with the learning rate: +0.0082,
+    +0.0063, +0.0018, +0.0017, +0.0033, +0.0018, +0.0006, +0.0008, +0.0002, +0.0006
+    at x1, and x4 ended at -0.0003 (prior-work.md, the reference). The user''s proposal:
+    finish on the real labels. The cosine schedule ends at 1% of its peak, so a single
+    last epoch would barely move the weights; the last three epochs cover the part
+    where the rate still averages about a tenth of the peak. Guess, low-medium: +0
+    to +0.001 macro at x4, PF OA, MCL, Effusion and Fracture first.'
+  mechanism: 'Today every epoch has 2 * ceil(n / batch_size) batches, Kaggle and fastMRI
+    alternating, with accumulate_grad_batches doubled and the returned loss multiplied
+    by EXTRA_BATCHES. Change: epochs 0 to 6 are unchanged; in epochs 7, 8 and 9 the
+    sampler emits the Kaggle batches only, one optimizer step per batch, and the loss
+    is not multiplied. The number of optimizer steps and the learning-rate schedule
+    are unchanged (441 steps per epoch in both phases). The fastMRI permutation simply
+    stops after epoch 6. The switch epoch is fixed at 7 by the schedule''s shape,
+    not by a sweep.'
+  precedents:
+  - 'prior-work.md, the reference: the per-epoch lead of the first joint run.'
+  novelty: First run with a Kaggle-only phase.
+  coverage: Every fastMRI study is still drawn about 2.5 times in epochs 0 to 6 (3,087
+    batches of 8 over 9,828 studies).
+  exploitation: 'Read x1 per epoch against the incumbent and the plain control, then
+    x4 and the per-label table with PF OA, MCL, Effusion and Fracture named apart.
+    Activation: train_extra_loss_epoch is logged for epochs 0 to 6 and absent for
+    7 to 9, and the optimizer steps of the run equal the reference''s. Shown wrong
+    by: the macro below the incumbent at both multipliers.'
+  budget: About 0.85 of the reference's training time, since three epochs have half
+    the batches.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    File: training/lightning.py only (scripts/ is not editable; the module owns the
+    accumulation, see the campaign index). PairedBatches emits only the Kaggle batches
+    from epoch 7 on and its length follows; the accumulation schedule the module returns
+    becomes per epoch (2 for epochs 0 to 6, 1 after); training_step treats a batch
+    as extra only in a paired epoch and multiplies the loss only there. The constant
+    7 lives beside EXTRA_BATCHES; no option, no config field. Check without a GPU:
+    the sampler''s lengths and index ranges for epochs 6 and 7 on a tiny dataset,
+    and the total of optimizer steps. The earlier candidate''s implementation was
+    approved by the review; reproduce the same change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Requeued by the keeper after a harness failure, not after a
+    result.
+  status: completed
+  created_revision: 73
+  seeded: /home/claudio/src/knee-abnormality-fastmri-pretraining/autoresearch/campaigns/fastmri-joint/seed-ideas-4.yaml
+  experiments:
+  - kaggle-only-final-epochs-rerun-20261012T215116Z-47e83b90
+  - kaggle-only-final-epochs-rerun-20261012T230509Z-2d74c87b
+  decision: provisional_accept
+- id: fastmri-weight-follows-learning-rate-on-incumbent
+  mechanism_id: joint-schedule
+  parent_idea_id: null
+  title: Weigh the fastMRI batch by the learning-rate curve, applied to the incumbent
+  opportunity: 'KEEPER, 2026-10-13, evidence from this campaign: on the first incumbent
+    this mechanism gave x4 0.932544 against 0.930745 (+0.0018, 80% interval +0.0011
+    to +0.0025; ten labels up, Synovitis +0.0049, Lateral Meniscus +0.0040, Lateral
+    OA +0.0037, ACL +0.0035, MCL +0.0026) and x1 0.926148 against 0.926211, and was
+    rejected on the x1 side by 0.0001. The user has since adopted batch-norm-statistics-from-kaggle
+    (x4 0.931370, x1 0.926095) as the incumbent. The earlier run is above that incumbent
+    at both multipliers, but it was not trained on it. This entry applies the same
+    mechanism to the incumbent, so the two changes are tested together and the runtime''s
+    rule can decide. Expected, medium: x4 above the incumbent by 0.0005 to 0.0015
+    if the two effects add.'
+  mechanism: 'Today the fastMRI batch''s loss enters the paired step at weight one.
+    Change: it is multiplied by the schedule''s current multiplier after warm-up,
+    that is the learning rate divided by its peak, and by one during warm-up. The
+    Kaggle batch is unchanged. With the cosine ending at 1% of the peak, the fastMRI
+    half fades to 1% of its weight in the last steps. Every fastMRI batch is still
+    loaded and forwarded.'
+  precedents:
+  - 'prior-work.md, the reference: the per-epoch lead of the first joint run.'
+  novelty: First run combining the scheduled fastMRI weight with Kaggle-only running
+    statistics.
+  coverage: Every fastMRI batch; the weight is above 0.5 for about the first half
+    of training.
+  exploitation: 'Read x1 per epoch against the incumbent and the plain control, then
+    x4 and the per-label table with PF OA, MCL, Effusion and Fracture named apart.
+    Activation: one training-side epoch metric through _log_epoch_metric, the mean
+    weight applied in the epoch (near 1 in epoch 0, near 0.02 in epoch 9). Shown wrong
+    by: the macro below the incumbent at both multipliers.'
+  budget: The reference's training time.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    File: training/lightning.py, training_step only. Read the multiplier from the
+    schedule the module already builds in configure_optimizers (a Python float per
+    step, no tensor operation); apply it to the loss of an extra batch before the
+    EXTRA_BATCHES multiplication. No option, no config field. If kaggle-only-final-epochs
+    is in the incumbent, apply the weight to the paired epochs only. The earlier candidate''s
+    implementation (experiment fastmri-weight-follows-learning-rate-20261012T214811Z-76841b3f)
+    was approved by the review; reproduce the same change on the incumbent''s source.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The best x4 result of the campaign so far, retested on the incumbent
+    the user adopted.
+  status: completed
+  created_revision: 111
+  seeded: /home/claudio/src/knee-abnormality-fastmri-pretraining/autoresearch/campaigns/fastmri-joint/seed-ideas-5.yaml
+  experiments:
+  - fastmri-weight-follows-learning-rate-on-incumbent-20261012T230805Z-c2d798bd
+  - fastmri-weight-follows-learning-rate-on-incumbent-20261013T001046Z-d668a6df
+  decision: reject
+- id: batch-norm-statistics-from-kaggle-on-incumbent
+  mechanism_id: normalisation-statistics
+  parent_idea_id: null
+  title: Keep the fastMRI batches out of the batch-norm running statistics, applied
+    to the incumbent
+  opportunity: 'USER, message on the monitor page, 2026-10-13 06:46 CEST: ''Add kaggle
+    norm statistics again to the queue''. Evidence from this campaign: on the first
+    incumbent this mechanism gave x4 0.931370 against 0.930745 (+0.0006, 80% interval
+    +0.0001 to +0.0012) and x1 0.926095 against 0.926211; Lateral OA +0.0035, ACL
+    +0.0018, Fracture +0.0015, MCL +0.0014, PF OA -0.0014. The user has since made
+    fastmri-weight-follows-learning-rate the incumbent (x4 0.932544, x1 0.926148),
+    which does not carry it. This entry applies it to that incumbent. Expected, low-medium:
+    x4 +0 to +0.0006 if the two effects add; the scheduled weight already reduces
+    fastMRI''s part late in training, so they may overlap.'
+  mechanism: 'Today every training batch updates the running mean and variance of
+    the batch-norm layers that are in training mode. Change: on a fastMRI batch those
+    layers still normalise with the batch''s own statistics, but their running statistics
+    are not updated (momentum 0 for that forward pass). Kaggle batches are unchanged,
+    so the statistics used at validation come from Kaggle studies alone, as in the
+    plain recipe.'
+  precedents: []
+  novelty: First run combining Kaggle-only running statistics with the scheduled fastMRI
+    weight alone.
+  coverage: Every batch-norm layer that updates running statistics in the recipe.
+  exploitation: 'Read the step from x1 to x4 against the incumbent''s, then the macro
+    and the per-label table. Activation: the number of layers affected, in the report,
+    and the mean absolute difference between the run''s and the reference''s running
+    means at the end, logged once on validation. Shown wrong by: the macro below the
+    incumbent at both multipliers.'
+  budget: The reference's training time.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    File: training/lightning.py. In training_step, around the forward pass of an extra
+    batch, set the momentum of the affected layers to 0 and restore it after; collect
+    the layers once. If no batch-norm layer updates running statistics in this recipe,
+    return blocked and say so. No option, no config field. The earlier candidate''s
+    implementation (experiment batch-norm-statistics-from-kaggle-20261012T200100Z-5451d8ca)
+    was approved by the review; reproduce the same change on the incumbent''s source.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Requested by the user.
+  status: completed
+  created_revision: 248
+  seeded: /home/claudio/src/knee-abnormality-fastmri-pretraining/autoresearch/campaigns/fastmri-joint/seed-ideas-6.yaml
+  experiments:
+  - batch-norm-statistics-from-kaggle-on-incumbent-20261013T054345Z-9fe8639c
+  decision: invalid
+- id: fastmri-loss-weight-doubled
+  mechanism_id: fastmri-share
+  parent_idea_id: null
+  title: Give the fastMRI batch twice the weight of the Kaggle batch in a paired step
+  opportunity: 'USER DIRECTION, 2026-10-13: the incumbent is the starting reference
+    again (S148, 0.962 public); S149, the scheduled fastMRI weight, gained +0.0018
+    at x4 on the fold and scored 0.961. Seeds now keep or increase what fastMRI contributes.
+    Increases fastMRI''s part. The paired step weighs the two batches equally, a choice
+    never tested; fastMRI is 2.8 times the Kaggle training set and is what the public
+    gain of S148 is attributed to, while every change that reduced its part gained
+    on the fold and the one submitted lost publicly. Guess, low: -0.001 to +0.0005
+    macro on the fold, which cannot see unseen sites; the run''s use is as a candidate
+    for a public check.'
+  mechanism: 'Today the fastMRI batch''s loss enters the paired step at weight one.
+    Change: it is multiplied by two, the weight of one more fastMRI batch per step,
+    in every epoch. The Kaggle batch, the anchor and the schedule are unchanged.'
+  precedents:
+  - 'run-notes.md, public check of the incumbent: reducing fastMRI''s part gained
+    on the fold and lost publicly.'
+  novelty: First run that increases the fastMRI share.
+  coverage: Every fastMRI batch.
+  exploitation: 'Read x4 and x1 against the incumbent and the plain control, per label,
+    PF OA, MCL, Effusion and Fracture named apart (the labels the first joint run
+    lost on). Activation: train_extra_loss_epoch is logged unscaled as now, and one
+    training-side epoch metric through _log_epoch_metric holds the weight applied
+    (2.0). Shown wrong by: x4 more than 0.001 below the incumbent.'
+  budget: The reference's training time.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    File: training/lightning.py, training_step only: multiply the loss of an extra
+    batch by a module constant of 2 beside EXTRA_BATCHES before the EXTRA_BATCHES
+    multiplication. No option, no config field.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The direct test of more fastMRI, at no cost in time.
+  status: completed
+  created_revision: 298
+  seeded: /home/claudio/src/knee-abnormality-fastmri-pretraining/autoresearch/campaigns/fastmri-joint/seed-ideas-7.yaml
+  experiments:
+  - fastmri-loss-weight-doubled-20261013T074522Z-5aac5942
+  decision: invalid
+- id: no-loader-augmentation-on-fastmri-on-reference
+  mechanism_id: pseudo-label-inputs
+  parent_idea_id: null
+  title: Load the fastMRI studies without contrast mixing, intensity and noise augmentation,
+    applied to the reference
+  opportunity: 'USER DIRECTION, 2026-10-13: the incumbent is the starting reference
+    again (S148, 0.962 public); S149, the scheduled fastMRI weight, gained +0.0018
+    at x4 on the fold and scored 0.961. Seeds now keep or increase what fastMRI contributes.
+    Keeps fastMRI''s part and cleans its supervision. Evidence from this campaign,
+    on an incumbent with Kaggle-only statistics and Kaggle-only final epochs: x1 0.926511
+    against 0.926178 (+0.0003), the highest x1 at the time, and x4 0.931334 against
+    0.931686 (-0.0004); that incumbent''s per-label profile was not repeated by any
+    of four candidates. This entry applies the change to the reference, where fastMRI
+    is used in all ten epochs and the change therefore acts throughout.'
+  mechanism: 'Today the fastMRI dataset is built with the recipe''s data settings.
+    Change: it is built with a copy in which data.contrast_mixing_augmentation.probability,
+    data.intensity_augmentation.probability and data.noise_augmentation.probability
+    are 0. Sampling of slices, reflection and series dropping are unchanged, and so
+    are the augmentations inside the model (GIN, feature statistics), which a campaign
+    seed cannot reach. The Kaggle dataset is unchanged.'
+  precedents: []
+  novelty: First run separating the augmentation of real and pseudo-labelled studies.
+  coverage: Every fastMRI study drawn.
+  exploitation: 'Read the macro and the per-label table at both multipliers, and train_extra_loss_epoch
+    against the reference''s (expected lower). Activation: the three probabilities
+    of the fastMRI dataset''s settings, listed in the report. No new metric. Shown
+    wrong by: the macro below the incumbent at both multipliers.'
+  budget: The reference's training time or slightly less.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    File: training/lightning.py, KneeDataModule.setup only: pass a model_copy of config.data
+    with the three probabilities at 0 to the fastMRI KneeStudyDataset and its series
+    index. No option, no config field. Check without a GPU: the two datasets'' settings
+    printed side by side. The earlier candidate (experiment no-loader-augmentation-on-fastmri-20261013T022015Z-9db9d241)
+    was approved by the review; reproduce the same change on the reference''s source.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: A seed that does not reduce fastMRI, retested on the reference
+    after the reset.
+  status: prepared
+  created_revision: 298
+  seeded: /home/claudio/src/knee-abnormality-fastmri-pretraining/autoresearch/campaigns/fastmri-joint/seed-ideas-7.yaml
+  experiments:
+  - no-loader-augmentation-on-fastmri-on-reference-20261013T091514Z-201f55f1
+- id: label-rate-matching-by-sampling-on-reference
+  mechanism_id: pseudo-label-sampling
+  parent_idea_id: null
+  title: Draw the fastMRI studies so their label rates match the Kaggle fold's, applied
+    to the reference
+  opportunity: 'USER DIRECTION, 2026-10-13: the incumbent is the starting reference
+    again (S148, 0.962 public); S149, the scheduled fastMRI weight, gained +0.0018
+    at x4 on the fold and scored 0.961. Seeds now keep or increase what fastMRI contributes.
+    Keeps fastMRI''s part and changes which studies are drawn. Evidence from this
+    campaign, on the scheduled-weight incumbent: x1 0.927656 against 0.926148 (+0.0015,
+    the highest x1 of the campaign) and x4 0.932420 against 0.932544 (-0.0001); PF
+    OA +0.0029 and Fracture +0.0042 at x4; all twelve label rates matched with an
+    effective sample size of 7,660 of 9,828 and 9,066 distinct studies over ten epochs.
+    This entry applies it to the reference, where the fastMRI weight does not fade,
+    so the matched draws count in the late epochs too.'
+  mechanism: 'Today PairedBatches draws the fastMRI studies from a seeded permutation
+    that cycles through all of them. Change: each study gets a sampling weight fitted
+    once per fold by iterative proportional fitting, so that the weighted fraction
+    of positives (pseudo-label >= 0.5) of each of the twelve labels equals the fraction
+    among the fold''s Kaggle training cells (the positive fractions of class_balance.json).
+    Each epoch draws its fastMRI studies without replacement with those weights, from
+    the run''s seed and the epoch.'
+  precedents:
+  - 'prior-work.md, precedents: class weighting has moved the public score against
+    the fold before.'
+  novelty: First run matching the external set's label mix by sampling.
+  coverage: Fewer distinct fastMRI studies over the run than the uniform draw; the
+    report states how many.
+  exploitation: 'Read PF OA, Effusion, MCL and ACL, then the macro, at both multipliers.
+    Activation, in the report: the twelve weighted fractions beside Kaggle''s and
+    the uniform ones, the effective sample size of the weights, and the number of
+    distinct fastMRI studies drawn over ten epochs. No new metric. Shown wrong by:
+    the macro below the incumbent at both multipliers.'
+  budget: The reference's training time; the weights are fitted once per fold.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    File: training/lightning.py: the weights are computed in KneeDataModule.setup
+    from the fastMRI training rows and the Kaggle training frame and passed to PairedBatches,
+    which draws with torch.multinomial without replacement from a generator seeded
+    by the run''s seed and the epoch. No option, no config field. Check without a
+    GPU: the fit on synthetic label tables and the fractions reached. If the fit does
+    not converge for a label, return blocked and name it. The earlier candidate (experiment
+    label-rate-matching-by-sampling-20261013T042402Z-e3f8db6d) drew with replacement
+    and was approved by the review; reproduce the same change on the reference''s
+    source.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: The strongest x1 result of the campaign, retested where fastMRI
+    keeps its full weight.
+  status: queued
+  created_revision: 298
+  seeded: /home/claudio/src/knee-abnormality-fastmri-pretraining/autoresearch/campaigns/fastmri-joint/seed-ideas-7.yaml
+- id: fastmri-loss-weight-doubled-rerun
+  mechanism_id: fastmri-share
+  parent_idea_id: null
+  title: Give the fastMRI batch twice the weight of the Kaggle batch in a paired step
+    (rerun after a decoder crash)
+  opportunity: 'KEEPER, 2026-10-13: the first run of this seed (fastmri-loss-weight-doubled-20261013T074522Z-5aac5942)
+    was lost at batch 581 of its fifth epoch to a segmentation fault in the JPEG 2000
+    decoder of a loader worker, an infrastructure failure and not a result; it stood
+    at +0.0006, +0.0013, -0.0010, +0.0004 against the reference in its four epochs.
+    The decoder has been replaced by one that gives identical pixels. This entry runs
+    the same mechanism again. USER DIRECTION, 2026-10-13: the incumbent is the starting
+    reference again (S148, 0.962 public); S149, the scheduled fastMRI weight, gained
+    +0.0018 at x4 on the fold and scored 0.961. Seeds now keep or increase what fastMRI
+    contributes. Increases fastMRI''s part. The paired step weighs the two batches
+    equally, a choice never tested; fastMRI is 2.8 times the Kaggle training set and
+    is what the public gain of S148 is attributed to, while every change that reduced
+    its part gained on the fold and the one submitted lost publicly. Guess, low: -0.001
+    to +0.0005 macro on the fold, which cannot see unseen sites; the run''s use is
+    as a candidate for a public check.'
+  mechanism: 'Today the fastMRI batch''s loss enters the paired step at weight one.
+    Change: it is multiplied by two, the weight of one more fastMRI batch per step,
+    in every epoch. The Kaggle batch, the anchor and the schedule are unchanged.'
+  precedents:
+  - 'run-notes.md, public check of the incumbent: reducing fastMRI''s part gained
+    on the fold and lost publicly.'
+  novelty: First run that increases the fastMRI share.
+  coverage: Every fastMRI batch.
+  exploitation: 'Read x4 and x1 against the incumbent and the plain control, per label,
+    PF OA, MCL, Effusion and Fracture named apart (the labels the first joint run
+    lost on). Activation: train_extra_loss_epoch is logged unscaled as now, and one
+    training-side epoch metric through _log_epoch_metric holds the weight applied
+    (2.0). Shown wrong by: x4 more than 0.001 below the incumbent.'
+  budget: The reference's training time.
+  implementation: 'Follow the environment paragraph of the developer instructions.
+    File: training/lightning.py, training_step only: multiply the loss of an extra
+    batch by a module constant of 2 beside EXTRA_BATCHES before the EXTRA_BATCHES
+    multiplication. No option, no config field. The earlier candidate''s implementation
+    was approved by the review; reproduce the same change.'
+  open_choices: None.
+  dependencies: []
+  priority_rationale: Requeued by the keeper after a harness failure, not after a
+    result.
+  status: queued
+  created_revision: 358
+  seeded: /home/claudio/src/knee-abnormality-fastmri-pretraining/autoresearch/campaigns/fastmri-joint/seed-ideas-8.yaml
