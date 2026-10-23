@@ -8,7 +8,7 @@ scanner group from detached tokens, and a bounded confusion loss pushes the back
 toward carrying no more scanner information than the group frequencies. It is dropped at
 inference. At `trainer.scanner_confusion_weight: 0` the head is not built. It never engaged: its
 accuracy kept rising and its KL term stayed about 0.1% of the loss on both backbones, and removing
-it was neutral ([removal](../validation/results/2026-09-30-rn18-l2sp-no-confusion.md)). The evidence and the rejected variants are in [bias_free.md](../../bias_free.md).
+it was neutral ([removal](../validation/results/validation-and-ensembles/2026-09-30-rn18-l2sp-no-confusion.md)). The evidence and the rejected variants are in [site bias](site-bias.md).
 
 ## Why
 
@@ -62,4 +62,4 @@ their disease cost: scanner-model target 0.944 (S70), stronger head 0.943 (S71).
   cross-entropy, so the backbone bent features to make the head confidently wrong.
 - **Stronger pressure, finer targets, earlier features, per-site and per-model logit biases:**
   measured in the auxiliary-signals campaign; none beat this head publicly
-  ([bias_free.md](../../bias_free.md)).
+  ([site bias](site-bias.md)).

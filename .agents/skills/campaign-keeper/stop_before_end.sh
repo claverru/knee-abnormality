@@ -2,9 +2,9 @@
 campaign="$1"
 root="$2"
 cd "$root" || exit 1
-status() { rtk proxy uv run --locked python -m scripts.tools.autoresearch status "$campaign" 2>&1; }
+status() { uv run --locked python -m scripts.tools.autoresearch status "$campaign" 2>&1; }
 until status | grep -qE "^ +training .*epoch (8|9|10)/10"; do sleep 30; done
-rtk proxy uv run --locked python -m scripts.tools.autoresearch stop "$campaign" >/dev/null 2>&1
+uv run --locked python -m scripts.tools.autoresearch stop "$campaign" >/dev/null 2>&1
 until status | head -1 | grep -q "STOPPED"; do sleep 15; done
 latest=$(ls -t "outputs/autoresearch/$campaign/experiments"/*/evaluation.json | head -1)
 python3 - "$latest" <<'PY'

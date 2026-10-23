@@ -51,7 +51,7 @@ ideas:
   - 'outputs/analysis/t/two-peak-sagittal-gate-20260923/result.md: frozen k05-clean with the curve density,
     x4 -0.00057 [80% -0.00120, +0.00008], despite the train-inference sampler mismatch; narrow two-peak
     -0.00153 [-0.00246, -0.00064]; sampling_curve.py implements the density.'
-  - 'docs/validation/results/2026-09-18-per-plane-sigma-cache.md: coronal narrower than 40 mm gains +0.00135
+  - 'docs/validation/results/sampling/2026-09-18-per-plane-sigma-cache.md: coronal narrower than 40 mm gains +0.00135
     on frozen checkpoints.'
   novelty: Parked unrun to make queue room; it never trained, so this is its first test, not a revisit.
     Every sampler so far was a Gaussian around the centre; this shape comes from the measured map, with
@@ -90,7 +90,7 @@ ideas:
   - 'outputs/analysis/t/token-attention-vs-k05-clean: dropping 1D/2D with only relative, raw-LPS 3D RoPE
     gave -0.0015 (PF OA -0.0152, Fracture -0.0153; meniscus +0.0027, OA +0.0035), confounded with an added
     attention block.'
-  - 'docs/inference/submissions/2026-09-15-champion-without-3d-at-inference.md: the additive, non-side-normalized
+  - 'docs/inference/submissions/early-submission-details.md: the additive, non-side-normalized
     3D embedding was worth about 0.'
   novelty: Parked unrun to make queue room; it never trained, so this is its first test, not a revisit.
     Absolute and side-normalized, replacing rather than joining 1D and 2D; anterior structures such as

@@ -5,7 +5,7 @@ stride-32 recipe `k_05`. Truncation lost; three fusion designs tied within about
 at ×4, below the +0.002 bar. The stride-16 features trade labels (menisci up, peripheral and
 whole-joint labels down) rather than add signal, and the pair-ensemble ceiling for scale
 complementarity is about +0.001. No code was kept; each run's `source_snapshot.zip` holds its
-implementation. The [research report](../research/multiscale-features-knee-mri.md) reviews the
+implementation. The [research report](../research/geometry-and-views/multiscale-features-knee-mri.md) reviews the
 literature and the project's own precedents.
 
 The investigation owned both late-stage ReXNet truncation and stride-16/stride-32 fusion, merged by
@@ -26,8 +26,8 @@ Deltas are against `k_05` with paired report-group 95% intervals.
 | `fusion-deepdrop25` | `fusion-sum` + per-study deep-term dropout 0.25 in training | 0.899699 | −0.0027 [−0.0060, +0.0006] | +0.0097 | −0.0065 | 1,591 s, 21.1 GB |
 | `fusion-scaleheads` | separate attention-MIL head per scale, summed logits, three equal BCE terms | 0.903023 | +0.0006 [−0.0031, +0.0040] | +0.0070 | −0.0012 | 1,642 s, 20.5 GB |
 
-Details: [truncation result](../validation/results/2026-09-22-stride16-truncation-result.md),
-[fusion, dropout, scale-heads and pair-ensemble results](../validation/results/2026-09-22-stride16-fusion-result.md).
+Details: [truncation result](../validation/results/pooling-and-attention/2026-09-22-stride16-truncation-result.md),
+[fusion, dropout, scale-heads and pair-ensemble results](../validation/results/pooling-and-attention/2026-09-22-stride16-fusion-result.md).
 Both fusion runs and the scale-heads run selected their last epoch.
 
 ## Findings
@@ -62,7 +62,7 @@ Both fusion runs and the scale-heads run selected their last epoch.
 - **Recovering the code:** `outputs/training/stride16/source_snapshot.zip` (truncation) and
   `outputs/training/fusion-scaleheads/source_snapshot.zip` (fusion with `stride16_fusion` and
   `fusion_readout`, plus `scripts/adhoc/diagnose_fusion_branches.py`). The fusion checkpoints
-  load only with that code; see [ensembling](../backlog/endgame.md#ensembling).
+  load only with that code; see [ensembling](../validation/validation-protocol.md#ensembles).
 
 ## Lessons
 

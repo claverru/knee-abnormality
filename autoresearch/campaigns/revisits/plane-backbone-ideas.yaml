@@ -23,7 +23,7 @@ ideas:
     (changes.diff and frozen code): PlaneBackbones for ResNet with RadImageNet loading.'
   - 'outputs/autoresearch/plane-specialization/experiments/dense-readouts-learned-fusion-20260927T231847Z-33417f97
     (modeling/planes/ in its frozen code): the plane-backbone routing and per-plane DSU.'
-  - 'docs/history/plane-backbones.md and docs/validation/results/2026-09-28-plane-specialization-campaign.md.'
+  - 'docs/history/plane-backbones.md and docs/validation/results/campaigns-and-queues/2026-09-28-plane-specialization-campaign.md.'
   novelty: First plane-backbone run on the current recipe at ten epochs, with the readout unchanged.
   coverage: All studies and labels.
   exploitation: Each plane backbone's per-stage drift and gradient RMS; per-label AUC against the

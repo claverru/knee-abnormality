@@ -2,8 +2,10 @@
 
 | Read when | Document |
 |---|---|
-| Checking project state and active work | [Ongoing work](ongoing/INDEX.md) |
-| Finding proposed experiments and deferred work | [Backlog](backlog/INDEX.md) |
+| Reading the solution the competition ended on: the S188 ensemble, how its members were trained, inference settings, scores and where the weights are | [Final solution](final-solution.md) |
+| Checking work in progress | [Ongoing work](ongoing/INDEX.md) |
+| Finding ideas that were never run, with the evidence behind them | [Backlog](backlog/INDEX.md) |
+| Reading an autoresearch campaign's contract, seeds, run notes and decisions | [Autoresearch campaigns](../autoresearch/campaigns/INDEX.md) |
 | Interpreting unverified working notes | [How to use these notes](research/provenance.md#how-to-use-these-notes) |
 | Understanding code organization, dependencies and experiment artifacts | [Architecture](architecture/INDEX.md) |
 | Finding scripts and their usage guides | [Script index](../scripts/INDEX.md) |

@@ -52,10 +52,10 @@ fell by 0.011455. The baseline again supervises all nonmissing soft targets.
 **Measured 2026-09-20; the proposed training change is untested.** Reporting status
 is available as auxiliary supervision, but the evidence does not establish that
 replacing disease targets with three hard states improves image-model AUC. The
-[backlog proposal](../backlog/small-changes.md#auxiliary-report-state-prediction)
+[backlog proposal](../backlog/untried-ideas.md#supervision-and-labels)
 retains balanced v4 BCE and adds a separate reporting head.
 
-The [audit artifact](../../outputs/analysis/r/report-state-audit-20260920/audit.json)
+The audit artifact (`outputs/analysis/r/report-state-audit-20260920/audit.json`, deleted)
 records input SHA-256 hashes, methods and all twelve labels' results. It joins
 Steven v1/v2/v4 and official labels by `StudyInstanceUID` across 4,407 studies.
 The diagnostic groups are `v1 < 0.5`, `v1 == 0.5` and `v1 > 0.5`: negative-score,
@@ -165,7 +165,7 @@ The visible prompt grades minimal, moderate/unqualified and severe findings;
 it does not establish compliance with all of the host's severity thresholds.
 The observed score/confidence mapping above is verified from the CSV.
 
-The [inspected baseline notebook](../research/public-research.md#public-code-worth-inspecting)
+The [inspected baseline notebook](../research/competition-and-prior-art/public-research.md#public-code-worth-inspecting)
 separately falls back to lexicon labels for uncovered IDs and replaces eligible
 training gold targets with official labels. Those are downstream notebook
 operations, not evidence of replacement inside the downloaded CSV.

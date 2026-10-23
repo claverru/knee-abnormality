@@ -17,7 +17,7 @@ measurement is explicitly identified below.
 
 ## Run identity and measured results
 
-Artifacts are under [`outputs/training/baseline1/`](../../outputs/training/baseline1).
+Artifacts are under `outputs/training/baseline1/` (deleted).
 
 | Item | Recorded value |
 |---|---|
@@ -80,7 +80,7 @@ target scores here do not establish that those targets are solved.
 
 The saved run contains no Kaggle submission score. Its `oof_predictions.csv`
 has only 12 rows; it is partial reference OOF, not the complete 58-study endpoint.
-The [public evidence](../research/public-research.md#validation-and-ensembling) includes a
+The [public evidence](../research/competition-and-prior-art/public-research.md#validation-and-ensembling) includes a
 reported 0.936 public score for a small single-fold ResNet at 224 px, but this
 does not imply that baseline1 is 0.092 worse on the same endpoint. The official
 requirements rechecked later are recorded in the
@@ -151,7 +151,7 @@ configuration/preparation/dataset path.
   match, along with training settings. Storage paths, run name, selected fold
   list and loader/device placement can change; the actual producing fold is
   checked separately. DICOM pixels are not rehashed by this guard.
-- `data.position_encoding: physical_mm` is explicit in `configs/baseline.yaml`.
+- `data.position_encoding: physical_mm` is explicit in `configs/baseline.yaml` (removed).
   With `position_reference: center`, it encodes float32 distances from the
   physical midpoint of the full indexed acquisition, keeping the reference
   fixed across sampled subsets.
@@ -245,4 +245,4 @@ probabilities scores
 retained, so it cannot currently become a deployable three-checkpoint ensemble.
 
 Broader deferrals and public evidence now live in the [backlog](../backlog/INDEX.md) and the
-[public modeling review](../research/public-research.md#geometry-sampling-encoders-and-losses).
+[public modeling review](../research/competition-and-prior-art/public-research.md#geometry-sampling-encoders-and-losses).

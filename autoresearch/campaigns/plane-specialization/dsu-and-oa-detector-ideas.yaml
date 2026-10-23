@@ -22,7 +22,7 @@ ideas:
     model.feature_statistics_augmentation.probability stays 0, and the ReXNet-only DSU path is
     untouched. Validation and inference run the backbones unchanged.
   precedents:
-  - 'DSU on ReXNet-200: +0.0022, rerun +0.0012 (docs/validation/results/2026-09-26-augmentation-campaign.md).'
+  - 'DSU on ReXNet-200: +0.0022, rerun +0.0012 (docs/validation/results/campaigns-and-queues/2026-09-26-augmentation-campaign.md).'
   - 'The ReXNet control scanner-confusion-control uses DSU at 0.5; the campaign reference had it off.'
   novelty: First DSU on EfficientNet and on plane-specific backbones.
   coverage: All training studies and every plane backbone.

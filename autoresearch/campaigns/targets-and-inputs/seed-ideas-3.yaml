@@ -34,8 +34,8 @@ ideas:
     the regions use the original definition from knee_side_sign, knee_center_x_mm, knee_center_y_mm
     and the middle slice's patient map, not the learned frame.
   precedents:
-  - 'docs/validation/results/2026-09-25-near-misses-campaign.md: the detector adopted, PF OA +0.0102; learned scales 0.040, 0.050 and 0.017 by epoch 9.'
-  - 'docs/validation/results/2026-10-05-fixes-and-removals-campaign.md: the removal, run 9 oa-detector-off, -0.000468 at x4, 80% interval [-0.001017, +0.000110]; S108 and S111 both 0.950.'
+  - 'docs/validation/results/campaigns-and-queues/2026-09-25-near-misses-campaign.md: the detector adopted, PF OA +0.0102; learned scales 0.040, 0.050 and 0.017 by epoch 9.'
+  - 'docs/validation/results/campaigns-and-queues/2026-10-05-fixes-and-removals-campaign.md: the removal, run 9 oa-detector-off, -0.000468 at x4, 80% interval [-0.001017, +0.000110]; S108 and S111 both 0.950.'
   - 'autoresearch/campaigns/near-misses/seed-ideas-2.yaml, three-compartment-oa-detector: the original seed.'
   novelty: First run of the detector with the routed shared OA head, on the ResNet-50 and on the current recipe.
   coverage: The three OA labels; other labels only through the shared token features.
@@ -91,9 +91,9 @@ ideas:
     added to the OA logits stays as it is today if it does not need the shared "oa" channel; if it
     does, keep it reading the cells it reads today through a channel of its own and say so.
   precedents:
-  - 'docs/ongoing/side-routed-heads.md: the routed shared heads, run 24, adopted for the menisci and OA together.'
-  - 'docs/validation/results/2026-09-25-near-misses-campaign.md: separate OA heads with the detector, PF OA +0.0102.'
-  - 'docs/validation/results/2026-10-05-fixes-and-removals-campaign.md: the last model of that arrangement, S108, 0.950.'
+  - 'docs/modeling/side-routed-heads.md: the routed shared heads, run 24, adopted for the menisci and OA together.'
+  - 'docs/validation/results/campaigns-and-queues/2026-09-25-near-misses-campaign.md: separate OA heads with the detector, PF OA +0.0102.'
+  - 'docs/validation/results/campaigns-and-queues/2026-10-05-fixes-and-removals-campaign.md: the last model of that arrangement, S108, 0.950.'
   novelty: First comparison of separate OA heads with the detector against the routed shared OA head with the menisci held fixed.
   coverage: The three OA labels; the menisci only through the frame the OA head no longer shapes.
   exploitation: >-

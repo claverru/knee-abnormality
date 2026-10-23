@@ -27,7 +27,7 @@ The reference is `outputs/training/oblique-x4`, the run below re-predicted at ×
 macro AUC 0.902373 (the τ-sweep's ×4 τ 1.00 gave 0.90237 on the same checkpoint).
 
 `outputs/training/oblique`
-([result](../../../docs/validation/results/2026-09-22-oblique-groups-result.md)): fold 0
+([result](../../../docs/validation/results/sampling/2026-09-22-oblique-groups-result.md)): fold 0
 0.897527 at ×1 τ 1 against 0.899042 for `k_05` (−0.0015, 95% [−0.0055, +0.0026]); ×4 τ 0.75
 0.90467 against 0.904375; ×5 τ 0.70 0.90495; public S46 0.944 (×4 τ 0.75) and S47 0.945 (×5
 τ 0.70) against 0.945 for `k_05`. On fold 0, 103 studies change; the mean study rises from 26.80 to 27.37 training triplets.
@@ -67,13 +67,13 @@ is 0.930 inside them against 0.939 outside; MCL is weak inside them (0.737 on ab
   tilted-only lost.
 - **Frozen-model repeated slots**: extra triplets from a slot's second series helped more than
   from its first, most for different-geometry pairs (+0.003 to +0.005 on those studies;
-  [test-time allocation](../../../docs/validation/results/2026-09-17-test-time-allocation.md#repeated-series-in-one-slot)).
+  [test-time allocation](../../../docs/validation/results/sampling/2026-09-17-test-time-allocation.md#repeated-series-in-one-slot)).
 - **Protocol as information** (`protocol_prior`): adding oblique, 3D or vendor flags to `k_05`'s
   fold-0 predictions changed macro AUC by −0.0003 to −0.0014 (ACL +0.0000). The model already reads
   the protocol from appearance; a gain has to come from how it routes and weights these views.
 - **Fixed-total reallocation into repeated slots** (`data.repeated_series_share`) topped fold 0 and
   lost publicly, 0.929 against 0.933
-  ([overnight](../../../docs/validation/results/2026-09-18-overnight-results.md)); it took triplets
+  ([overnight](../../../docs/validation/results/campaigns-and-queues/2026-09-18-overnight-results.md)); it took triplets
   from other types for any repeated series.
 - **Per-label localization** (`span_by_group`): in the sampling campaign's physical-span run the
   PF OA loss and ligament gains were as large in studies without thin series, so per-label claims
@@ -117,7 +117,7 @@ hold only about 14 windows. Denser or re-centred sampling of the same series has
 
 ## Backlog ownership and directions left out
 
-- The general backlog's [oblique embedding](../../../docs/backlog/small-changes.md#oblique-embedding)
+- The general backlog's [oblique embedding](../../../docs/backlog/untried-ideas.md#position-and-knee-side)
   entry was transferred to the first campaign on 2026-09-22 and carries over here.
 - Left out: tilt-threshold changes (set from measured geometry), sagittal obliques, test-time
   policies such as the two-pass average (endgame test-time augmentation), the image count and τ

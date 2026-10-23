@@ -9,11 +9,11 @@ the score, not learned placement:
 
 Learned placement was never worth more than about 0.005. A full-slice test of finer resolution
 at a fixed field of view is deferred to the
-[end of the competition](../backlog/endgame.md#bigger-images).
+[end of the competition](../backlog/untried-ideas.md#views-and-fields).
 
 The original rationale is in the [implementation plan](crop-selection-plan.md). Documentation
 snapshots, source archives and retired scripts are listed in the
-[historical crop-selection sources](crop-selection-sources/README.md), including the last
+[historical crop-selection sources](sources/crop-selection/README.md), including the last
 `docs/ongoing.md` (`f076a09:docs/history/crop-selection-sources/ongoing.md.txt`) with every open option in full.
 
 ## Goal
@@ -34,16 +34,16 @@ public score.
 
 | Run | Crops | What ReXNet-200 sees | Macro AUC | vs `00-baseline` | Record |
 |---|---|---|---:|---:|---|
-| 160 px | One per kept canvas, summed value map, 15-epoch extension | Every slice, 80 mm at 0.5 mm | 0.887151 | −0.0056 | [result](../validation/results/2026-09-15-crop-selection-result.md) |
-| Two crops | 160 px, two per kept canvas | Every slice twice, 80 mm at 0.5 mm | 0.889409 | −0.0034 | [result](../validation/results/2026-09-15-two-crops-result.md) |
-| crop224 | 224 px on 75% of canvases, summed value map | 75% of slices, 112 mm at 0.5 mm | 0.891624 | −0.0011 | [result](../validation/results/2026-09-16-crop224-result.md) |
-| per-label | 224 px on 75%, equal label quotas, union pooling | 75% of slices, 112 mm at 0.5 mm | 0.891703 | −0.0011 | [result](../validation/results/2026-09-16-per-label-crops-result.md) |
-| label-private | 2 per label, plane spread, private gated pooling, label FiLM | About a quarter of slices, pooled per label | 0.845131 | −0.0476 | [result](../validation/results/2026-09-16-label-private-crops-result.md) |
-| shared | 2 per label, plane spread, shared gated pooling | About a quarter of slices (12.9 of 50.7 validation canvases) | 0.879626 | −0.0131 | [result](../validation/results/2026-09-16-shared-crops-result.md) |
-| learned zoom | 160 px context on every slice, learned 224 px detail, one softmax | Every slice at 0.875 mm; detail glimpses at 0.42 mm went unused | 0.869951 | −0.0228 | [result](../validation/results/2026-09-16-learned-zoom-result.md) |
+| 160 px | One per kept canvas, summed value map, 15-epoch extension | Every slice, 80 mm at 0.5 mm | 0.887151 | −0.0056 | [result](../validation/results/crops-and-views/2026-09-15-crop-selection-result.md) |
+| Two crops | 160 px, two per kept canvas | Every slice twice, 80 mm at 0.5 mm | 0.889409 | −0.0034 | [result](../validation/results/crops-and-views/2026-09-15-two-crops-result.md) |
+| crop224 | 224 px on 75% of canvases, summed value map | 75% of slices, 112 mm at 0.5 mm | 0.891624 | −0.0011 | [result](../validation/results/crops-and-views/2026-09-16-crop224-result.md) |
+| per-label | 224 px on 75%, equal label quotas, union pooling | 75% of slices, 112 mm at 0.5 mm | 0.891703 | −0.0011 | [result](../validation/results/crops-and-views/2026-09-16-per-label-crops-result.md) |
+| label-private | 2 per label, plane spread, private gated pooling, label FiLM | About a quarter of slices, pooled per label | 0.845131 | −0.0476 | [result](../validation/results/crops-and-views/2026-09-16-label-private-crops-result.md) |
+| shared | 2 per label, plane spread, shared gated pooling | About a quarter of slices (12.9 of 50.7 validation canvases) | 0.879626 | −0.0131 | [result](../validation/results/crops-and-views/2026-09-16-shared-crops-result.md) |
+| learned zoom | 160 px context on every slice, learned 224 px detail, one softmax | Every slice at 0.875 mm; detail glimpses at 0.42 mm went unused | 0.869951 | −0.0228 | [result](../validation/results/crops-and-views/2026-09-16-learned-zoom-result.md) |
 
 The overnight `crop130` rerun is a separate full-slice test (130 mm at 224 px), a tie at 0.892500
-([overnight results](../validation/results/2026-09-15-overnight-results.md)).
+([overnight results](../validation/results/campaigns-and-queues/2026-09-15-overnight-results.md)).
 
 ## Recipes
 
@@ -114,7 +114,7 @@ These are single-seed fold-0 results.
     −0.0039.
   - *Why:* the uncropped canvases were mostly edge slices, and fracture pairs are the most
     expensive
-    ([pair costs](../validation/target-level-diagnostics.md#cost-of-a-reversed-pair)).
+    ([pair costs](../validation/run-comparison-and-diagnostics.md#cost-of-a-reversed-pair)).
 - **Slice coverage matters more than per-label targeting at 224 px.** Score followed how many
   canvases ReXNet-200 saw:
 
@@ -127,24 +127,24 @@ These are single-seed fold-0 results.
 
   Four crops per label at inference recovered 0.003 of shared's 0.012 gap to per-label. This is
   a pattern across runs, not a controlled run
-  ([shared crops](../validation/results/2026-09-16-shared-crops-result.md#reading)).
+  ([shared crops](../validation/results/crops-and-views/2026-09-16-shared-crops-result.md#reading)).
 - **Resolution matters as well as coverage.**
   - *Learned zoom:* ReXNet-200 evidence was in effect at 0.875 mm on every slice. The lateral
     meniscus fell 0.106, MCL 0.067 and ACL 0.022 against `00-baseline`, while effusion (+0.006)
     and contusion held.
   - *Comparison:* `00-baseline` reads every slice at 0.625 mm, and per-label read 75% at 0.5 mm.
   - *Caveat:* the architectures differ, so this is not a controlled resolution test
-    ([learned zoom](../validation/results/2026-09-16-learned-zoom-result.md#reading)).
+    ([learned zoom](../validation/results/crops-and-views/2026-09-16-learned-zoom-result.md#reading)).
 - **Selection adds little because the value map is weak.**
   - *Learned against fixed placement:* learned placement beat uniform and centred 160 px crops
     by about 0.005. Training on learned crops inflated that gap
-    ([placement ablation](../validation/results/2026-09-15-crop-selection-result.md#placement-ablation)).
+    ([placement ablation](../validation/results/crops-and-views/2026-09-15-crop-selection-result.md#placement-ablation)).
   - *Attention against random selection:* on the label-private checkpoint with shared pooling,
     attention beat random selection by 0.004. A label's attention on its chosen canvas had a
     normalised entropy of 0.97–0.99
-    ([probe](../validation/results/2026-09-16-label-private-crops-result.md#selection-signal-probe)).
+    ([probe](../validation/results/crops-and-views/2026-09-16-label-private-crops-result.md#selection-signal-probe)).
   - *Per-label placement:* crop centres of studies with and without a finding differed by only
-    0.1–3.6 mm ([placement](../validation/results/2026-09-16-per-label-crops-result.md#placement)).
+    0.1–3.6 mm ([placement](../validation/results/crops-and-views/2026-09-16-per-label-crops-result.md#placement)).
   - *Learned zoom:* removing or randomising the detail glimpses changed nothing.
 - **A trained coarse pool made placement study-specific only while fine pooling was weak.**
   - *Label-private:* its gated coarse pool reached 0.82, against 0.61–0.71 for the other runs'
@@ -158,26 +158,26 @@ These are single-seed fold-0 results.
     moved.
 - **Misses can be recognition failures.** A detected fracture relied on crops that other labels
   chose. A missed one lay inside other labels' crops and was not recognised
-  ([renders](../validation/results/2026-09-16-per-label-crops-result.md#visual-review-of-fracture-cases)).
+  ([renders](../validation/results/crops-and-views/2026-09-16-per-label-crops-result.md#visual-review-of-fracture-cases)).
 - **Averaging a crop model with the champion added about as much as a second full-slice run**
   (+0.00036 more for per-label crops). See the
-  [ensembles](../validation/results/2026-09-16-per-label-crops-result.md#ensembles-with-the-full-triplet-models)
-  and [two-crops averaging](../validation/results/2026-09-15-two-crops-result.md#per-target-comparison-with-the-champion).
+  [ensembles](../validation/results/crops-and-views/2026-09-16-per-label-crops-result.md#ensembles-with-the-full-triplet-models)
+  and [two-crops averaging](../validation/results/crops-and-views/2026-09-15-two-crops-result.md#per-target-comparison-with-the-champion).
 
 ## Rejected approaches
 
 - **Private fine pooling and label FiLM:** see the
-  [label-private result](../validation/results/2026-09-16-label-private-crops-result.md).
+  [label-private result](../validation/results/crops-and-views/2026-09-16-label-private-crops-result.md).
 - **Two crops per label with plane spread,** also with shared pooling: see the
-  [shared-crops result](../validation/results/2026-09-16-shared-crops-result.md).
+  [shared-crops result](../validation/results/crops-and-views/2026-09-16-shared-crops-result.md).
 - **Selecting by class-activation evidence instead of attention:** it lost 0.0006–0.0023 and aimed
   at bright superficial signal
-  ([probe](../validation/results/2026-09-16-label-private-crops-result.md#selection-signal-probe)).
+  ([probe](../validation/results/crops-and-views/2026-09-16-label-private-crops-result.md#selection-signal-probe)).
 - **Learned zoom as built:** the detail glimpses went unused, and the context resolution cost
   the detail targets.
 - **Blaming draft-uncertainty weighting for the peripheral losses:** removing the weighting at
   inference scored +0.000709 and left Baker's cyst and MCL far below the champion
-  ([check](../validation/results/2026-09-15-two-crops-result.md#draft-uncertainty-check)).
+  ([check](../validation/results/crops-and-views/2026-09-15-two-crops-result.md#draft-uncertainty-check)).
 
 ## Options not pursued
 
@@ -190,12 +190,12 @@ risks.
 | Learned glimpse sets (the recommended run 1) | Two-scale glimpses, detail at 0.42 mm and context at 0.625 mm, on 0.42 mm canvases. A k-DPP policy over label-weighted facility location, a budget matched to the champion's compute, a demand head, union pooling with log-demand, and matched exploration pairs with per-label swap credit and a Bradley–Terry loss. |
 | Glimpse-outcome predictor (run 2) | A JEPA-like head on scout tokens that predicts the ReXNet-200 embedding a glimpse would produce, so selection can estimate each candidate's effect without running the backbone. |
 | DINO scout pretraining (run 3) | Self-supervised multi-crop pretraining of the scout on about 175k training canvases, for an anatomy-aware latent space. |
-| Anatomical glimpses (run 4) | Detail windows fixed in patient coordinates around the structures (compartments, notch, patellofemoral joint, posteromedial corner, MCL), with no learned placement. The joint line is more than 25 mm from the image centre in 6–16% of series ([input resolution](../research/input-resolution.md#field-of-view-and-joint-position)). |
-| Branch fusion (run 5) | A zero-initialised projection of the crop's scout cells into ReXNet-200's `features.10`, plus a canvas-pooled scale and shift ([GLNet](../research/learned-crop-selection.md#global-local-branch-fusion)). |
+| Anatomical glimpses (run 4) | Detail windows fixed in patient coordinates around the structures (compartments, notch, patellofemoral joint, posteromedial corner, MCL), with no learned placement. The joint line is more than 25 mm from the image centre in 6–16% of series ([input resolution](../research/geometry-and-views/input-resolution.md#field-of-view-and-joint-position)). |
+| Branch fusion (run 5) | A zero-initialised projection of the crop's scout cells into ReXNet-200's `features.10`, plus a canvas-pooled scale and shift ([GLNet](../research/geometry-and-views/learned-crop-selection.md#global-local-branch-fusion)). |
 | Training-only crop jitter | ±1 scout cell (±8 mm). |
 | Per-slice canvas centring | Superior axial slices sat off-centre because every canvas was centred on one study point. |
-| Several attention heads per label | Listed without a design; now a general idea in the [small changes](../backlog/small-changes.md#attention-pooling). |
-| Deferred | Per-label learned prototypes as the coarse attention score, weak location labels from reports, a second selection pass, light token mixing across coarse tokens, and a larger scout ([candidates](../research/scout-backbones.md)). |
+| Several attention heads per label | Listed without a design; now a general idea in the [small changes](../backlog/untried-ideas.md#pooling-and-the-attention-head). |
+| Deferred | Per-label learned prototypes as the coarse attention score, weak location labels from reports, a second selection pass, light token mixing across coarse tokens, and a larger scout ([candidates](../research/backbones-and-pretraining/scout-backbones.md)). |
 
 The same snapshot records superseded variants: a higher early Gumbel temperature, selection from
 the gated coarse pool, a study-dependent gate and a soft per-label bias.
@@ -208,11 +208,11 @@ the gated coarse pool, a study-dependent gate and a soft per-label bias.
 - **GPU memory:**
   - *crop224:* 224 px crops on every canvas ran out of memory on the 24 GiB card, while 75% of
     canvases peaked at 21.3 GiB in the heaviest-study profile
-    ([crop224](../validation/results/2026-09-16-crop224-result.md#setup)).
+    ([crop224](../validation/results/crops-and-views/2026-09-16-crop224-result.md#setup)).
   - *Later runs:* label-private, shared crops and learned zoom peaked at 22.4–22.5 GiB.
 - **Epoch time:** the simplifications from label-private to shared crops saved nothing. Epochs
   took about 200 s for crop224 and per-label, 234 s for label-private, 237 s for shared crops and
   246–262 s for learned zoom.
 - **Backbone costs:** the learned-zoom budget, scout delta formula and scout code requirements
   are in the backbone-swap snapshot (`f076a09:docs/history/crop-selection-sources/learned-zoom-backbone-swaps.md.txt`).
-  The scout survey is in [scout backbone candidates](../research/scout-backbones.md).
+  The scout survey is in [scout backbone candidates](../research/backbones-and-pretraining/scout-backbones.md).

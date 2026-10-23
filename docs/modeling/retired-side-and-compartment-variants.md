@@ -3,20 +3,20 @@
 ## Knee-side embedding
 
 The embedding remains retired. The audited side resolver was restored on 2026-09-21
-for the adopted [anatomical attention](../validation/results/2026-09-21-anatomical-attention-result.md);
+for the adopted [anatomical attention](../validation/results/pooling-and-attention/2026-09-21-anatomical-attention-result.md);
 it now supplies a geometric bias rather than a left/right token embedding.
 
 **Retired on 2026-09-14.** Research approach 1 added a zero-initialized learned
 left/right vector to every token, used a fixed zero vector for unknown side,
 swapped sides under reflection and applied study-level side dropout of 0.10.
-Sides came from the audited [metadata policy](../metadata/knee-side-policy-audit.md).
+Sides came from the audited [metadata policy](../metadata/knee-side/knee-side-policy-audit.md).
 The run `outputs/training/knee-side-embedding/` scored 0.892410 fold-0 macro AUC, a
-[tie](../validation/results/2026-09-14-knee-side-embedding-result.md) with the champion's 0.892360.
+[tie](../validation/results/pooling-and-attention/2026-09-14-knee-side-embedding-result.md) with the champion's 0.892360.
 Swapping or suppressing side on its checkpoint left predictions unchanged.
 
 The side resolver, loader field, embedding, `model.side_dropout`, identity entries,
 run side manifests and diagnostic side interventions were removed, restoring the
-`ea19772` champion sources. [Archived sources](../history/knee-side-sources/README.md)
+`ea19772` champion sources. [Archived sources](../history/sources/knee-side/README.md)
 preserve the integration patch, resolver, policy audit and plan. The run's
 source archive, side manifests and analyses remain local; its checkpoints, which current
 code rejected, were deleted on 2026-09-16.
@@ -25,7 +25,7 @@ code rejected, were deleted on 2026-09-16.
 
 **Historical experiment; training implementation removed on 2026-09-14.**
 Candidate 1 from the
-[transfer research](../research/medial-lateral-transfer.md#candidate-1-weak-classifier-coupling)
+[transfer research](../research/geometry-and-views/medial-lateral-transfer.md#candidate-1-weak-classifier-coupling)
 kept the twelve classifier vectors, biases and attention scorers independent.
 Its training objective was:
 
@@ -71,12 +71,12 @@ contains those same values under `classifier_coupling`. For a resumed run the in
 record described the loaded weights. Validation BCE excluded the penalty,
 and checkpoint selection used full-fold macro AUC.
 
-The [completed comparison](../validation/results/2026-09-14-meniscus-soft-coupling-result.md)
+The [completed comparison](../validation/results/labels-and-losses/2026-09-14-meniscus-soft-coupling-result.md)
 scored 0.890868573 versus 0.892360168: both meniscus targets declined despite
 a 20.5% reduction in classifier distance relative to the champion. It retains
 the predefined family, BCE, exclusive-positive and co-occurrence/manufacturer
 diagnostics. Reflection/sigma 40 remains the champion, and no additional training
-is scheduled. The [historical CPU analysis](../history/meniscus-coupling-sources/README.md)
+is scheduled. The [historical CPU analysis](../history/sources/meniscus-coupling/README.md)
 ran against saved artifacts without the removed training loss; it can no longer be rerun
 because the run's checkpoints were deleted on 2026-09-16.
 
@@ -103,8 +103,8 @@ Their architecture identities are respectively
 `spatial_tokens_shared_meniscus_classifier_v1`,
 `spatial_tokens_shared_meniscus_oa_classifiers_v1` and
 `spatial_tokens_disease_compartment_attention_v1`.
-[Historical sources](../history/sharing-sources/README.md),
+[Historical sources](../history/sources/sharing/README.md),
 [validation and intervention results](../history/sharing/INDEX.md), and the
-[transfer investigation](../research/medial-lateral-transfer.md) preserve the
+[transfer investigation](../research/geometry-and-views/medial-lateral-transfer.md) preserve the
 implementation rationale and findings. Reproduce each checkpoint with its own
 saved source/configuration; sharing is not an option in the current model.

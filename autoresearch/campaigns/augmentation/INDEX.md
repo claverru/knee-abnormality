@@ -11,4 +11,4 @@
 | Recording ideas, their ancestry and completed outcomes | [Idea registry](ideas.yaml) |
 | Checking the live queue | [Backlog](backlog.yaml) |
 | Reviewing campaign decisions | [Findings](findings.md) |
-| Reading the outcome: every result, the manual decisions, the stacks and public scores | [Campaign result](../../../docs/validation/results/2026-09-26-augmentation-campaign.md) |
+| Reading the outcome: every result, the manual decisions, the stacks and public scores | [Campaign result](../../../docs/validation/results/campaigns-and-queues/2026-09-26-augmentation-campaign.md) |

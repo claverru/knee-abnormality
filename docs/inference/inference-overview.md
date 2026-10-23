@@ -1,38 +1,48 @@
-# Inference and efficiency
+# Inference pipeline overview
 
-Evidence: official submission research and repository inspection through
-2026-09-11, completed local submissions checked on 2026-09-14, plus unverified working notes;
-see [provenance](../research/provenance.md).
+How a checkpoint became a scored Kaggle submission, as the pipeline stood at the end of the
+competition. Every submission came from `main`; the separate inference-speed branch was removed on
+2026-10-23 and efficiency submissions were exported from `main` too. Scores, settings and Kaggle's
+order among ties for every submission are in the [ledger](submissions/ledger.md); the model itself is
+in [current model](../modeling/current-model.md).
 
-Each current submission uses one trained fold. The implemented exporter
-packages the checked-in offline Kaggle notebook with a frozen model bundle; the notebook runs the
-shared inference path on mounted test data and writes `submission.csv`.
-Baseline3 submission `56164711` scored **0.878** publicly, and baseline4
-submission `56167669` scored **0.910** publicly at 1× image limits. Baseline4
-at 2× scored **0.913** (`56169438`), ahead of 3× at **0.912** (`56169445`).
-The 2026-09-15 submission used **2× images, four studies per GPU, 16 total loader workers and
-automatic FP16 with fixed backbone chunks** through the isolated dual-GPU runtime; it rescored
-the champion at 0.936 ([record](submissions/2026-09-15-fast-champion-submission.md)), which held
-as the best public result from 2026-09-14 (`reflection-sigma40`, submission `56230573`, with its
-[validation comparison](../validation/results/2026-09-14-reflection-sigma-40-result.md) and
-[submission artifact](submissions/2026-09-14-reflection-sigma-40-submission.md)) until the
-attention temperature and larger evaluation counts took it to 0.939 on 2026-09-18. The
-[submission ledger](submissions/ledger.md) carries the current best and every scored submission;
-the older commands in this branch still describe the original batch-2 exporter, so reproduce a
-later submission from its recorded runtime or frozen bundle.
+## Stages
 
-## 2026-09-14 inference timing investigation
+1. **Export** ([`scripts/pipeline/export.py`](../../scripts/pipeline/export.py)): one or more fold
+   checkpoints become an immutable bundle with the frozen config, a copy of the shared package, both
+   prediction entry points, the notebook template and offline wheels. Image multiplier, attention
+   temperature (one value or one per member), batch size, loader workers, mirror TTA and backbone
+   mode (`graph` compiled and captured, or `eager`) are bundle settings, and a bundle rejects
+   contradicting overrides at prediction time
+   ([bundle](model-bundle-and-offline-environment.md), [recipes](justfile-recipes.md)).
+2. **Submit** ([`scripts/pipeline/submit.py`](../../scripts/pipeline/submit.py), detached through
+   `just submission-job`): versions a private dataset, builds a compile cache on Kaggle when the bundle
+   lacks one, runs the offline GPU notebook on the visible test, verifies `submission.csv` and submits
+   that exact notebook version; every remote response is written to a record
+   ([workflow](kaggle-submission-workflow.md)).
+3. **Kaggle rerun**: the notebook discovers studies from the mounted test data, one process per visible
+   GPU decodes and scores a disjoint partition, members of an ensemble share each decoded batch, and the
+   merged CSV is validated against the output contract
+   ([GPU processes](independent-gpu-inference-processes.md),
+   [output contract](submission-requirements-and-output-contract.md)).
+4. **Scoring**: Kaggle reports a public score only; no runtime is exposed through the API. The
+   [efficiency leaderboard](efficiency-leaderboard.md) is the only view of hidden runtimes.
 
-The [generalization and inference investigation](../history/sharing/generalization-inference-clocks.md)
-compares reflection, 1A, 1B and original 1C using their actual GPU, worker and
-batch settings. Submission-to-completion waits of 13m36s–17m38s include queue
-and scoring delays; they do not establish hidden-data inference speed or the
-efficiency-prize runtime, and carry queueing noise of unmeasured size
-([efficiency leaderboard](efficiency-leaderboard.md#each-pick-is-a-measurement-of-our-hidden-runtimes)).
-The saved visible notebooks contain only three studies.
+## Settings that varied
 
-Static inspection identifies duplicated full-test metadata indexing per GPU,
-shared CPU/I/O limits, process startup and uneven study costs as scaling
-hypotheses. All four Kaggle runs use FP32 on T4. The report proposes a controlled
-Kaggle profiling matrix and explains the official accuracy/runtime tradeoff.
-No local GPU work or new remote benchmark was run for this investigation.
+- Image count and memory: ×1 to ×3 on the first baselines ([image count](inference-image-count-and-memory.md)),
+  ×2 for the early fold-0 models, ×4 from 2026-09-18, ×6 in S103–S106 and ×8 in S190–S191.
+- Attention temperature τ: 1.0 until 2026-09-18, 0.75 from S28, then 0.9 and tuned per ensemble
+  (0.35 to 0.85 in the October ensembles).
+- Runtime: FP32 on two T4s with 2 to 4 workers for the first dual-GPU submissions; FP16 chunked
+  backbones and 16 workers from 2026-09-15; GPU image preparation, CUDA graphs, buffer pools and
+  compile caches afterwards ([profiling records](profiling/INDEX.md)).
+
+## Where the evidence is
+
+| Question | Document |
+|---|---|
+| What each early submission contained | [Early submission details](submissions/early-submission-details.md) |
+| Why runtime was priced in AUC | [Efficiency exchange rate](profiling/2026-10-16-efficiency-exchange-rate.md) |
+| What competitors reported about runtime | [Runtime evidence and leads](runtime-evidence-and-leads.md) |
+| The 2026-09-14 comparison of reflection, 1A, 1B and 1C inference clocks | [Generalization inference clocks](../history/sharing/generalization-inference-clocks.md) |

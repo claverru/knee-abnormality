@@ -18,7 +18,7 @@ ideas:
     restore the target's padding. The target keeps its slot, plane/contrast embedding, positions,
     geometry and masks; the other acquisition stays unmixed.
   precedents:
-  - 'Contrast heterogeneity: docs/metadata/series-filtering-census.md.'
+  - 'Contrast heterogeneity: docs/metadata/series-filtering-census/census-and-categories.md.'
   - 'GIN (seed 1) and broader gamma/contrast (-0.0033/-0.0067, 2026-09-20) perturb contrast synthetically; this uses the study''s own second contrast.'
   novelty: First augmentation that mixes two real contrasts of the same anatomy; no cross-study label mixing.
   coverage: Coronal and sagittal in most studies; axial where a T1/PD axial exists (857 studies).
@@ -46,7 +46,7 @@ ideas:
   precedents:
   - 'Li et al., DSU (arXiv:2202.03958): gains on natural-image domain-generalization benchmarks; no medical evidence found.'
   - 'MixStyle, its predecessor, scored -0.8 to +0.5 Dice in the MRI comparisons of the GIN and SLAug papers.'
-  - 'docs/backlog/small-changes.md, Feature-space augmentation (DSU).'
+  - 'docs/backlog/untried-ideas.md, Feature-space augmentation (DSU).'
   novelty: First feature-level augmentation here.
   coverage: Every acquisition; feature statistics also carry diagnostic signal (overall fluid brightness in effusion).
   exploitation: If it helps, the insertion stage is not swept; a plane/contrast-free variant would be the contrast test.
@@ -69,7 +69,7 @@ ideas:
     model.backbone_eval false, the recipe's value.
   precedents:
   - 'Head dropout 0.1 gave +0.0032 (2026-09-18) and -0.0005 (2026-09-20): regularization effects here sit near seed noise.'
-  - 'Stochastic depth appears only in docs/modeling/coatnet-224-spatial-backbone.md and docs/research/efficientnet-training.md; never measured on ReXNet.'
+  - 'Stochastic depth appears only in docs/modeling/backbones/coatnet-224-spatial-backbone.md and docs/research/backbones-and-pretraining/efficientnet-training.md; never measured on ReXNet.'
   novelty: First layer-level stochastic regularization on ReXNet here.
   coverage: Every study; all labels.
   exploitation: If it helps, it combines with adopted augmentation families as independent regularization.

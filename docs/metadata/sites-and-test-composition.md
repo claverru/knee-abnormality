@@ -47,7 +47,7 @@ and tabulates language by vendor, field strength and model. Artifacts are in
 `outputs/analysis/t/training-sites-20260929/`.
 
 ```bash
-rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked --with langdetect python -m scripts.adhoc.infer_training_sites --output-dir outputs/analysis/training-sites-new
+env CUDA_VISIBLE_DEVICES= uv run --locked --with langdetect python -m scripts.adhoc.infer_training_sites --output-dir outputs/analysis/training-sites-new
 ```
 
 | Language | Studies | Scanners | Inferred institution | Confidence |
@@ -85,7 +85,7 @@ Four reports have uncertain language.
   generalization. The five cleanly inferred sites (Bulgarian, German, Greek, Dutch and French
   clusters, 1,036 studies, 224 in fold 0 of `all_5fold_scanner_v2`) are the natural held-out set
   for a leave-sites-out measurement
-  ([sites-out diagnostic](../validation/results/2026-09-29-sites-out-diagnostic.md): an unseen site costs
+  ([sites-out diagnostic](../validation/results/validation-and-ensembles/2026-09-29-sites-out-diagnostic.md): an unseen site costs
   about 0.009 macro AUC).
 - **Scanner memorization in metadata:** a public thread reports metadata-only macro AUC of 0.652
   under random folds and 0.598 under scanner-grouped folds

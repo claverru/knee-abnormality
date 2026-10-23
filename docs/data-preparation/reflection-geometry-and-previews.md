@@ -67,12 +67,12 @@ hardware, shapes, seeds, incremental peak allocated/reserved memory, source/conf
 identity and input hashes in `manifest.json`. It does not run a backbone or optimizer.
 
 ```bash
-rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/resnet50.yaml --variants 1 --profile-cuda --output-dir outputs/previews/reflection-new
-rtk proxy uv run --locked python -m scripts.tools.preview_augmentations configs/resnet50.yaml --split validation --offset 604 --max-studies 8 --variants 1 --output-dir outputs/previews/reflection-validation-new
+uv run --locked python -m scripts.tools.preview_augmentations configs/resnet50.yaml --variants 1 --profile-cuda --output-dir outputs/previews/reflection-new
+uv run --locked python -m scripts.tools.preview_augmentations configs/resnet50.yaml --split validation --offset 604 --max-studies 8 --variants 1 --output-dir outputs/previews/reflection-validation-new
 ```
 
-The [example-test preview](../../outputs/previews/reflection-test-20260913/preview.html)
-and its [manifest](../../outputs/previews/reflection-test-20260913/manifest.json)
+The example-test preview (deleted)
+and its manifest (deleted)
 cover three eligible studies, 15 acquisitions and 138 triplets, all three planes,
 four acquisitions tilted over 10 degrees and missing types in all three studies.
 On the RTX 3090, seed 42, five warmups and 30 iterations, zero reflection took
@@ -81,18 +81,18 @@ allocated memory was 242.33 versus 320.00 MiB; reserved memory was 246 versus
 320 MiB. These are bounded augmentation costs, not end-to-end training throughput.
 The manifest and archived source/config snapshot own the exact measurement identity.
 
-The [left-source preview](../../outputs/previews/reflection-left-20260913/preview.html)
+The left-source preview (deleted)
 adds one study with eight acquisitions, 64 triplets and a padded crop. The
-[validation preview](../../outputs/previews/reflection-validation-20260913/preview.html)
+validation preview (deleted)
 adds eight studies with 53 acquisitions and 452 triplets, recorded right-source
 laterality, 20 acquisitions tilted over 10 degrees, one padded crop and five studies
 with absent types. All nine validation studies were eligible with accepted centers.
 These previews do not establish full-dataset eligibility or an accuracy gain.
 
-The [rejected-center preview](../../outputs/previews/reflection-rejected-center-20260913/preview.html)
+The rejected-center preview (deleted)
 adds one eligible left-source study with `excessive_rms`, six acquisitions and
 54 triplets. Its local acquisitions reflect while every displayed 3D anchor
-remains unavailable. The [bounded metadata screen](../../outputs/analysis/r/reflection-screen-20260913/report.json)
+remains unavailable. The bounded metadata screen (`outputs/analysis/r/reflection-screen-20260913/report.json`, deleted)
 covered the 29 validation studies present in the saved 128-study header audit:
 two centers were rejected and no acquisition failed reflection eligibility.
 No real ineligible acquisition was found in this bounded selection; that preview

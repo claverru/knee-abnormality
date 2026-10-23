@@ -61,7 +61,7 @@ ideas:
     own slices with the incumbent''s rule. The label bias has one row per view, A and B included. Nothing
     is learned but the label bias; data.learn_views stays empty. Everything else is the incumbent''s.'
   precedents:
-  - 'docs/validation/results/2026-10-02-smart-crops-campaign.md: 84/93 mm against 120 mm, +0.0022;
+  - 'docs/validation/results/crops-and-views/2026-10-02-smart-crops-campaign.md: 84/93 mm against 120 mm, +0.0022;
     axial at 130 and 140 mm, no gain; known cost of the zoom on Baker''s cyst, -0.0040.'
   - 'two-views-sagittal-fluid and the sagittal-fluid pairs (this campaign): two views on one type with
     slices split, the label bias with one row per view; frozen sources under outputs/autoresearch/learnable-views/experiments.'

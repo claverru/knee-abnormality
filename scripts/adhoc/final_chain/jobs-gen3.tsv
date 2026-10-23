@@ -1,0 +1,30 @@
+convnext-gen3-fold-0	convnext	configs/convnext-rebuild-gen3.yaml	0	1009027163	finetune	any	--validation.split all_5fold_scanner_v2_r13 --initial-weights @T@/convnext-rebuild-pretrain/fold_0/last.ckpt	gen3-table
+resnet50-gen3-fold-0	resnet50	configs/resnet50-rebuild-gen3.yaml	0	2350920154	finetune	any	--validation.split all_5fold_scanner_v2_r14 --initial-weights @T@/resnet50-rebuild-pretrain/fold_0/last.ckpt	gen3-table
+nextvit-gen3-fold-0	nextvit	configs/nextvit-rebuild-gen3.yaml	0	3303874362	finetune	any	--validation.split all_5fold_scanner_v2_r18 --initial-weights @T@/nextvit-rebuild-pretrain/fold_0/last.ckpt	gen3-table
+convnext-gen3-fold-1	convnext	configs/convnext-rebuild-gen3.yaml	1	2745625857	finetune	any	--validation.split all_5fold_scanner_v2_r13 --initial-weights @T@/convnext-rebuild-pretrain/fold_0/last.ckpt	gen3-table
+resnet50-gen3-fold-1	resnet50	configs/resnet50-rebuild-gen3.yaml	1	432825361	finetune	any	--validation.split all_5fold_scanner_v2_r14 --initial-weights @T@/resnet50-rebuild-pretrain/fold_0/last.ckpt	gen3-table
+nextvit-gen3-fold-1	nextvit	configs/nextvit-rebuild-gen3.yaml	1	3717665184	finetune	any	--validation.split all_5fold_scanner_v2_r18 --initial-weights @T@/nextvit-rebuild-pretrain/fold_0/last.ckpt	gen3-table
+convnext-gen3-fold-2	convnext	configs/convnext-rebuild-gen3.yaml	2	482907124	finetune	any	--validation.split all_5fold_scanner_v2_r13 --initial-weights @T@/convnext-rebuild-pretrain/fold_0/last.ckpt	gen3-table
+resnet50-gen3-fold-2	resnet50	configs/resnet50-rebuild-gen3.yaml	2	3752455074	finetune	any	--validation.split all_5fold_scanner_v2_r14 --initial-weights @T@/resnet50-rebuild-pretrain/fold_0/last.ckpt	gen3-table
+nextvit-gen3-fold-2	nextvit	configs/nextvit-rebuild-gen3.yaml	2	721432567	finetune	any	--validation.split all_5fold_scanner_v2_r18 --initial-weights @T@/nextvit-rebuild-pretrain/fold_0/last.ckpt	gen3-table
+convnext-gen3-fold-3	convnext	configs/convnext-rebuild-gen3.yaml	3	3871370021	finetune	any	--validation.split all_5fold_scanner_v2_r13 --initial-weights @T@/convnext-rebuild-pretrain/fold_0/last.ckpt	gen3-table
+resnet50-gen3-fold-3	resnet50	configs/resnet50-rebuild-gen3.yaml	3	1644762857	finetune	any	--validation.split all_5fold_scanner_v2_r14 --initial-weights @T@/resnet50-rebuild-pretrain/fold_0/last.ckpt	gen3-table
+nextvit-gen3-fold-3	nextvit	configs/nextvit-rebuild-gen3.yaml	3	3963280627	finetune	any	--validation.split all_5fold_scanner_v2_r18 --initial-weights @T@/nextvit-rebuild-pretrain/fold_0/last.ckpt	gen3-table
+convnext-gen3-fold-4	convnext	configs/convnext-rebuild-gen3.yaml	4	3964625070	finetune	any	--validation.split all_5fold_scanner_v2_r13 --initial-weights @T@/convnext-rebuild-pretrain/fold_0/last.ckpt	gen3-table
+resnet50-gen3-fold-4	resnet50	configs/resnet50-rebuild-gen3.yaml	4	3649124138	finetune	any	--validation.split all_5fold_scanner_v2_r14 --initial-weights @T@/resnet50-rebuild-pretrain/fold_0/last.ckpt	gen3-table
+nextvit-gen3-fold-4	nextvit	configs/nextvit-rebuild-gen3.yaml	4	2583351970	finetune	any	--validation.split all_5fold_scanner_v2_r18 --initial-weights @T@/nextvit-rebuild-pretrain/fold_0/last.ckpt	gen3-table
+rsna-convnext-gen3-fold-0	convnext	convnext-gen3-fold-0	0	-	rsna	local		convnext-gen3-fold-0
+rsna-convnext-gen3-fold-1	convnext	convnext-gen3-fold-1	1	-	rsna	local		convnext-gen3-fold-1
+rsna-convnext-gen3-fold-2	convnext	convnext-gen3-fold-2	2	-	rsna	local		convnext-gen3-fold-2
+rsna-convnext-gen3-fold-3	convnext	convnext-gen3-fold-3	3	-	rsna	local		convnext-gen3-fold-3
+rsna-convnext-gen3-fold-4	convnext	convnext-gen3-fold-4	4	-	rsna	local		convnext-gen3-fold-4
+rsna-resnet50-gen3-fold-0	resnet50	resnet50-gen3-fold-0	0	-	rsna	local		resnet50-gen3-fold-0
+rsna-resnet50-gen3-fold-1	resnet50	resnet50-gen3-fold-1	1	-	rsna	local		resnet50-gen3-fold-1
+rsna-resnet50-gen3-fold-2	resnet50	resnet50-gen3-fold-2	2	-	rsna	local		resnet50-gen3-fold-2
+rsna-resnet50-gen3-fold-3	resnet50	resnet50-gen3-fold-3	3	-	rsna	local		resnet50-gen3-fold-3
+rsna-resnet50-gen3-fold-4	resnet50	resnet50-gen3-fold-4	4	-	rsna	local		resnet50-gen3-fold-4
+rsna-nextvit-gen3-fold-0	nextvit	nextvit-gen3-fold-0	0	-	rsna	local		nextvit-gen3-fold-0
+rsna-nextvit-gen3-fold-1	nextvit	nextvit-gen3-fold-1	1	-	rsna	local		nextvit-gen3-fold-1
+rsna-nextvit-gen3-fold-2	nextvit	nextvit-gen3-fold-2	2	-	rsna	local		nextvit-gen3-fold-2
+rsna-nextvit-gen3-fold-3	nextvit	nextvit-gen3-fold-3	3	-	rsna	local		nextvit-gen3-fold-3
+rsna-nextvit-gen3-fold-4	nextvit	nextvit-gen3-fold-4	4	-	rsna	local		nextvit-gen3-fold-4

@@ -2,7 +2,7 @@
 
 ## Objective
 
-Improve the side-routed design ([plan and runs](../../../docs/ongoing/side-routed-heads.md)):
+Improve the side-routed design ([plan and runs](../../../docs/modeling/side-routed-heads.md)):
 one shared classifier for the two meniscus targets and one for the three OA targets, with the
 knee's geometry deciding which target a token's evidence counts for. Two submissions of this
 design scored 0.952 (S112), 0.953 (S113) and 0.952 (S114) public against 0.950 for the recipe it replaces on
@@ -12,7 +12,7 @@ makes no Kaggle submission.
 The base and starting incumbent is `side-routed-run5`
 (`outputs/training/20261005-205251-side-routed-run5`: fold 1 of `all_5fold_scanner_v2`, seed
 1110484336, ResNet-18, ten epochs, ×4 0.924476, ×1 0.915823), the
-[fifth build](../../../docs/ongoing/side-routed-heads.md#fifth-build-2026-10-05). What the
+[fifth build](../../../docs/validation/results/pooling-and-attention/side-routed-heads/2026-10-05-fourth-and-fifth-builds.md#fifth-build-2026-10-05). What the
 campaign settles is carried to the ResNet-50 afterwards by the user.
 
 ## Scope
@@ -95,7 +95,7 @@ repairs it or returns it blocked. The script is not edited by a seed.
 | Loss terms | Only the target loss, the side loss, the report-attribute loss and the anchor penalty |
 | Mirror | A mirrored pass keeps every token's anatomical position |
 
-**After a run**, `python -m scripts.tools.report_side_routing` writes the table the next design
+**After a run**, `609a489:scripts/tools/report_side_routing.py` writes the table the next design
 is written from, the flags below and `joins_lineage`:
 
 | Flag | Raised when |

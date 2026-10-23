@@ -22,7 +22,7 @@ ideas:
     not added to the OA logits. Nothing else changes.
   precedents:
   - 'run-notes.md, 6: computed-centre-3d-position, its per-label deltas and the detector''s corrections.'
-  - 'docs/validation/results/2026-10-03-learnable-views-campaign.md: the detector silent beside the 3D position in 5 of 5 runs; the 3D position with a first-order detector +0.0010.'
+  - 'docs/validation/results/crops-and-views/2026-10-03-learnable-views-campaign.md: the detector silent beside the 3D position in 5 of 5 runs; the 3D position with a first-order detector +0.0010.'
   novelty: First 3D position without the detector.
   coverage: Every token; the three OA labels lose the detector's correction.
   exploitation: >-

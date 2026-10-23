@@ -1,7 +1,7 @@
 # View-poses campaign: prior work
 
 **Skeleton.** The measurements below were taken on 2026-10-08 and are held in full, with
-tables and limits, in the [view pose studies](../../../docs/research/view-pose-studies.md); they move here
+tables and limits, in the [view pose studies](../../../docs/research/geometry-and-views/view-pose-studies/INDEX.md); they move here
 when the campaign is written out. Figures and tables are under `outputs/analysis/`. The one-off
 scripts were lost in a WSL restart; outputs remain.
 
@@ -72,12 +72,12 @@ readout at the last epoch; best view per label in bold), against the pixel size 
 - The table shows what each view gives with today's crops; a view shown coarsely may look weaker
   than it could be.
 
-**How the fields were chosen** ([smart-crops campaign](../../../docs/validation/results/2026-10-02-smart-crops-campaign.md)):
+**How the fields were chosen** ([smart-crops campaign](../../../docs/validation/results/crops-and-views/2026-10-02-smart-crops-campaign.md)):
 in the order they were tried. T1/PD to 84 mm first (+0.0013), then sagittal and coronal fluid to
 93 mm (+0.0010). Fluid was never tried tighter than 93 mm (sagittal at 100 mm: −0.0002). Axial
 was tried wider only (130 mm 0.0000, 140 mm −0.0006), and zoomed once, as a second 84 mm view
 on the kneecap joint taking half the axial slices, rule-placed and before the anatomy map:
-−0.0013 ([learnable-views run 44](../../../docs/validation/results/2026-10-03-learnable-views-campaign.md)).
+−0.0013 ([learnable-views run 44](../../../docs/validation/results/crops-and-views/2026-10-03-learnable-views-campaign.md)).
 
 ## Errors against crop coverage
 
@@ -192,4 +192,4 @@ asks for (shift, turn, scale 0.87 to 1.13, training jitter) in 99% of images.
 
 Tokens are centred at pixels 0 to 192 of the 224 px crop, 15.5 px off the crop centre; the first
 row and column are valid 60% of the time in training and always at prediction. Neither matters
-to the score ([token grid alignment](../../../docs/validation/results/2026-10-08-token-grid-alignment.md)).
+to the score ([token grid alignment](../../../docs/validation/results/crops-and-views/2026-10-08-token-grid-alignment.md)).

@@ -26,7 +26,7 @@ Learned crop selection was dropped on 2026-09-16: no run beat the full-slice mod
 learned placement was worth at most about 0.005, and the attention value map was
 weak ([investigation](../../../docs/history/crop-selection-investigation.md)).
 Crop proposals here keep the 140 mm window at 0.625 mm and place it from measured
-anatomy ([input resolution](../../../docs/research/input-resolution.md#field-of-view-and-joint-position)).
+anatomy ([input resolution](../../../docs/research/geometry-and-views/input-resolution.md#field-of-view-and-joint-position)).
 
 ## User submissions
 

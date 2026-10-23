@@ -24,7 +24,7 @@ ideas:
   precedents:
   - 'outputs/analysis/r/robust-center-rescore-20260923/robust_center.patch: robust refit and fallback, applies to d914079; inference gate +0.0001, bias alone +0.00009 [80% +0.00003, +0.00015].'
   - 'outputs/analysis/m/midline-vs-centre-20260923/result.md: midline vs fitted x, median 1.55 mm, p95 8.6 mm, 12.5% above 5 mm; worst cases are off-centre sagittal slabs.'
-  - 'docs/research/series-filtering-signals.md#contralateral-knee: seven bilateral studies, X sign separates the knees.'
+  - 'docs/research/data-and-validation/series-filtering-signals/findings-by-case.md#contralateral-knee: seven bilateral studies, X sign separates the knees.'
   novelty: >-
     The robust centre was measured only at inference, before the bias depended on it at training
     time; per-knee geometry for bilateral studies and the fitted-x midline are new.
@@ -138,7 +138,7 @@ ideas:
     unchanged.
   precedents:
   - 'outputs/analysis/t/two-peak-sagittal-gate-20260923/result.md: frozen k05-clean with the curve density, x4 -0.00057 [80% -0.00120, +0.00008], despite the train-inference sampler mismatch; narrow two-peak -0.00153 [-0.00246, -0.00064]; sampling_curve.py implements the density.'
-  - 'docs/validation/results/2026-09-18-per-plane-sigma-cache.md: coronal narrower than 40 mm gains +0.00135 on frozen checkpoints.'
+  - 'docs/validation/results/sampling/2026-09-18-per-plane-sigma-cache.md: coronal narrower than 40 mm gains +0.00135 on frozen checkpoints.'
   novelty: >-
     Every sampler so far was a Gaussian around the centre; this shape comes from the measured map,
     with no width to tune.
@@ -178,7 +178,7 @@ ideas:
     completion reports metrics for unknown-side and invalid-geometry studies separately.
   precedents:
   - 'outputs/analysis/t/token-attention-vs-k05-clean: dropping 1D/2D with only relative, raw-LPS 3D RoPE gave -0.0015 (PF OA -0.0152, Fracture -0.0153; meniscus +0.0027, OA +0.0035), confounded with an added attention block.'
-  - 'docs/inference/submissions/2026-09-15-champion-without-3d-at-inference.md: the additive, non-side-normalized 3D embedding was worth about 0.'
+  - 'docs/inference/submissions/early-submission-details.md: the additive, non-side-normalized 3D embedding was worth about 0.'
   novelty: >-
     Absolute and side-normalized, replacing rather than joining 1D and 2D; anterior structures
     such as the patellofemoral joint stay locatable, unlike the relative-only arm.

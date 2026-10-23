@@ -30,7 +30,7 @@ ideas:
   - 'prior-work.md, precedents: exponent 0.5 lost on fold 0 and won publicly; a ramped
     exponent tied; soft-mass weighting and a prior offset lost 0.0092 and 0.0119 while
     changing other loss semantics.'
-  - 'docs/backlog/small-changes.md, weighting strength: the entry this seed implements.'
+  - 'docs/backlog/untried-ideas.md, weighting strength: the entry this seed implements.'
   novelty: First isolated run of soft prevalence; first class-weight change on a RadImageNet
     backbone.
   coverage: Every training cell of every label; the weights change most on Synovitis,
@@ -93,7 +93,7 @@ ideas:
   precedents:
   - 'docs/data-preparation/preprocessing-implementation-and-profile.md, clipping-bound
     stability across draws: the measurement.'
-  - 'docs/backlog/big-bets.md, sampling-independent intensity bounds: the entry this
+  - 'docs/backlog/untried-ideas.md, sampling-independent intensity bounds: the entry this
     seed implements.'
   - 'prior-work.md, precedents: other quantile levels lost 0.0003 and 0.0021; this
     changes the pixel population, not the levels.'
@@ -154,7 +154,7 @@ ideas:
   precedents:
   - 'prior-work.md, precedents: the binary mask of low-evidence cells was rejected;
     shared balanced focal, which up-weights hard cells, lost 0.0026.'
-  - 'docs/backlog/small-changes.md, report-label supervision, source-aware uncertainty
+  - 'docs/backlog/untried-ideas.md, report-label supervision, source-aware uncertainty
     weighting: the entry this seed implements with the target itself as the evidence.'
   novelty: First graded uncertainty weight; the direction opposite to focal weighting.
   coverage: Every non-gold cell; a third of Synovitis and Effusion cells lose most
@@ -199,7 +199,7 @@ ideas:
     training rows, the validation frame and its targets are unchanged. The class weights
     are unchanged by construction, since they already count cells at or above 0.5.'
   precedents:
-  - 'docs/backlog/small-changes.md, report-label supervision, hard versus soft report-derived
+  - 'docs/backlog/untried-ideas.md, report-label supervision, hard versus soft report-derived
     targets: the entry this seed implements.'
   - 'prior-work.md, the training targets: where soft and hard differ.'
   novelty: First hard-target run on rebuild_state_v2.
@@ -258,7 +258,7 @@ ideas:
     in validation and prediction are unchanged.'
   precedents:
   - 'prior-work.md, precedents: the anatomy map and posed crops on the ResNet-50.'
-  - 'docs/backlog/big-bets.md, anatomy masks, segmentation before the labels: the
+  - 'docs/backlog/untried-ideas.md, anatomy masks, segmentation before the labels: the
     entry this seed implements as a side task.'
   novelty: First dense mask supervision finer than the third-stage grid.
   coverage: The studies with prepared volumes (about 400 knees for bone, 265 for soft
@@ -308,7 +308,7 @@ ideas:
   mechanism: In configs/training.yaml, data.intensity_augmentation.probability becomes
     0 (it is 0.5). The gamma_range and contrast_range lines stay. Nothing else changes.
   precedents:
-  - 'docs/backlog/overnight.md, next queue: the entry this seed runs.'
+  - 'docs/validation/run-comparison-and-diagnostics.md#overnight-launcher, next queue: the entry this seed runs.'
   - 'prior-work.md, precedents: the augmentation campaign on ReXNet-200; contrast
     mixing off lost 0.0025 on the ResNet-18.'
   novelty: First removal of this family on a RadImageNet backbone.
@@ -342,7 +342,7 @@ ideas:
   mechanism: In configs/training.yaml, data.noise_augmentation.probability becomes
     0 (it is 0.15). The std_range line stays. Nothing else changes.
   precedents:
-  - 'docs/backlog/overnight.md, next queue: the entry this seed runs.'
+  - 'docs/validation/run-comparison-and-diagnostics.md#overnight-launcher, next queue: the entry this seed runs.'
   novelty: First removal of this family on a RadImageNet backbone.
   coverage: 15% of the training images.
   exploitation: 'Read the macro at both multipliers. Activation: the run''s effective_config.json
@@ -383,7 +383,7 @@ ideas:
     is over the kept observed cells. Studies, images and the other labels of a dropped
     cell''s study are unchanged.'
   precedents:
-  - 'docs/backlog/small-changes.md, report-label supervision, balance each target
+  - 'docs/backlog/untried-ideas.md, report-label supervision, balance each target
     column through training masks: the entry this seed implements, with the mask drawn
     per step instead of per epoch.'
   - 'prior-work.md, precedents: class-balanced BCE about +0.008 over none; the binary
@@ -444,7 +444,7 @@ ideas:
     positive logit) over all positive-negative pairs of that label inside the batch
     (same 0.75 and 0.25 rule). Validation and prediction are unchanged.'
   precedents:
-  - 'docs/backlog/big-bets.md, hard-pair mining phase: the entry this seed implements.'
+  - 'docs/backlog/untried-ideas.md, hard-pair mining phase: the entry this seed implements.'
   - 'prior-work.md, precedents: the always-on in-batch ranking term +0.0007; shared
     balanced focal -0.0026.'
   novelty: First mined-pair batches; first pair term on a RadImageNet backbone.
@@ -495,7 +495,7 @@ ideas:
     else branch of _attention_pool and of _soft_tissue_pool in modeling/model.py)
     instead of one head per series type. Nothing else changes.
   precedents:
-  - 'docs/backlog/small-changes.md, removals of active mechanisms: the entry this
+  - 'docs/backlog/untried-ideas.md, removals of active mechanisms: the entry this
     seed runs.'
   - 'prior-work.md, precedents: plane-contrast readouts adopted in the revisits campaign
     (Lateral OA +0.0054).'
@@ -561,9 +561,9 @@ ideas:
     original definition from knee_side_sign, knee_center_x_mm, knee_center_y_mm and
     the middle slice''s patient map, not the learned frame.'
   precedents:
-  - 'docs/validation/results/2026-09-25-near-misses-campaign.md: the detector adopted,
+  - 'docs/validation/results/campaigns-and-queues/2026-09-25-near-misses-campaign.md: the detector adopted,
     PF OA +0.0102; learned scales 0.040, 0.050 and 0.017 by epoch 9.'
-  - 'docs/validation/results/2026-10-05-fixes-and-removals-campaign.md: the removal,
+  - 'docs/validation/results/campaigns-and-queues/2026-10-05-fixes-and-removals-campaign.md: the removal,
     run 9 oa-detector-off, -0.000468 at x4, 80% interval [-0.001017, +0.000110]; S108
     and S111 both 0.950.'
   - 'autoresearch/campaigns/near-misses/seed-ideas-2.yaml, three-compartment-oa-detector:
@@ -635,11 +635,11 @@ ideas:
     keep it reading the cells it reads today through a channel of its own and say
     so.'
   precedents:
-  - 'docs/ongoing/side-routed-heads.md: the routed shared heads, run 24, adopted for
+  - 'docs/modeling/side-routed-heads.md: the routed shared heads, run 24, adopted for
     the menisci and OA together.'
-  - 'docs/validation/results/2026-09-25-near-misses-campaign.md: separate OA heads
+  - 'docs/validation/results/campaigns-and-queues/2026-09-25-near-misses-campaign.md: separate OA heads
     with the detector, PF OA +0.0102.'
-  - 'docs/validation/results/2026-10-05-fixes-and-removals-campaign.md: the last model
+  - 'docs/validation/results/campaigns-and-queues/2026-10-05-fixes-and-removals-campaign.md: the last model
     of that arrangement, S108, 0.950.'
   novelty: First comparison of separate OA heads with the detector against the routed
     shared OA head with the menisci held fixed.
@@ -702,9 +702,9 @@ ideas:
     > 0; training/report_attributes.py) and read the manifest the config already names
     (paths.report_attribute_manifest, target set v4.0). Nothing else changes.
   precedents:
-  - 'docs/validation/results/2026-09-25-report-attribute-heads.md: the adoption, +0.00105
+  - 'docs/validation/results/labels-and-losses/2026-09-25-report-attribute-heads.md: the adoption, +0.00105
     at x4, 0.940 against 0.938 public.'
-  - 'docs/backlog/small-changes.md, removals of active mechanisms: heads off -0.0006
+  - 'docs/backlog/untried-ideas.md, removals of active mechanisms: heads off -0.0006
     on the 2026-10-01 recipe.'
   - 'autoresearch/campaigns/anatomy-recipe: the loss switched off, x4 0.927291.'
   novelty: First run with the heads on the ResNet-50 on the current recipe.
@@ -748,7 +748,7 @@ ideas:
     else changes.
   precedents:
   - 'docs/modeling/scanner-confusion-head.md: the adoption and its evidence, S67 0.948.'
-  - 'docs/validation/results/2026-09-30-rn18-l2sp-no-confusion.md: L2-SP added and
+  - 'docs/validation/results/validation-and-ensembles/2026-09-30-rn18-l2sp-no-confusion.md: L2-SP added and
     the head removed together, 0.943 for both S86 and S82.'
   novelty: First run of the head together with L2-SP, and on the ResNet-50.
   coverage: Every training study with a scanner group; a training-only loss on the
@@ -792,7 +792,7 @@ ideas:
   precedents:
   - 'docs/modeling/current-model.md, adoption history, 2026-10-03: the adoption and
     its control.'
-  - 'docs/validation/results/2026-10-03-learnable-views-campaign.md: the bias as the
+  - 'docs/validation/results/crops-and-views/2026-10-03-learnable-views-campaign.md: the bias as the
     learned recipe''s own gain (+0.0017).'
   novelty: First removal on the ResNet-50 and on the current recipe.
   coverage: The attention of every label over every view.
@@ -841,9 +841,9 @@ ideas:
     patient map, zero where the side or the geometry is unknown, not the learned frame''s
     axis. PF OA and the other labels get no bias.'
   precedents:
-  - 'docs/validation/results/2026-09-21-anatomical-attention-result.md: the adoption,
+  - 'docs/validation/results/pooling-and-attention/2026-09-21-anatomical-attention-result.md: the adoption,
     +0.0023.'
-  - 'docs/validation/results/2026-10-01-revisits-campaign.md: its removal, +0.0009
+  - 'docs/validation/results/campaigns-and-queues/2026-10-01-revisits-campaign.md: its removal, +0.0009
     at x4 (80% [+0.0002, +0.0016]).'
   novelty: First run of the bias with the routed shared heads and on the ResNet-50.
   coverage: Four labels' attention; other labels only through the shared token features.
@@ -886,7 +886,7 @@ ideas:
     buffer is all false), so the gates that open that view to the menisci, the OA
     labels and ACL have nothing to act on.
   precedents:
-  - 'docs/validation/results/2026-10-12-soft-tissue-reads-and-rn50-input-sampling.md:
+  - 'docs/validation/results/campaigns-and-queues/2026-10-12-soft-tissue-reads-and-rn50-input-sampling.md:
     the view on both backbones.'
   - 'autoresearch/campaigns/soft-tissue-reads/run-notes.md, ResNet-18 against ResNet-50:
     the cell read and detail view, +0.0013 against +0.00004.'
@@ -933,7 +933,7 @@ ideas:
   precedents:
   - 'autoresearch/campaigns/fixes-and-removals/seed-ideas-3.yaml, detail-view-embedding-off:
     the seed that never ran.'
-  - 'docs/validation/results/2026-10-02-smart-crops-campaign.md: the views adopted
+  - 'docs/validation/results/crops-and-views/2026-10-02-smart-crops-campaign.md: the views adopted
     with the embedding in place.'
   novelty: First removal of the embedding.
   coverage: The tokens of every coronal and sagittal view.
@@ -968,7 +968,7 @@ ideas:
   mechanism: In configs/training.yaml, data.gin_augmentation.probability becomes 0.0
     (it is 0.3). Nothing else changes.
   precedents:
-  - 'docs/validation/results/2026-09-26-augmentation-campaign.md: the half stack adopted
+  - 'docs/validation/results/campaigns-and-queues/2026-09-26-augmentation-campaign.md: the half stack adopted
     as a bundle.'
   - 'The seeds intensity-augmentation-off and noise-augmentation-off of this campaign:
     the same question for two older parts.'
@@ -1004,7 +1004,7 @@ ideas:
   mechanism: In configs/training.yaml, data.resolution_augmentation.probability becomes
     0.0 (it is 0.25). Nothing else changes.
   precedents:
-  - 'docs/validation/results/2026-09-26-augmentation-campaign.md: the half stack adopted
+  - 'docs/validation/results/campaigns-and-queues/2026-09-26-augmentation-campaign.md: the half stack adopted
     as a bundle.'
   novelty: First removal of the degradation alone.
   coverage: 25% of training images.
@@ -1114,7 +1114,7 @@ ideas:
     validation and prediction are unchanged.'
   precedents:
   - 'run-notes.md, run 5: the decoder on the 28 by 28 grid, adopted.'
-  - docs/backlog/big-bets.md, anatomy masks, segmentation before the labels.
+  - docs/backlog/untried-ideas.md, anatomy masks, segmentation before the labels.
   novelty: First mask supervision at the first stage's resolution.
   coverage: The studies with prepared volumes; four times the supervised cells of
     run 5 (about 57 million per epoch).
@@ -1193,7 +1193,7 @@ ideas:
     heads and the mask decoder read are untouched in shape. No option and no config
     field: the ResNet backbones of this recipe have SE from this run on.'
   precedents:
-  - 'docs/ongoing/radimagenet-backbone.md: how the Refined-RadImageNet weights are
+  - 'docs/modeling/backbones/resnet-radimagenet-backbones.md: how the Refined-RadImageNet weights are
     loaded and what was tried on the backbone.'
   - 'run-notes.md, run 5 and its audit: the last gain came through stage four and
     the token projection, the features the SE gates rescale.'
@@ -1268,7 +1268,7 @@ ideas:
     Validation, prediction and Kaggle inference run the same backbone. No option and
     no config field.'
   precedents:
-  - 'docs/ongoing/radimagenet-backbone.md: how the Refined-RadImageNet weights are
+  - 'docs/modeling/backbones/resnet-radimagenet-backbones.md: how the Refined-RadImageNet weights are
     loaded.'
   - 'seed-ideas-7.yaml, squeeze-excitation-in-the-resnet-blocks: the same slot, load
     rule and optimizer treatment.'
@@ -1398,7 +1398,7 @@ ideas:
     on pretrained weights the function changes slightly at the start (0.018 relative
     on random weights, measured by the modernisation review of 2026-10-13) and fine-tuning
     adapts: guess, low, -0.0005 to +0.0005 macro. Never run here; the token mapping
-    already handles these shortcuts (docs/ongoing/radimagenet-backbone.md).'
+    already handles these shortcuts (docs/modeling/backbones/resnet-radimagenet-backbones.md).'
   mechanism: In modeling/model.py the ResNet backbone is created with avg_down=True
     in addition to today's arguments. timm then builds each shortcut as (average pool,
     1 by 1 convolution at stride 1, batch norm), so the shortcut's tensors move from
@@ -1410,9 +1410,9 @@ ideas:
     built from the loaded parameters as today. Validation, prediction and Kaggle inference
     run the same backbone. No option and no config field.
   precedents:
-  - 'docs/ongoing/radimagenet-backbone.md: _resnet_mapping walks ResNet-D average-pool
+  - 'docs/modeling/backbones/resnet-radimagenet-backbones.md: _resnet_mapping walks ResNet-D average-pool
     shortcuts.'
-  - 'docs/modeling/backbone-swaps.md: how the feature mapping checks each residual
+  - 'docs/modeling/backbones/backbone-swaps.md: how the feature mapping checks each residual
     shortcut.'
   novelty: First change to the backbone's downsampling.
   coverage: Every image, at the three stride-two transitions.
@@ -1474,9 +1474,9 @@ ideas:
     groups are unchanged. Validation, prediction and Kaggle inference run the same
     backbone. No option and no config field.'
   precedents:
-  - 'docs/ongoing/radimagenet-backbone.md: how the Refined-RadImageNet weights are
+  - 'docs/modeling/backbones/resnet-radimagenet-backbones.md: how the Refined-RadImageNet weights are
     loaded.'
-  - 'docs/research/input-resolution.md: downsampling must be antialiased; the repository
+  - 'docs/research/geometry-and-views/input-resolution.md: downsampling must be antialiased; the repository
     resampler is, the backbone is not.'
   novelty: First anti-aliased downsampling inside the backbone.
   coverage: Every image, at the three stride-two transitions.
@@ -1814,7 +1814,7 @@ ideas:
   - 'run-notes.md, the global-context run and run 22: free modules at the head rate.'
   - 'seed-ideas-10.yaml and seed-ideas-11.yaml: the same pull on squeeze-and-excitation
     and on coordinate attention.'
-  - 'docs/ongoing/radimagenet-backbone.md: how the Refined-RadImageNet weights are
+  - 'docs/modeling/backbones/resnet-radimagenet-backbones.md: how the Refined-RadImageNet weights are
     loaded.'
   novelty: First global-context block held near the identity.
   coverage: Every image, at stages two to four.
@@ -1888,9 +1888,9 @@ ideas:
     groups are unchanged. Validation, prediction and Kaggle inference run the same
     backbone. No option and no config field.'
   precedents:
-  - 'docs/ongoing/radimagenet-backbone.md: how the Refined-RadImageNet weights are
+  - 'docs/modeling/backbones/resnet-radimagenet-backbones.md: how the Refined-RadImageNet weights are
     loaded.'
-  - 'docs/research/input-resolution.md: downsampling must be antialiased; the repository
+  - 'docs/research/geometry-and-views/input-resolution.md: downsampling must be antialiased; the repository
     resampler is, the backbone is not.'
   novelty: First anti-aliased downsampling inside the backbone.
   coverage: Every image, at the three stride-two transitions.

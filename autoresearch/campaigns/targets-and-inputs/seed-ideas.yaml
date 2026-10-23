@@ -24,7 +24,7 @@ ideas:
     Fracture (from 3.15), 2.55 for MCL (from 3.66), 1.21 for Effusion (from 1.38).
   precedents:
   - 'prior-work.md, precedents: exponent 0.5 lost on fold 0 and won publicly; a ramped exponent tied; soft-mass weighting and a prior offset lost 0.0092 and 0.0119 while changing other loss semantics.'
-  - 'docs/backlog/small-changes.md, weighting strength: the entry this seed implements.'
+  - 'docs/backlog/untried-ideas.md, weighting strength: the entry this seed implements.'
   novelty: First isolated run of soft prevalence; first class-weight change on a RadImageNet backbone.
   coverage: Every training cell of every label; the weights change most on Synovitis, Fracture, MCL and Baker's.
   exploitation: >-
@@ -73,7 +73,7 @@ ideas:
     the central window, the normalisation and every image pixel path are unchanged.
   precedents:
   - 'docs/data-preparation/preprocessing-implementation-and-profile.md, clipping-bound stability across draws: the measurement.'
-  - 'docs/backlog/big-bets.md, sampling-independent intensity bounds: the entry this seed implements.'
+  - 'docs/backlog/untried-ideas.md, sampling-independent intensity bounds: the entry this seed implements.'
   - 'prior-work.md, precedents: other quantile levels lost 0.0003 and 0.0021; this changes the pixel population, not the levels.'
   novelty: First run with bounds independent of the drawn slices.
   coverage: Every series; series with few selected triplets most.
@@ -125,7 +125,7 @@ ideas:
     exactly 0.5 contributes nothing.
   precedents:
   - 'prior-work.md, precedents: the binary mask of low-evidence cells was rejected; shared balanced focal, which up-weights hard cells, lost 0.0026.'
-  - 'docs/backlog/small-changes.md, report-label supervision, source-aware uncertainty weighting: the entry this seed implements with the target itself as the evidence.'
+  - 'docs/backlog/untried-ideas.md, report-label supervision, source-aware uncertainty weighting: the entry this seed implements with the target itself as the evidence.'
   novelty: First graded uncertainty weight; the direction opposite to focal weighting.
   coverage: Every non-gold cell; a third of Synovitis and Effusion cells lose most of their weight.
   exploitation: >-
@@ -162,7 +162,7 @@ ideas:
     unchanged. The class weights are unchanged by construction, since they already count cells at or
     above 0.5.
   precedents:
-  - 'docs/backlog/small-changes.md, report-label supervision, hard versus soft report-derived targets: the entry this seed implements.'
+  - 'docs/backlog/untried-ideas.md, report-label supervision, hard versus soft report-derived targets: the entry this seed implements.'
   - 'prior-work.md, the training targets: where soft and hard differ.'
   novelty: First hard-target run on rebuild_state_v2.
   coverage: Every non-gold cell that is not already 0 or 1; a third of Synovitis and Effusion cells move by more than 0.25.
@@ -208,7 +208,7 @@ ideas:
     losses, the routing that reads them and everything in validation and prediction are unchanged.
   precedents:
   - 'prior-work.md, precedents: the anatomy map and posed crops on the ResNet-50.'
-  - 'docs/backlog/big-bets.md, anatomy masks, segmentation before the labels: the entry this seed implements as a side task.'
+  - 'docs/backlog/untried-ideas.md, anatomy masks, segmentation before the labels: the entry this seed implements as a side task.'
   novelty: First dense mask supervision finer than the third-stage grid.
   coverage: The studies with prepared volumes (about 400 knees for bone, 265 for soft tissue); the backbone's stages one to four.
   exploitation: >-

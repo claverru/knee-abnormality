@@ -28,9 +28,9 @@ To obtain just these files with the installed Kaggle CLI, run from the root:
 
 ```bash
 for file in train.csv train_series.csv test.csv test_series.csv sample_submission.csv; do
-    rtk proxy uv run --locked kaggle competitions download rsna-knee-abnormality-detection -f "$file" -p data/raw -q
+    uv run --locked kaggle competitions download rsna-knee-abnormality-detection -f "$file" -p data/raw -q
 done
-rtk proxy uv run --locked python -m scripts.adhoc.audit_metadata
+uv run --locked python -m scripts.adhoc.audit_metadata
 ```
 
 [`scripts/adhoc/audit_metadata.py`](../../scripts/adhoc/audit_metadata.py) reads the local CSVs

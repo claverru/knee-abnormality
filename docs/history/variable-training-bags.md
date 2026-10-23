@@ -47,5 +47,5 @@ Three early epochs of one run are weak evidence; the idea was not measured to co
 Never committed. The worktree's changes against `665af0e` (configuration, dataset batching, the
 sampler's bag draw and ceiling, Lightning logging and the documentation above) are archived in
 `outputs/analysis/v/variable-bags-worktree-20260925/` as `worktree.patch`, with
-`untracked-files.tar.gz` holding `configs/variable-bags.yaml` and the two simulation scripts. The
+`untracked-files.tar.gz` holding `configs/variable-bags.yaml` (removed) and the two simulation scripts. The
 run's `source_snapshot.zip` holds the code that trained.

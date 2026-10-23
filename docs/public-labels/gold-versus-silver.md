@@ -2,7 +2,7 @@
 
 **Status, 2026-09-27:** the training labels describe what the reports say, the hidden-test labels
 what the images show. This document collects the measured gaps, how they affect training and
-validation, and what to try. The site-bias part has its own document, [bias_free.md](../../bias_free.md).
+validation, and what to try. The site-bias part has its own document, [site bias](../modeling/site-bias.md).
 
 ## Where the labels come from
 
@@ -20,7 +20,7 @@ silence is an unobserved label, not an absent one.
 
 ## Measured gaps
 
-From the [v3 answer analysis](../ongoing/report-attribute-extraction.md#v3-full-run-analysis-2026-09-25)
+From the [v3 answer analysis](jevk5-report-attribute-extraction.md)
 (58 gold studies, 2026-09-25):
 
 | Report says | Gold positive | Silver targets positive | Official text |
@@ -65,24 +65,26 @@ throughout.
 
 - Gold labels override silver on the 58 studies, in training and evaluation.
 - `combined_v1` sources were chosen by gold AUC (0.9075 macro against 0.8927 for Steven v4; gold
-  helped choose, so the figure is optimistic).
+  helped choose, so the figure is optimistic). `rebuild_state_v2` and then `rebuild_state_v3`
+  (report-reading rules aimed at the same over-calls) replaced it ([label tables](label-tables.md)).
 - Report-attribute heads add structured report supervision
   ([heads](../modeling/report-attribute-heads.md)).
-- Site debiasing ([bias_free.md](../../bias_free.md)): the light scanner confusion head is adopted
+- Site debiasing ([site bias](../modeling/site-bias.md)): the light scanner confusion head is adopted
   (0.948 against 0.947); stronger site removal lost publicly (S70 0.944, S71 0.943), in the
   order of each variant's disease cost on the major vendors.
 
-## What to try
+## Ideas considered
 
-1. **Target repair toward the image criteria** (evidence-backed; open work in the
-   [extraction doc](../ongoing/report-attribute-extraction.md), the OA-only repair plan it relates to was
-   superseded by the [label rebuild](label-rebuild.md)). The v3 answers encode severity
-   at the official thresholds. Blend each study's silver target toward "the finding is at or above
-   the official threshold" with one label-agnostic rule, instead of a hard cut, since the gold
-   check favors the threshold for PF OA and Effusion and "any finding" for Baker's and Medial OA.
-   No new extraction is needed. It is the largest untested lever on this exact mismatch.
+1. **Target repair toward the image criteria** (evidence-backed). The v3 answers of the
+   [extraction work](jevk5-report-attribute-extraction.md) encode severity at the official
+   thresholds; the proposal was to blend each study's silver target toward "the finding is at or
+   above the official threshold" with one label-agnostic rule instead of a hard cut, since the gold
+   check favors the threshold for PF OA and Effusion and "any finding" for Baker's and Medial OA. The
+   OA-only repair plan it relates to was superseded by the [label rebuild](label-rebuild/INDEX.md),
+   and the report-reading rules of `rebuild_state_v3` addressed the same mismatch with per-label
+   rules.
 2. **Decide with pooled gold, not fold gold.** Fold gold is about 11 studies, which is noise;
-   out-of-fold predictions across all five folds give the full 58. Report it as a standing
+   out-of-fold predictions across all five folds give the full 58. It was reported as a standing
    diagnostic beside the fold metric, not as an adoption rule.
 3. **Read local losses on over-called labels as a possible good sign.** A candidate that loses
    locally by lowering low-grade positives may be moving toward the test labels; check with a
@@ -93,5 +95,5 @@ throughout.
 - Correcting labels with the model's own predictions (noisy-labels campaign, nothing adopted).
 - Upweighting the gold studies in the loss (rejected by the user).
 - Stronger site removal: finer site identity and harder confusion pressure lost publicly
-  ([bias_free.md](../../bias_free.md)).
+  ([site bias](../modeling/site-bias.md)).
 - Post-hoc centering of predictions per scanner: lost on gold (−0.0096 pooled).

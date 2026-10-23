@@ -2,7 +2,7 @@
 
 Current state, 2026-09-21: stopped on the user-adopted learned-strength incumbent
 (seed 2263738815, fold-0 AUC 0.897443). The source/reference transition is recorded
-in [the shared closure record](../../checkpoint-closure.md). Original reference,
+in the shared closure record (`autoresearch/checkpoint-closure.md`, removed). Original reference,
 budget and startup sections below describe the historical seal; they do not select
 the current incumbent. Historical attempts retain their original references.
 The [2026-09-21 queue refresh](prior-work.md#revisit-queue-on-learned-strength)

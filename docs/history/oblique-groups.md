@@ -46,7 +46,7 @@ unless noted. Local values are ×4 τ 1 validation predictions.
 The embedding alone was measured against `oblique-clean` (groups only, cleaned source) at ×4:
 +0.0015 hard (80% [−0.0004, +0.0033]) and +0.0019 soft (80% [+0.0009, +0.0030]). `oblique-clean`
 was never submitted, so the embedding's own public effect is unmeasured. Details:
-[oblique groups result](../validation/results/2026-09-22-oblique-groups-result.md).
+[oblique groups result](../validation/results/sampling/2026-09-22-oblique-groups-result.md).
 
 ## Campaigns
 
@@ -71,7 +71,7 @@ with pooled slots, not training under a policy. It used the GPU, about five minu
 for every variant at ×4 τ 0.75 on one RTX 3090, and did not depend on the removed oblique code:
 
 ```bash
-rtk proxy uv run --locked python -m scripts.adhoc.score_tilted_slot_policies --output-dir outputs/analysis/tilted-slot-policies-gate --run-dirs '["outputs/training/k_05"]' --thresholds '[30]' --variants '["standard","additive_acl","intact_acl","intact_hidden"]'
+uv run --locked python -m scripts.adhoc.score_tilted_slot_policies --output-dir outputs/analysis/tilted-slot-policies-gate --run-dirs '["outputs/training/k_05"]' --thresholds '[30]' --variants '["standard","additive_acl","intact_acl","intact_hidden"]'
 ```
 
 Outputs are in `outputs/analysis/tilted-slot-policies-*` (`results.csv`, `aggregate.csv`,

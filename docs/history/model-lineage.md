@@ -32,11 +32,11 @@ and classifiers, reflection probability 0.5 and sampling sigma **40 mm**. The co
 `outputs/training/reflection-sigma40` run selected epoch 7 at **0.892360168 validation macro
 AUC** and scored **0.936 publicly**. It remains the best submitted model; runs on the current
 code, which lacks its 3D embedding, compare against the matched `00-baseline` control. See the
-[paired comparison](../validation/results/2026-09-14-reflection-sigma-40-result.md) and
-[frozen submission runtime](../inference/submissions/2026-09-14-reflection-sigma-40-submission.md).
+[paired comparison](../validation/results/sampling/2026-09-14-reflection-sigma-40-result.md) and
+[frozen submission runtime](../inference/submissions/early-submission-details.md).
 
 The `meniscus-soft-coupling` experiment
-[regressed locally](../validation/results/2026-09-14-meniscus-soft-coupling-result.md), and its
+[regressed locally](../validation/results/labels-and-losses/2026-09-14-meniscus-soft-coupling-result.md), and its
 training changes were removed on 2026-09-14. Its objective and archived evidence are preserved
 under [meniscus classifier coupling](../modeling/retired-side-and-compartment-variants.md#meniscus-classifier-coupling);
 it has no measured public score. Later that day the baseline config and maintained model moved
@@ -56,13 +56,13 @@ removed:
   field.
 - **Unchanged from `ea19772`:** `config.py`, `training.py` and `checkpoints.py` (before the
   package restructure).
-- **Config:** the baseline YAML, later renamed `configs/training.yaml`, equals `00-baseline`'s
+- **Config:** the baseline YAML, later renamed `configs/resnet50.yaml`, equals `00-baseline`'s
   effective configuration except for its name and output root.
 
 The same day, the package moved into the `data/`, `modeling/`, `training/`, `evaluation/` and
 `inference/` subpackages, single-value config fields became code constants, and the preprocessing
 identity became `physical_gaussian_overlap_spatial_tokens_reflection_v9`. The
-[current model](../modeling/current-model.md#00-baseline-result) records the result and the
+[current model](../modeling/current-model.md#historical-reference-00-baseline) records the result and the
 restoration checks. On 2026-09-17 the identity became
 `ranked_filtered_physical_gaussian_overlap_spatial_tokens_reflection_v10` (series exclusions and
 a fixed evaluation source ranking; model unchanged).
@@ -76,7 +76,7 @@ From 2026-09-15 to 2026-09-16, the baseline config and model changed several tim
 
 No run beat `00-baseline`, and the investigation was dropped. The
 [investigation record](crop-selection-investigation.md) holds the recipes, results and
-findings. The [historical crop-selection sources](crop-selection-sources/README.md) hold the
+findings. The [historical crop-selection sources](sources/crop-selection/README.md) hold the
 earlier versions of the model page and the source archives.
 
 ## Retired token graph
@@ -91,9 +91,9 @@ Two fold-0 runs, both measured with the encoding diagnostic:
 | `token-graph` | Two zero-initialized residual layers before `mil_norm`, head learning rate | 0.892376 | Champion 0.892360 | +0.000007 |
 | `graph-forced` | Default output initialization, update after `mil_norm`, learning rate 0.0018 without weight decay | 0.892679 | `00-baseline` 0.892763 | +0.000039 |
 
-The [token-graph result](../validation/results/2026-09-14-token-graph-result.md) owns the
+The [token-graph result](../validation/results/pooling-and-attention/2026-09-14-token-graph-result.md) owns the
 measurements. The plan and graph-era sources are archived as
-[historical token-graph sources](token-graph-sources/README.md), and the run source
+[historical token-graph sources](sources/token-graph/README.md), and the run source
 archives `outputs/training/token-graph/source_snapshot.zip` and
 `outputs/training/graph-forced/source_snapshot.zip` reproduce each run. Removing the graph
 changed the source, spatial-token and preprocessing identities, so every earlier checkpoint,
@@ -102,8 +102,8 @@ including `00-baseline` and `attention-prior`, requires its archived sources.
 ## Retired attention prior
 
 The prior was implemented on 2026-09-15 from the
-[position research](../research/position-encoding.md#phase-1-head-only-changes) and retired on
-2026-09-16. Its fold-0 run [regressed by 0.002177](../validation/results/2026-09-15-attention-prior-result.md)
+[position research](../research/geometry-and-views/position-encoding.md#phase-1-head-only-changes) and retired on
+2026-09-16. Its fold-0 run [regressed by 0.002177](../validation/results/pooling-and-attention/2026-09-15-attention-prior-result.md)
 against the matched `00-baseline` control, and its learned priors stayed nearly flat.
 
 With `model.attention_prior: gaussian_1d_2d_3d`, it added three per-target log-biases to the
@@ -124,7 +124,7 @@ The 3D term read each token's patient point, the middle-slice LPS anchor with re
 
 The prior is absent from the restored code, which removes:
 
-- `attention_prior.py`, `model.attention_prior` and `configs/attention-prior.yaml`;
+- `attention_prior.py`, `model.attention_prior` and `configs/attention-prior.yaml` (removed);
 - the per-token points and their validity;
 - the collated `patient_maps` and `geometry_valid` tensors;
 - the diagnostic's prior variants.
@@ -146,7 +146,7 @@ The `spatial-tokens-five-embeddings` run, and every later run up to the champion
 
 The champion (`reflection-sigma40`, 0.892360, public 0.936) carries this embedding. Replacing it
 with `unknown_3d` at inference still scored
-[0.936 publicly](../inference/submissions/2026-09-15-champion-without-3d-at-inference.md).
+[0.936 publicly](../inference/submissions/early-submission-details.md).
 
 The run kept everything else fixed: seed 42, `all_5fold_v3`, 224 pixels, 140 mm, 2× validation
 density, pretrained initialization, augmentation, labels, loss, optimizer and the ten-epoch
@@ -159,17 +159,17 @@ budget.
 It was launched with:
 
 ```bash
-rtk proxy uv run --locked just train spatial-tokens-five-embeddings
+uv run --locked just train spatial-tokens-five-embeddings
 ```
 
 The completed run is saved in `outputs/training/spatial-tokens-five-embeddings/`. It selected
 epoch 10 at 0.889506 fold-0 macro AUC and **0.929 public AUC**, later surpassed by
-[3dsampling at 0.930](../validation/results/2026-09-13-3dsampling-validation-comparison.md).
+[3dsampling at 0.930](../validation/results/sampling/2026-09-13-3dsampling-validation-comparison.md).
 
 - **Details:** the
-  [validation comparison](../validation/results/2026-09-13-spatial-token-validation-comparison.md)
+  [validation comparison](../validation/results/sampling/2026-09-13-spatial-token-validation-comparison.md)
   covers target changes, uncertainty, learning curves, timing and memory.
-- **Submission:** the [submission record](../inference/submissions/2026-09-13-spatial-token-submission.md).
+- **Submission:** the [submission record](../inference/submissions/early-submission-details.md).
 
 ## Baseline3 and baseline4
 

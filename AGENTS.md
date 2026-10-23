@@ -3,7 +3,7 @@
 Workspace for the [RSNA Knee Abnormality Detection competition on Kaggle](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection).
 
 - Consult the competition page for rules, data details, evaluation, and submission requirements.
-- Use `$docs-maintainer` to consult, create, update, or audit repository documentation. Open known paths or sections directly, use `rg` for specific terms, and use the relevant folder index for broad topics; start with `docs/INDEX.md` when the destination is unclear.
+- Use the repository's [$docs-maintainer](.agents/skills/docs-maintainer/SKILL.md) to consult, create, update, or audit repository documentation. Open known paths or sections directly, use `rg` for specific terms, and use the relevant folder index for broad topics; start with `docs/INDEX.md` when the destination is unclear.
 - Keep indexes navigation-only, with distinctive "read when" descriptions and section links for common lookups. Update entries when documents are added, moved, removed, change purpose, or their navigation needs repair; a changed result inside a document does not require an index update.
 - Use the repository's [$scripts-maintainer](.agents/skills/scripts-maintainer/SKILL.md) to find, create, update, move, or retire scripts. Open known paths directly or start at `scripts/INDEX.md`; keep the script indexes current in the same change.
 - Use the repository's [$disk-cleanup](.agents/skills/disk-cleanup/SKILL.md) to free disk space; it deletes by fixed rules without asking and records the cleanup.
@@ -23,12 +23,8 @@ Workspace for the [RSNA Knee Abnormality Detection competition on Kaggle](https:
 
 ## Work tracking
 
-- Keep a snapshot of the current state and active work in [docs/ongoing/](docs/ongoing/INDEX.md). Update it in the same change when something starts or finishes.
-- Classify every new idea into exactly one [backlog](docs/backlog/INDEX.md) document:
-  - `docs/backlog/overnight.md`: hyperparameter-only runs on the current recipe, one change per run against a fresh control.
-  - `docs/backlog/small-changes.md`: small code additions behind one new option. The user supervises them: implement one only when the user asks, then move its run to `overnight.md`.
-  - `docs/backlog/big-bets.md`: investigation-sized plans. Start one only in a session with the user, and move it to `docs/ongoing/` when it starts.
-  - `docs/backlog/endgame.md`: final-phase work; it waits for the final phase.
-  - `docs/backlog/refactors/`: tooling and code-structure changes that leave training behavior unchanged, one document per refactor.
+- The competition has ended; [docs/final-solution.md](docs/final-solution.md) records the solution it ended on.
+- Keep active work in [docs/ongoing/](docs/ongoing/INDEX.md), empty when nothing is in progress. Update it in the same change when something starts or finishes.
+- Record new ideas that are not started in [docs/backlog/untried-ideas.md](docs/backlog/untried-ideas.md), with the evidence behind each.
 - The user launches training, detached from agent sessions.
 - Before deleting a finished entry, preserve its durable findings in the relevant topic documentation.

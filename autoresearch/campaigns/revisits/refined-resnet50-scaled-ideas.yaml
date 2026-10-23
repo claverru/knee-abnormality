@@ -12,7 +12,7 @@ ideas:
     5.5e-5.'
   precedents:
   - 'refined-resnet50-ideas.yaml: checkpoint hash, inspection and median convolution RMS 0.0136.'
-  - 'docs/ongoing/radimagenet-backbone.md: the weight-RMS rule (ResNet-18 5e-5 at RMS 0.0124).'
+  - 'docs/modeling/backbones/resnet-radimagenet-backbones.md: the weight-RMS rule (ResNet-18 5e-5 at RMS 0.0124).'
   novelty: First Refined-RadImageNet ResNet-50 run at its own scaled rate.
   coverage: All studies and labels.
   exploitation: Per-epoch x1 and per-stage drift against the incumbent and refined-rn50-incumbent-recipe.

@@ -27,7 +27,7 @@ ideas:
   - 'Mixed-field (reference rn18-l2sp-no-confusion, 140 mm): 120 mm alone +0.0011
     and +0.0012, 0.947 public against 0.943; contrast-split-112-140 +0.0015 but -0.0003
     against 120 mm alone (80% [-0.0017, +0.0011]) and 0.945 public; the medial meniscus
-    fell -0.002 to -0.007 in every 120 mm run (docs/validation/results/2026-10-01-mixed-field-campaign.md).'
+    fell -0.002 to -0.007 in every 120 mm run (docs/validation/results/crops-and-views/2026-10-01-mixed-field-campaign.md).'
   - 'Acquired resolution: T1/PD coronal 92% and sagittal 90% fully resolved at 0.375
     mm, 18% and 23% at 0.536 mm (prior-work.md, Acquired resolution).'
   - 'Extent: the detail labels use 80-90 mm across a coronal slice and 60-70 mm across
@@ -93,7 +93,7 @@ ideas:
   - A 60 mm window at one position for all studies keeps 0.55 of ACL, 0.56 of medial-meniscus
     and 0.49 of lateral-meniscus attention on the 140 mm control (prior-work.md, Where
     the model looks).
-  - Crop jitter was called crucial by the RSNA lumbar winners (docs/research/learned-crop-selection.md).
+  - Crop jitter was called crucial by the RSNA lumbar winners (docs/research/geometry-and-views/learned-crop-selection.md).
   - 'two-stream-paired: a second stream behind a zero-initialized gate never trained
     (0.506 alone); views sharing the backbone were both used, 0.859 and 0.916 alone
     for the contrast split (prior-work.md, Precedent table).'
@@ -324,10 +324,10 @@ ideas:
   - 'two-stream-paired (mixed-field): every slice at 120 mm (ResNet-18) and 140 mm
     (ResNet-10t), pooled as narrow + tanh(gate) x (joint - narrow) with the gate at
     zero; the second stream never trained and the run was in effect 120 mm alone.
-    51 inputs per study took 1,736 s (docs/validation/results/2026-10-01-mixed-field-campaign.md).'
+    51 inputs per study took 1,736 s (docs/validation/results/crops-and-views/2026-10-01-mixed-field-campaign.md).'
   - 'Two views per slice, backlog: both streams must feed the pool from the first
     step, and the activation check must compare the joint score with the narrow-only
-    one (docs/backlog/big-bets.md).'
+    one (docs/backlog/untried-ideas.md).'
   - 'rn18-field-120-control against the same recipe at 140 mm: +0.0008 overall, synovitis
     -0.0044, Baker''s cyst -0.0030, medial meniscus -0.0018 (prior-work.md, Precedent
     table).'
@@ -401,7 +401,7 @@ ideas:
   - 'Acquired resolution at 0.5 mm: coronal T1/PD 35%, sagittal T1/PD 37%, fluid 60%
     fully resolved; at 0.536 mm 18%, 23% and 37-44% (prior-work.md, Acquired resolution).'
   - 'Centred 112 mm crop, September: Baker''s cyst -0.028, the cyst outside 112 mm
-    and inside 140 mm in two of three reviewed studies (docs/research/input-resolution.md).'
+    and inside 140 mm in two of three reviewed studies (docs/research/geometry-and-views/input-resolution.md).'
   - The 120 mm field already cuts more than 10 mm of tissue on a coronal side in 30-31%
     of series and more than 20 mm of popliteal tissue in 34% of sagittal ones (prior-work.md,
     What the 120 mm field already cuts).
@@ -2883,7 +2883,7 @@ ideas:
   precedents:
   - plane-conditioned-batchnorm (revisits campaign), one bank per plane in the upper
     stages on the single-scale 140 mm recipe, -0.0010, 80% [-0.0018, -0.0002], rejected;
-    it took 1,247 s (docs/validation/results/2026-10-01-revisits-campaign.md). This
+    it took 1,247 s (docs/validation/results/campaigns-and-queues/2026-10-01-revisits-campaign.md). This
     idea splits by pixel size, not plane, and in the early stages, not the upper ones.
   - view-specific-early-batch-statistics, proposed by the researcher on t1pd-detail-84
     with two banks (zoomed and wide) and never queued (ideas.yaml).

@@ -55,7 +55,7 @@ values differ from this worktree's recipe and are declared as `reference_config_
   reference was trained at `0bd598f` and this worktree holds the loader changes of `c1d973b`,
   which edit hashed preprocessing sources. Their recorded parity is zero differing fields over
   every training, validation and ×4 prediction batch of a fold
-  ([profile](../../../docs/inference/2026-10-12-middle-slice-preparation-and-loader-speed.md#parity)).
+  ([profile](../../../docs/inference/profiling/2026-10-12-middle-slice-preparation-and-loader-speed.md#parity)).
 
 ## Settled
 

@@ -5,9 +5,9 @@ built and while its [campaign](INDEX.md) ran; moved here from `docs/ongoing/view
 when the line closed on 2026-10-04. They describe the code of the `view-optimisation` branch,
 which is not on main: main keeps the hand-set view table and the label bias
 ([view table](../../../docs/modeling/current-model.md#view-table)). Results and conclusions:
-[2026-10-03 learnable-views campaign](../../../docs/validation/results/2026-10-03-learnable-views-campaign.md).
+[2026-10-03 learnable-views campaign](../../../docs/validation/results/crops-and-views/2026-10-03-learnable-views-campaign.md).
 Statements such as "uncommitted" or "no run yet" are as written at the time. It followed the
-[smart-crops campaign](../../../docs/validation/results/2026-10-02-smart-crops-campaign.md);
+[smart-crops campaign](../../../docs/validation/results/crops-and-views/2026-10-02-smart-crops-campaign.md);
 detailed evidence behind the smart-crops statements here:
 [view effects by target](../smart-crops/view-effects-by-target.md).
 
@@ -562,7 +562,7 @@ Built at the user's request after the frozen control tied main.
   learned-view run is as different from the hand recipe as the 120 mm control is and as
   strong as the hand recipe, so the pair gains more over its better member. Not separated
   from plain seed variety: no pair here has the same views and a different seed. Filed as
-  a candidate ensemble member in the [endgame backlog](../../../docs/backlog/endgame.md#ensembling).
+  a candidate ensemble member in the [endgame backlog](../../../docs/validation/validation-protocol.md#ensembles).
 
   | Pair | Average | Over the pair mean | Over the better member | Mean logit correlation |
   |---|---:|---:|---:|---:|
@@ -679,7 +679,7 @@ The configuration schema of the view-config worktree is merged into this build (
 ## Blends submitted on 2026-10-02
 
 Recorded in
-[2026-10-02 learned-view and blend submissions](../../../docs/inference/submissions/2026-10-02-blend-submissions.md):
+[2026-10-02 learned-view and blend submissions](../../../docs/validation/results/validation-and-ensembles/2026-10-02-blend-submissions.md):
 S94 (the reference of the learnable-views campaign alone, 0.947), S95 (with the hand-view
 ResNet-18, 0.950), S96 (ReXNet + ResNet-50 + hand-view ResNet-18, 0.953) and S97 (28 networks,
 0.954).

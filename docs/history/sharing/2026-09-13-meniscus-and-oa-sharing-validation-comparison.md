@@ -84,7 +84,7 @@ Recorded run costs do not isolate an architecture-specific runtime effect.
 Candidate AUC peaks at epoch 7, falls to 0.886732 at epoch 8, then recovers to
 0.891646 at epoch 10; selection uses the saved best checkpoint.
 
-The [comparison artifact](../../../outputs/analysis/m/meniscus-oa-vs-controls-20260913/comparison.json)
+The comparison artifact (`outputs/analysis/m/meniscus-oa-vs-controls-20260913/comparison.json`, deleted)
 preserves complete metrics, subgroup counts, within-study rankings, epoch curves,
 configurations, input identities, timing and SHA-256 hashes of checkpoints,
 predictions and source snapshots. One fold and seed do not quantify training

@@ -25,7 +25,7 @@ reference studies. Their scores, and comparisons selected using them, are
 development evidence. Preserve the project's [fixed folds](../validation/INDEX.md),
 but do not claim those folds undo prior public reference-set feedback.
 The source claim that teacher extraction AUC bounds image-model performance
-is also not a mathematical guarantee; see [supervision evidence](../research/public-research.md#report-derived-supervision).
+is also not a mathematical guarantee; see [supervision evidence](../research/competition-and-prior-art/public-research.md#report-derived-supervision).
 
 ## Implication for the first baseline
 
@@ -43,8 +43,8 @@ Its 0.0054 advantage over v2 on the reused 58-study endpoint does not establish
 that it trains a better image model. v2 remains a useful single-source control,
 and Pilkwang is usable on the entire report-only pool.
 
-Fold-aware training now retains official gold separately, uses it only on
+Fold-aware training later retained official gold separately, uses it only on
 eligible training rows, and preserves every held-out study under the
-[all-study protocol](../validation/project-validation-protocol.md). That later
+[all-study protocol](../validation/validation-protocol.md). That later
 implementation does not change this audit's scope: it altered no labels or
 folds and ran no LLM or image-model comparison between label sources.

@@ -9,7 +9,7 @@ ideas:
     series dropout (+0.0023).'
   mechanism: data.resolution_augmentation.probability 0.
   precedents:
-  - 'Half stack adoption: docs/validation/results/2026-09-26-augmentation-campaign.md.'
+  - 'Half stack adoption: docs/validation/results/campaigns-and-queues/2026-09-26-augmentation-campaign.md.'
   - 'radimagenet-rn18 and site-generalization findings for the other half-stack members.'
   novelty: First removal on ResNet-18.
   coverage: All studies and labels.
@@ -31,8 +31,8 @@ ideas:
     U_q 32 to 256 and zero-initialized so the candidate starts as the incumbent. The adapted tokens
     feed scoring, pooling and every head.'
   precedents:
-  - 'docs/backlog/small-changes.md#planecontrast-specific-feature-adapters.'
-  - 'docs/research/pretraining-and-external-data.md#adapting-2d-foundation-models-to-volumes.'
+  - 'docs/backlog/untried-ideas.md#pooling-and-the-attention-head.'
+  - 'docs/research/backbones-and-pretraining/pretraining-and-external-data.md#adapting-2d-foundation-models-to-volumes.'
   novelty: Untested; the pre-pooling sibling of plane-contrast readouts.
   coverage: All studies and labels; types missing from a study add nothing.
   exploitation: Log each type's adapter output RMS relative to h per epoch; per-label AUC and

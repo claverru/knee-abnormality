@@ -16,7 +16,7 @@ ideas:
     (docs/modeling/report-attribute-heads.md, Question weighting). The heads are worth keeping:
     +0.00105 x4 at adoption and -0.0006 when removed on the ResNet-18 recipe. The same sharing
     gave the five routed targets +0.0090 to +0.0131 against separate classifiers in the fourth
-    and fifth runs (docs/ongoing/side-routed-heads.md).
+    and fifth runs (docs/modeling/side-routed-heads.md).
   mechanism: >-
     Five question families get one shared head each (one attention score column and one
     classifier block of options), routed by the model's routing weights exactly as the targets
@@ -46,7 +46,7 @@ ideas:
     26 heads. The targets table, the reliability weights, report_attribute_loss, the loss
     weight and the logged report_attribute_kl_<question> per remaining question are unchanged.
   precedents:
-  - 'docs/ongoing/side-routed-heads.md, Fourth run and Fifth run: the five routed targets sum to +0.0131 and +0.0090 against the reference; localisation +0.002 to +0.013 in the fourth run.'
+  - 'docs/modeling/side-routed-heads.md, Fourth run and Fifth run: the five routed targets sum to +0.0131 and +0.0090 against the reference; localisation +0.002 to +0.013 in the fourth run.'
   - 'docs/modeling/report-attribute-heads.md: adoption at +0.00105 x4 and 0.940 against 0.938 public; removal on the ResNet-18 recipe -0.0006 (80% [-0.0011, -0.0001]).'
   novelty: First change to the structure of the report-attribute heads since their adoption on 2026-09-25; they have never been routed or shared.
   coverage: >-
@@ -92,7 +92,7 @@ ideas:
     which gave up the whole front of their side, fell from +0.0030 and +0.0022 (fourth run,
     front tokens counted for their side) to +0.0013 and +0.0003, while PF OA stayed above all
     12 sibling runs (+0.0071). The drawings of 2026-10-05
-    (outputs/analysis/o/octant-sketches-20261005, docs/ongoing/side-routed-heads.md, Octant
+    (outputs/analysis/o/octant-sketches-20261005, docs/modeling/side-routed-heads.md, Octant
     sketches) show why a vertical cut costs them: the fitted centre sits at the notch, about
     15 mm above the joint line, so the front-and-low region holds the front of the tibial
     plateau, its cartilage and the anterior meniscal horns, which belong to the tibiofemoral
@@ -115,8 +115,8 @@ ideas:
     lateral_rest). The frame, its learned rotation, the position prior, the token position code
     and the side head are unchanged; the origin stays the fitted centre with no offset.
   precedents:
-  - 'docs/ongoing/side-routed-heads.md, Fifth run: nod -5.1 degrees, Medial OA +0.0013 and Lateral OA +0.0003 against +0.0030 and +0.0022 in the fourth run, PF OA +0.0071.'
-  - 'docs/ongoing/side-routed-heads.md, Octant sketches and Third run: the centre about 15 mm above the joint line; prior peaks for PF OA and the OA sides.'
+  - 'docs/modeling/side-routed-heads.md, Fifth run: nod -5.1 degrees, Medial OA +0.0013 and Lateral OA +0.0003 against +0.0030 and +0.0022 in the fourth run, PF OA +0.0071.'
+  - 'docs/modeling/side-routed-heads.md, Octant sketches and Third run: the centre about 15 mm above the joint line; prior peaks for PF OA and the OA sides.'
   novelty: First use of the height coordinate for routing; the fifth build routes on the midline and the front cut only.
   coverage: >-
     Every study with a fitted centre, training and inference. Tokens in front of and below the
@@ -169,7 +169,7 @@ ideas:
     classifiers' tokens stay position-free. code_frequencies and the padding go.
   precedents:
   - 'outputs/autoresearch/fixes-and-removals/experiments: computed-centre-3d-position, position-3d-without-oa-detector, position-3d-beside-1d-2d and position-embeddings-off, per-target x4 deltas against slab-rule-and-positive-std-requeue.'
-  - 'docs/ongoing/side-routed-heads.md, Second run (zero-started code unused), Fourth run and Fifth run (own-channel targets with and without the fixed sinusoid).'
+  - 'docs/modeling/side-routed-heads.md, Second run (zero-started code unused), Fourth run and Fifth run (own-channel targets with and without the fixed sinusoid).'
   novelty: The campaign's learned 3D code has not been run in the knee frame or restricted to the own-channel classifiers.
   coverage: >-
     Every token of a series with a fitted centre, for the seven own-channel targets and the

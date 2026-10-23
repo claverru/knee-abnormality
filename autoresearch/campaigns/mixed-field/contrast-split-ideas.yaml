@@ -26,7 +26,7 @@ ideas:
     120 against 160 directly +0.0046 (95% [+0.0016, +0.0076]),
     outputs/analysis/m/mixed-field-120-vs-160.'
   - 'Label reliance by series type: outputs/analysis/t/type-importance-20260917/label_type_importance.csv
-    (docs/validation/results/2026-09-17-plane-contrast-importance.md); older labels and backbone,
+    (docs/validation/results/pooling-and-attention/2026-09-17-plane-contrast-importance.md); older labels and backbone,
     indicative only.'
   - 'Acquired resolution by contrast:
     outputs/analysis/i/input-resolution-research-20260915/acquisition/series_acquisition.parquet

@@ -1,7 +1,7 @@
 # fastMRI joint training campaign contract
 
 Written 2026-10-12 with the user. Not started: it waits for the
-[remote training host](../../../docs/backlog/refactors/remote-training-host.md) option.
+[remote training host](../../../autoresearch/runtime.md#training-host) option.
 
 ## Objective
 
@@ -66,7 +66,7 @@ part of the input identity the comparison checks. **Authorized by the user on 20
 ## Training host
 
 Calibration, trainings and comparisons run on the rented machine named in `campaign.yaml`
-([remote training host](../../../docs/backlog/refactors/remote-training-host.md)); their records
+([remote training host](../../../autoresearch/runtime.md#training-host)); their records
 come back after every poll and checkpoints stay there. **The campaign's code runs there with
 network access, accepted by the user on 2026-10-12 for this machine:** its container cannot cut
 the network, and it holds no credentials, agents or records.

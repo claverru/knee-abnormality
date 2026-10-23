@@ -25,8 +25,8 @@ ideas:
     Contusion''s target loss through the new term; it reads the shared tokens without detaching, as
     the report heads do.'
   precedents:
-  - 'docs/ongoing/side-routed-heads.md: edema by compartment 25% explained on validation knees.'
-  - 'docs/ongoing/side-routed-heads.md, The runs sorted: Contusion -0.0020 top six against bottom
+  - 'docs/modeling/side-routed-heads.md: edema by compartment 25% explained on validation knees.'
+  - 'docs/modeling/side-routed-heads.md, The runs sorted: Contusion -0.0020 top six against bottom
     six.'
   novelty: First use of a located report head at inference.
   coverage: Contusion on every study; the edema reader on every study at inference.

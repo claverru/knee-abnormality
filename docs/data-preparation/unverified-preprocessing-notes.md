@@ -1,4 +1,6 @@
-# Unverified preprocessing notes and open questions
+# Competitor-reported preprocessing notes (unverified)
+
+What other competitors and the early working notes reported about preprocessing, kept as unverified leads. None of it describes this project's pipeline, which is in [current preparation](current-preparation.md).
 
 ## Data shape and redundancy
 
@@ -49,25 +51,24 @@ the usual setup. The score's evaluation split, exact model, and benchmark
 conditions were not specified, so these are experiment leads rather than
 guaranteed tradeoffs.
 
-## Ordering and unanswered preprocessing questions
+## Ordering and the questions these notes left open
 
-The maintained pipeline sorts by the DICOM orientation/location projection,
-falling back to `SliceLocation`, then index metadata. The current code always uses
-float32 millimeter positions relative to the midpoint of the acquisition's
-physical extent; the former `data.position_encoding` and `data.position_reference`
-fields are gone. This reference remains fixed when different slices are sampled.
-Physical mode rejects candidates whose sampled slices only have index metadata,
-using the existing alternative-acquisition fallback. Baseline1's ordinal (`index`)
-positions need its archived sources. The [correction record](../history/baseline1-review.md#implemented-corrections)
-documents compatibility and real-data execution.
+This project's pipeline sorts slices by the DICOM orientation/location projection, falling back to
+`SliceLocation` and then index metadata (`data/preprocessing/dicom.py`). It uses float32 millimeter
+positions relative to the midpoint of the acquisition's physical extent, fixed when different slices
+are sampled; the former `data.position_encoding` and `data.position_reference` fields are gone, and
+physical mode rejects candidates whose sampled slices only have index metadata, using the
+alternative-acquisition fallback. Baseline1's ordinal (`index`) positions need its archived sources
+([correction record](../history/baseline1-review.md#implemented-corrections)).
 
-The following uncertainties concern the historical pipeline:
+Questions the reported pipelines left open, answered for this project where the source shows it:
 
-- The notes warn against ordering by sequence IDs and indicate use of patient
-  orientation/coordinate information. Exact tags, sorting logic, and handling
-  of inconsistent geometry are unavailable.
-- Whether the pipeline applies rescale slope/intercept is unresolved.
-- Photometric inversion was raised during the DICOM review; the actual
-  pipeline's handling was not established.
-- The exact intensity mapping into `uint8`, padding policy, interpolation,
-  series classification, and duplicate-detection criteria are missing.
+- Ordering by patient orientation and coordinates: implemented as above; handling of inconsistent
+  geometry is the instance guard and study cleaning in [current preparation](current-preparation.md).
+- Rescale slope/intercept: applied when not 1 and 0 (`data/preprocessing/device.py`).
+- Photometric inversion: no handling exists in `data/preprocessing/` (no `PhotometricInterpretation`
+  logic). Whether any competition study needed it was not established here.
+- The reported pipelines' exact `uint8` mapping, padding, interpolation, series classification and
+  duplicate criteria remain unknown; this project's are quantile bounds of 0.005 and 0.995 on valid
+  crop pixels, `uint8` normalization, scale-aware antialiased resampling, and the cleaning rules in
+  [current preparation](current-preparation.md).

@@ -15,13 +15,13 @@ not the option.
   the center projects inside its acquired range, and locally otherwise. The model no longer reads
   3D geometry, so only the previews' `geometry_valid` still depends on `& physical` in
   `src/knee_abnormality/data/dataset.py`.
-- *CPU analysis* ([summary](../../outputs/analysis/s/study-center-robust-20260915/summary.txt)):
+- *CPU analysis* (summary (`outputs/analysis/s/study-center-robust-20260915/summary.txt`, deleted)):
   it rescues 131 studies (21 of 31 on fold 0), dropping 159 series, mostly small-FOV axials. Of
   the 47 still rejected, 44 have no series above 20 mm. Centers of accepted studies do not move,
   by construction. Of 24,371 series, 350 would sample locally (75 on fold 0).
 - *Gate on range rather than retention:* retained series from the other knee in bilateral
   studies, or from an ankle series filed in a knee slot, project up to 184 mm outside their range
-  (see the [series-filtering census](../metadata/series-filtering-census.md#implemented-rule-2026-09-17); the ankle and stray other-knee series are now dropped before the fit).
+  (see the [series-filtering census](../metadata/series-filtering-census/implemented-rule.md); the ankle and stray other-knee series are now dropped before the fit).
 - *Cost:* setting the option adds a `robust_center` entry to the preprocessing identity, so the
   run starts fresh on fold 0.
 
@@ -31,10 +31,10 @@ Measured, inference only. The three fold-0 control checkpoints of
 `overnight-20260916T214520Z-t8k_kw2z` (runs 00–02) re-scored the rescued fold-0 studies at batch
 size 1 with bf16 autocast; the rest of fold 0 keeps its saved predictions. The comparison uses a
 paired report-group bootstrap (2,000 draws), with Δ macro AUC ×1000 averaged over the three
-checkpoints. Tables: [macro](../../outputs/analysis/s/series-filtering-20260917/robust-centre-rescore/macro_deltas.csv),
-[per target](../../outputs/analysis/s/series-filtering-20260917/robust-centre-rescore/per_target_deltas.csv),
-[series paths](../../outputs/analysis/s/series-filtering-20260917/robust-centre-rescore/series_sampling.parquet),
-[sanity](../../outputs/analysis/s/series-filtering-20260917/robust-centre-rescore/sanity_slots.csv).
+checkpoints. Tables: macro (`outputs/analysis/s/series-filtering-20260917/robust-centre-rescore/macro_deltas.csv`, deleted),
+per target (`outputs/analysis/s/series-filtering-20260917/robust-centre-rescore/per_target_deltas.csv`, deleted),
+series paths (`outputs/analysis/s/series-filtering-20260917/robust-centre-rescore/series_sampling.parquet`, deleted),
+sanity (`outputs/analysis/s/series-filtering-20260917/robust-centre-rescore/sanity_slots.csv`, deleted).
 Script: `robust_rescore.py` (`041bd16:docs/history/series-and-sampling-sources/series-filtering/robust_rescore.py.txt`).
 
 - *Patch:* a `KneeStudyDataset` subclass replaces a rejected reference with the robust fit. Series
@@ -67,7 +67,7 @@ The option reproduces the 20 mm patch above. The implemented behaviour, the iden
 the CPU verification (null against HEAD, 20 mm and 10 mm) are recorded in
 [current preparation](../data-preparation/current-preparation.md#robust-study-centre-removed).
 The runs were made on 2026-09-18 and all landed inside the control spread
-([results](../validation/results/2026-09-18-overnight-results.md)), which is what removed the
+([results](../validation/results/campaigns-and-queues/2026-09-18-overnight-results.md)), which is what removed the
 option.
 
 - *Counts:* after the ankle exclusion, 177 training studies are rejected, and 20 mm rescues 130 of
@@ -85,5 +85,5 @@ option.
   - The three control checkpoints above averaged −0.0001 (from −0.00004 to −0.00015), so this
     checkpoint loses more than any of them. The result comes from one checkpoint and 21 studies
     (`outputs/analysis/r/robust-center-implementation-20260917/rescore.json`).
-- *Expectation:* the run is expected to tie. Seed-to-seed noise is 0.0029 ([strategy](../validation/validation-strategy.md#what-a-comparison-can-resolve)), so a single run
+- *Expectation:* the run is expected to tie. Seed-to-seed noise is 0.0029 ([strategy](../validation/validation-protocol.md)), so a single run
   cannot resolve a change of this size.

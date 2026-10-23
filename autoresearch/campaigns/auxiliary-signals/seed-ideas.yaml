@@ -12,7 +12,7 @@ ideas:
     Set trainer.report_attribute_loss_weight to 0.2 in configs/training.yaml. Nothing else
     changes.
   precedents:
-  - 'Target set 3.1 heads at 0.1: +0.00105 [95% -0.0012, +0.0035], public 0.940 vs 0.938 (docs/validation/results/2026-09-25-report-attribute-heads.md).'
+  - 'Target set 3.1 heads at 0.1: +0.00105 [95% -0.0012, +0.0035], public 0.940 vs 0.938 (docs/validation/results/labels-and-losses/2026-09-25-report-attribute-heads.md).'
   - 'Coefficient reasoning and failure signs: docs/modeling/report-attribute-heads.md#coefficient.'
   novelty: First measurement of the attribute coefficient.
   coverage: All studies with attribute targets; all labels.
@@ -71,7 +71,7 @@ ideas:
     kept question list.
   precedents:
   - 'Reliability weights and gates: docs/modeling/report-attribute-heads.md#targets.'
-  - 'Known weak targets and audits: docs/ongoing/report-attribute-extraction.md.'
+  - 'Known weak targets and audits: docs/public-labels/jevk5-report-attribute-extraction.md.'
   - 'Dropping osteophytes and Hoffa for noise was part of the v3 -> v3.1 change (+0.0003 vs v3, bundled).'
   novelty: First question selection by a fixed reliability rule instead of by hand.
   coverage: Removes 7 of 35 heads, all cartilage extent/depth/surface or Baker's size questions.
@@ -106,7 +106,7 @@ ideas:
     trainer.report_attribute_targets.drop_completeness_options: true; log the removed options
     and the mean weight lost per question.
   precedents:
-  - 'v3 analysis: Spanish not-mentioned answers, order flips between same-meaning options (docs/ongoing/report-attribute-extraction.md#v3-full-run-analysis-2026-09-25).'
+  - 'v3 analysis: Spanish not-mentioned answers, order flips between same-meaning options (docs/public-labels/jevk5-report-attribute-extraction.md#v3-full-run-analysis-2026-09-25).'
   - 'Host: silence is an unobserved label (docs/metadata/official-label-criteria.md).'
   - 'Merging same-meaning options was part of the v3 -> v3.1 change (+0.0003 vs v3, bundled).'
   novelty: First removal of report-style options; 3.1 only merged them into their neighbours.
@@ -135,7 +135,7 @@ ideas:
     options stay. Setting trainer.report_attribute_targets.drop_hedged_options: true; log the
     removed options and the mean weight lost per question.
   precedents:
-  - 'Question-set design: hedging is an option (docs/ongoing/report-attribute-extraction.md#question-set-design).'
+  - 'Question-set design: hedging is an option (docs/public-labels/jevk5-report-attribute-extraction.md#question-set-design).'
   - 'Dead options in the v3 analysis: synovitis possible (9 answers).'
   novelty: First treatment of hedged answers as unobserved.
   coverage: 10 questions; small mass, concentrated in the ambiguous studies where the reliability weights are also lowest.

@@ -65,7 +65,7 @@ VSSD-Tiny and FlashInternImage-T may need nine epochs or more checkpointing to f
 All take ImageNet mean and std. Licences: the host's rule is that non-commercial terms alone do not
 disqualify a source ([supervision](../../../docs/modeling/supervision.md#official-labeling-context)), and
 MedSAM2 passed the user's licence and rules pass of 2026-10-07
-([segmenters](../../../docs/research/anatomy-from-pretrained-segmenters.md)).
+([segmenters](../../../docs/research/geometry-and-views/anatomy-from-pretrained-segmenters/INDEX.md)).
 
 Weights and sources on this machine:
 
@@ -299,7 +299,7 @@ Fold 2 of `all_5fold_scanner_v2`, ×4 macro AUC.
 | Backbone | Run | ×4 | Blend gain with the ResNet-50 | Source |
 |---|---|---:|---:|---|
 | FocalNet-T SRF, twelve epochs | `focalnet-silver-fold-2` | 0.938816 | +0.003179 | this campaign's reference |
-| EfficientViT-B2, stochastic depth 0.2 | `efficientvit-sd02-fold-2` | 0.938773 | +0.003098 | [first round](../../../docs/validation/results/2026-10-16-backbone-families.md) |
+| EfficientViT-B2, stochastic depth 0.2 | `efficientvit-sd02-fold-2` | 0.938773 | +0.003098 | [first round](../../../docs/validation/results/backbones/2026-10-16-backbone-families.md) |
 | ResNet-50, silver recipe | `resnet50-silver-fold2` | 0.937820 | (the blend partner) | crop-views campaign |
 | DaViT-T | first round | 0.936669 | | first round |
 | EdgeNeXt-B | first round | 0.936033 | | first round |
@@ -308,7 +308,7 @@ Fold 2 of `all_5fold_scanner_v2`, ×4 macro AUC.
 | DINOv3 ConvNeXt-T | first round | 0.934199 | | first round |
 | PVTv2-b2 | first round | 0.933099 | | first round |
 | SAM2.1 Hiera-T, rate 1e-4, anchors 0.01 and 1e-4 | first round, aborted at epoch 7 | ×1 −0.021 against MambaVision-T at epoch 7 | | [run notes](../backbone-families/run-notes.md#1-sam2-hiera-tiny-aborted-at-epoch-7-on-the-users-order-invalid) |
-| RadioDINO-S/16, best | radiodino-settings | 0.929641 | | [result](../../../docs/validation/results/2026-10-15-radiodino-s16.md) |
+| RadioDINO-S/16, best | radiodino-settings | 0.929641 | | [result](../../../docs/validation/results/backbones/2026-10-15-radiodino-s16.md) |
 
 The SAM2.1 Hiera-T run localised bones level with or better than the reference (kneecap overlap 0.709
 against 0.652) and lagged on the menisci and cartilage maps; its candidate causes were no convolution after

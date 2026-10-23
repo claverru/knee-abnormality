@@ -20,7 +20,7 @@ helpers reverse pixels/channels, compose `F @ U` and negate sagittal positions.
 The preview tool uses these helpers, applies LPS reflection to its absolute anchor points
 while retaining immutable source maps, and supports bounded augmentation-only profiling.
 
-The [sampling experiment](../validation/results/2026-09-12-accurate-centers-result.md)
+The [sampling experiment](../validation/results/sampling/2026-09-12-accurate-centers-result.md)
 selected midpoint sampling. Projections are diagnostics only and do not change
 triplet selection, physical position encoding or the centered image crop.
 Native pose validity, reference acceptance and an in-range projection remain
@@ -35,12 +35,12 @@ correspondence.
 
 The shared geometry foundation and accurate-centers comparison are complete.
 The frozen fusion control is the submitted `crop140mm` checkpoint/bundle and
-midpoint recipe identified in [validation](../validation/results/2026-09-12-accurate-centers-result.md).
+midpoint recipe identified in [validation](../validation/results/sampling/2026-09-12-accurate-centers-result.md).
 Use its saved config, seed, input/label/split identities and predictions; the
 mutable training YAML is not its recipe. Historical checkpoints run through
 their archived source/bundles and never receive invented preprocessing identities.
 The spatial-fusion stage was implemented, profiled and
-[rejected at the deployment runtime gate](../validation/results/2026-09-12-spatial-fusion-engineering-result.md).
+[rejected at the deployment runtime gate](../validation/results/sampling/2026-09-12-spatial-fusion-engineering-result.md).
 The user subsequently selected the original 27-query, width-64 architecture
 with eager execution, later replaced by the [spatial-token model](../modeling/current-model.md).
 The reduced compiled variant remains archived. The selected sampler and

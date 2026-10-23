@@ -56,7 +56,7 @@ by meniscus share.
 - **Crops are centred on the structures a view frames**, read from the predicted map per knee;
   the four hand-measured centre offsets go.
 - **224 px.** Centring the token grid (225 and 257 px) and removing the border tokens changed
-  nothing ([token grid alignment](../../../docs/validation/results/2026-10-08-token-grid-alignment.md)).
+  nothing ([token grid alignment](../../../docs/validation/results/crops-and-views/2026-10-08-token-grid-alignment.md)).
 - **Masks on a subset.** The soft-tissue masks exist for the DESS studies only (about 265, one
   scanner); the model generalises from them as it does from the 550 bone masks.
 - **All series of a study are supervised** by its mask, through patient coordinates; a token

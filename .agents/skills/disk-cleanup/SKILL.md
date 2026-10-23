@@ -8,7 +8,7 @@ description: Free disk space by fixed rules, without asking, across every worktr
 Run it to the end without asking the user. The rules decide; whatever no rule covers stays and
 is reported.
 
-- **Run:** `rtk proxy uv run --locked python -m scripts.tools.free_disk` from the repository
+- **Run:** `uv run --locked python -m scripts.tools.free_disk` from the repository
   root. It scans every worktree's `outputs/` and `data/raw/.download`, the Hugging Face cache,
   `~/.codex` and the session scratchpads, deletes, and writes
   `outputs/archive/maintenance/disk-cleanup-<UTC>/manifest.json` with every deleted and kept
@@ -16,7 +16,7 @@ is reported.
 - **uv cache:** then run `uv cache prune` on its own, not under `uv run`, which holds the cache
   lock. If another uv process holds the lock, skip it and say so; never pass `--force`.
 - **Record:** add one dated paragraph to
-  [checkpoint pruning](../../../docs/architecture/configs-and-experiment-artifacts.md#checkpoint-pruning):
+  [checkpoint pruning](../../../docs/architecture/disk-cleanup-log.md):
   the totals, the manifest link, what went by rule, and what was kept for a decision. Leave it
   uncommitted.
 - **Report:** GiB freed per rule, the `Kept, needs a decision` list, any path that failed to

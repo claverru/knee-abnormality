@@ -63,7 +63,7 @@ separate from the paired results above.
 
 Reproduction config, environment/package versions, cohort identity, source
 snapshot, raw runs and audits are under
-[`outputs/profiling/dicom-reader-20260912`](../../outputs/profiling/dicom-reader-20260912).
+`outputs/profiling/dicom-reader-20260912` (deleted).
 `comparison-v1/` contains the real DataLoader audit and timings;
 `corrected-edge-audit.json` owns the edge coverage above. The first edge fixtures
 retained a trailing padding element and therefore exercised fallback; they are

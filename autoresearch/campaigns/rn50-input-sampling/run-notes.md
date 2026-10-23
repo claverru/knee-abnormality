@@ -598,7 +598,7 @@ fewer slices on the joint; it loses at ×4 as well, so the training bags were wo
 Graceful stop after run 14. Fourteen runs; incumbent in the runtime `thirty-five-distinct-slices`.
 
 **The user's objection to run 12 (09:47):** an idea that adds images per study should not have
-been queued. It is an endgame item (`docs/backlog/endgame.md`: more training triplets per
+been queued. It is an endgame item (`docs/backlog/untried-ideas.md`: more training triplets per
 study); the sampling subagent had flagged its seed 7 as such and the keeper queued it anyway.
 Runs 7 and 9 keep the reference's image count; run 12 has about 36 images against 31.7 and 1.13
 of the time. **And its measurement is not like for like:** it validates and predicts on more

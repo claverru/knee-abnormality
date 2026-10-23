@@ -58,5 +58,5 @@ effective config, source snapshot, input identity and timing JSON. No new
 training, inference or tests ran for this summary. These single-seed comparisons
 on 904 studies do not establish repeatability or transfer to reflection/public
 performance. The user requested the
-[sigma-40 submission](../../inference/submissions/2026-09-14-sigma-40-overnight-submission.md)
+[sigma-40 submission](../../inference/submissions/early-submission-details.md)
 on 2026-09-14; it completed with 0.931 public AUC, tying reflection.

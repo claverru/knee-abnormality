@@ -1,0 +1,30 @@
+convnext-v31-gen1-fold-0	convnext	configs/convnext.yaml	0	2213331574	teacher	any	--paths.label-manifest configs/labels/rebuild-state-v3-1-label-sources.json --labels.source rebuild_state_v3_1 --validation.split all_5fold_scanner_v3_1	
+convnext-v31-gen1-fold-1	convnext	configs/convnext.yaml	1	2859431146	teacher	any	--paths.label-manifest configs/labels/rebuild-state-v3-1-label-sources.json --labels.source rebuild_state_v3_1 --validation.split all_5fold_scanner_v3_1	
+convnext-v31-gen1-fold-2	convnext	configs/convnext.yaml	2	3116816646	teacher	any	--paths.label-manifest configs/labels/rebuild-state-v3-1-label-sources.json --labels.source rebuild_state_v3_1 --validation.split all_5fold_scanner_v3_1	
+convnext-v31-gen1-fold-3	convnext	configs/convnext.yaml	3	472329450	teacher	any	--paths.label-manifest configs/labels/rebuild-state-v3-1-label-sources.json --labels.source rebuild_state_v3_1 --validation.split all_5fold_scanner_v3_1	
+convnext-v31-gen1-fold-4	convnext	configs/convnext.yaml	4	1155053165	teacher	any	--paths.label-manifest configs/labels/rebuild-state-v3-1-label-sources.json --labels.source rebuild_state_v3_1 --validation.split all_5fold_scanner_v3_1	
+resnet50-v31-gen1-fold-0	resnet50	configs/resnet50.yaml	0	1852835020	teacher	any	--paths.label-manifest configs/labels/rebuild-state-v3-1-label-sources.json --labels.source rebuild_state_v3_1 --validation.split all_5fold_scanner_v3_1	
+resnet50-v31-gen1-fold-1	resnet50	configs/resnet50.yaml	1	273425338	teacher	any	--paths.label-manifest configs/labels/rebuild-state-v3-1-label-sources.json --labels.source rebuild_state_v3_1 --validation.split all_5fold_scanner_v3_1	
+resnet50-v31-gen1-fold-2	resnet50	configs/resnet50.yaml	2	2971365270	teacher	any	--paths.label-manifest configs/labels/rebuild-state-v3-1-label-sources.json --labels.source rebuild_state_v3_1 --validation.split all_5fold_scanner_v3_1	
+resnet50-v31-gen1-fold-3	resnet50	configs/resnet50.yaml	3	718440231	teacher	any	--paths.label-manifest configs/labels/rebuild-state-v3-1-label-sources.json --labels.source rebuild_state_v3_1 --validation.split all_5fold_scanner_v3_1	
+resnet50-v31-gen1-fold-4	resnet50	configs/resnet50.yaml	4	3544148865	teacher	any	--paths.label-manifest configs/labels/rebuild-state-v3-1-label-sources.json --labels.source rebuild_state_v3_1 --validation.split all_5fold_scanner_v3_1	
+nextvit-v31-gen1-fold-0	nextvit	configs/nextvit.yaml	0	600344267	teacher	any	--paths.label-manifest configs/labels/rebuild-state-v3-1-label-sources.json --labels.source rebuild_state_v3_1 --validation.split all_5fold_scanner_v3_1	
+nextvit-v31-gen1-fold-1	nextvit	configs/nextvit.yaml	1	3263439082	teacher	any	--paths.label-manifest configs/labels/rebuild-state-v3-1-label-sources.json --labels.source rebuild_state_v3_1 --validation.split all_5fold_scanner_v3_1	
+nextvit-v31-gen1-fold-2	nextvit	configs/nextvit.yaml	2	2601503909	teacher	any	--paths.label-manifest configs/labels/rebuild-state-v3-1-label-sources.json --labels.source rebuild_state_v3_1 --validation.split all_5fold_scanner_v3_1	
+nextvit-v31-gen1-fold-3	nextvit	configs/nextvit.yaml	3	3677311113	teacher	any	--paths.label-manifest configs/labels/rebuild-state-v3-1-label-sources.json --labels.source rebuild_state_v3_1 --validation.split all_5fold_scanner_v3_1	
+nextvit-v31-gen1-fold-4	nextvit	configs/nextvit.yaml	4	1802698385	teacher	any	--paths.label-manifest configs/labels/rebuild-state-v3-1-label-sources.json --labels.source rebuild_state_v3_1 --validation.split all_5fold_scanner_v3_1	
+rsna-convnext-v31-gen1-fold-0	convnext	convnext-v31-gen1-fold-0	0	-	rsna	local		convnext-v31-gen1-fold-0
+rsna-convnext-v31-gen1-fold-1	convnext	convnext-v31-gen1-fold-1	1	-	rsna	local		convnext-v31-gen1-fold-1
+rsna-convnext-v31-gen1-fold-2	convnext	convnext-v31-gen1-fold-2	2	-	rsna	local		convnext-v31-gen1-fold-2
+rsna-convnext-v31-gen1-fold-3	convnext	convnext-v31-gen1-fold-3	3	-	rsna	local		convnext-v31-gen1-fold-3
+rsna-convnext-v31-gen1-fold-4	convnext	convnext-v31-gen1-fold-4	4	-	rsna	local		convnext-v31-gen1-fold-4
+rsna-resnet50-v31-gen1-fold-0	resnet50	resnet50-v31-gen1-fold-0	0	-	rsna	local		resnet50-v31-gen1-fold-0
+rsna-resnet50-v31-gen1-fold-1	resnet50	resnet50-v31-gen1-fold-1	1	-	rsna	local		resnet50-v31-gen1-fold-1
+rsna-resnet50-v31-gen1-fold-2	resnet50	resnet50-v31-gen1-fold-2	2	-	rsna	local		resnet50-v31-gen1-fold-2
+rsna-resnet50-v31-gen1-fold-3	resnet50	resnet50-v31-gen1-fold-3	3	-	rsna	local		resnet50-v31-gen1-fold-3
+rsna-resnet50-v31-gen1-fold-4	resnet50	resnet50-v31-gen1-fold-4	4	-	rsna	local		resnet50-v31-gen1-fold-4
+rsna-nextvit-v31-gen1-fold-0	nextvit	nextvit-v31-gen1-fold-0	0	-	rsna	local		nextvit-v31-gen1-fold-0
+rsna-nextvit-v31-gen1-fold-1	nextvit	nextvit-v31-gen1-fold-1	1	-	rsna	local		nextvit-v31-gen1-fold-1
+rsna-nextvit-v31-gen1-fold-2	nextvit	nextvit-v31-gen1-fold-2	2	-	rsna	local		nextvit-v31-gen1-fold-2
+rsna-nextvit-v31-gen1-fold-3	nextvit	nextvit-v31-gen1-fold-3	3	-	rsna	local		nextvit-v31-gen1-fold-3
+rsna-nextvit-v31-gen1-fold-4	nextvit	nextvit-v31-gen1-fold-4	4	-	rsna	local		nextvit-v31-gen1-fold-4

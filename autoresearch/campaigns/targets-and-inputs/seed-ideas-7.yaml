@@ -33,7 +33,7 @@ ideas:
     decoder read are untouched in shape. No option and no config field: the ResNet backbones of this
     recipe have SE from this run on.
   precedents:
-  - 'docs/ongoing/radimagenet-backbone.md: how the Refined-RadImageNet weights are loaded and what was tried on the backbone.'
+  - 'docs/modeling/backbones/resnet-radimagenet-backbones.md: how the Refined-RadImageNet weights are loaded and what was tried on the backbone.'
   - 'run-notes.md, run 5 and its audit: the last gain came through stage four and the token projection, the features the SE gates rescale.'
   novelty: First change inside the backbone's blocks.
   coverage: Every image, at all four stages.

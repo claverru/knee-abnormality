@@ -1,7 +1,7 @@
 # Prior work for the frame-and-targets campaign
 
 The summary the researcher checks proposals against. Tables, drawings and every run's details
-are in the [plan and runs](../../../docs/ongoing/side-routed-heads.md); the earlier campaigns on
+are in the [plan and runs](../../../docs/modeling/side-routed-heads.md); the earlier campaigns on
 the design are [side routing](../side-routing/INDEX.md) and
 [routing and shifts](../routing-and-shifts/INDEX.md) (keeper's notes per run:
 [run notes](../routing-and-shifts/run-notes.md)); learned view placement was studied in
@@ -183,7 +183,7 @@ against that model at ×4 and ×1; details per run in its [run notes](../routing
 ## Measured on 2026-10-07
 
 All on the validation fold, written up with tables in
-[the plan and runs](../../../docs/ongoing/side-routed-heads.md) (sections from "MCL in
+[the plan and runs](../../../docs/modeling/side-routed-heads.md) (sections from "MCL in
 spot-shift-locator-keeps-spatial-maps-k" onwards). Outputs under
 `outputs/analysis/r/routing-and-shifts-frames-20261007/`.
 

@@ -25,9 +25,9 @@ Unresolved concerns:
 - Single-run resolution on this recipe is roughly 0.005 macro, and no arm has exceeded +0.001 against its control mean. Intervals condition on the fitted models and exclude training-seed and checkpoint-selection variability.
 
 Evidence:
-- docs/validation/results/2026-09-20-compartment-adapter-result.md:41-53 (family and margin intervals vs both controls), :82-92 (prevalence asymmetry argument), :94-107 (no width/coefficient sweep; `independent` retired as residual-readout reparametrization), :109-133 (empirical null: macro min −0.0050, max +0.0011; per-label sd table), :143-149 (caveats)
+- docs/validation/results/pooling-and-attention/2026-09-20-compartment-adapter-result.md:41-53 (family and margin intervals vs both controls), :82-92 (prevalence asymmetry argument), :94-107 (no width/coefficient sweep; `independent` retired as residual-readout reparametrization), :109-133 (empirical null: macro min −0.0050, max +0.0011; per-label sd table), :143-149 (caveats)
 - autoresearch/campaigns/medial-lateral-transfer/prior-work.md:13-31 (completed external adapter run identity and rejection), :33-57 (pinned control B reference and derived limits), :85-93 (history table), :102-119 (ownership and retirement of the independent arm)
-- docs/research/medial-lateral-transfer.md:142-160 (candidate 3 design, required independent-auxiliary control, warning against probabilistic-OR study-level targets and teacher distillation from 1B/1C), :120-140 (candidate 2 rejection header and capacity-attribution caveat)
+- docs/research/geometry-and-views/medial-lateral-transfer.md:142-160 (candidate 3 design, required independent-auxiliary control, warning against probabilistic-OR study-level targets and teacher distillation from 1B/1C), :120-140 (candidate 2 rejection header and capacity-attribution caveat)
 - Verified via effective_config.json for outputs/training/{disease-compartment-attention,meniscus-classifier,meniscus-oa-classifiers,meniscus-soft-coupling}: all validation_image_multiplier 2, no compartment-sharing key — archived recipe, not current-recipe duplicates
 - docs/history/sharing/oa-and-meniscus-disagreement-audit.md (OA annotation and acquisition sensitivity limits bearing on family choice)
 
@@ -96,10 +96,10 @@ Evidence:
 - src/knee_abnormality/modeling/model.py:204-239 — per-target pooled [b,t,f] and logit formation in float32 outside autocast; :129-137 residual_readout parameters; :53 constructor takes target_count only
 - src/knee_abnormality/evaluation/metrics.py:6-9 — frozen COMPARTMENT_PAIRS for meniscus and OA
 - src/knee_abnormality/data/preprocessing/preparation.py:31,228-235 — PreparedSeries.patient_maps computed per triplet channel
-- docs/validation/results/2026-09-20-compartment-adapter-result.md — rejected pooled shared adapter, meniscus -0.0114 [-0.0200,-0.0030], within-study margin -0.0191 [-0.0392,-0.0034]
+- docs/validation/results/pooling-and-attention/2026-09-20-compartment-adapter-result.md — rejected pooled shared adapter, meniscus -0.0114 [-0.0200,-0.0030], within-study margin -0.0191 [-0.0392,-0.0034]
 - autoresearch/campaigns/medial-lateral-transfer/prior-work.md#active-run-and-launch-readiness — adapter run is external evidence; control B pinned, 1,562.282713 s, 1,797 s ceiling
-- docs/validation/results/2026-09-14-meniscus-soft-coupling-result.md — isotropic weight coupling: macro -0.0015, meniscus -0.0041
-- docs/metadata/knee-side-policy-audit.md — 96.14% side assignment, fold-0 862/904 assigned, 42 unknown
+- docs/validation/results/labels-and-losses/2026-09-14-meniscus-soft-coupling-result.md — isotropic weight coupling: macro -0.0015, meniscus -0.0041
+- docs/metadata/knee-side/knee-side-policy-audit.md — 96.14% side assignment, fold-0 862/904 assigned, 42 unknown
 
 ## review-20260920T222103Z-34b9ddfa
 
@@ -200,8 +200,8 @@ Unresolved concerns:
 Evidence:
 - Reproduced probe inputs: outputs/training/overnight-20260919T235434Z-8ol_1c30/runs/13-control-repeat/fold_0/validation_predictions.csv joined to data/folds/all_5fold_v3/targets.csv (904 studies); pair indices per data/folds/all_5fold_v3/protocol.json
 - Proposal source report: outputs/autoresearch/medial-lateral-transfer/jobs/researcher-20260920T222419Z-48e1f1a0/report.json (both ideas, precedents, exhausted_directions)
-- docs/validation/results/2026-09-20-compartment-adapter-result.md: rejected pooled shared adapter, meniscus family -0.0114 [-0.0200,-0.0030], margin -0.0191 [-0.0392,-0.0034]; prevalence domination of shared pooled parameters
-- docs/validation/results/2026-09-14-meniscus-soft-coupling-result.md: isotropic classifier coupling, macro -0.0015, meniscus -0.0041
+- docs/validation/results/pooling-and-attention/2026-09-20-compartment-adapter-result.md: rejected pooled shared adapter, meniscus family -0.0114 [-0.0200,-0.0030], margin -0.0191 [-0.0392,-0.0034]; prevalence domination of shared pooled parameters
+- docs/validation/results/labels-and-losses/2026-09-14-meniscus-soft-coupling-result.md: isotropic classifier coupling, macro -0.0015, meniscus -0.0041
 - src/knee_abnormality/modeling/model.py:204-240 (_attention_pool materialises per-study token membership, float32 block, per-target pooled vectors and logits) — attachment point both proposals rely on
 - autoresearch/campaigns/losses/ideas.yaml shared-label-contrast-ranking (rejected) — confirms the pair-restricted main-logit margin variant is a measured-negative objective, correctly excluded
 - autoresearch/campaigns/medial-lateral-transfer/prior-work.md#active-run-and-launch-readiness — control B reference and rejected-adapter provenance
@@ -360,8 +360,8 @@ Evidence:
 - Target order: validation_predictions.csv header -> indices 2/3 = Medial/Lateral Meniscus, 4/5 = Medial/Lateral OA; pairs also in src/knee_abnormality/evaluation/metrics.py:6-9
 - Call site for the rotation: src/knee_abnormality/modeling/model.py:217-239 (float32 autocast-disabled block); configs/training.yaml:86 residual_readout: false
 - Token composition for the geometry-free value: src/knee_abnormality/modeling/model.py:305-316 (features + position_1d + position_2d + plane + contrast, then shared mil_norm at model.py:110)
-- Prior negative evidence cited and relied on: docs/validation/results/2026-09-20-compartment-adapter-result.md; campaign results compartment-pair-contrast-readout-20260920T222418Z-147e1fbd and shared-disease-auxiliary-20260920T221219Z-2457a3ee
-- Historical positive sharing arm: docs/research/medial-lateral-transfer.md#the-six-relevant-experiments (1A/1B meniscus +0.002737 / +0.003406, margin 0.980173 vs 0.972321)
+- Prior negative evidence cited and relied on: docs/validation/results/pooling-and-attention/2026-09-20-compartment-adapter-result.md; campaign results compartment-pair-contrast-readout-20260920T222418Z-147e1fbd and shared-disease-auxiliary-20260920T221219Z-2457a3ee
+- Historical positive sharing arm: docs/research/geometry-and-views/medial-lateral-transfer.md#the-six-relevant-experiments (1A/1B meniscus +0.002737 / +0.003406, margin 0.980173 vs 0.972321)
 
 ## completion-20260920T234557Z-829311f3
 
@@ -496,7 +496,7 @@ Evidence:
 - Verified seed-only config diff: flattened effective_config.json of overnight-20260919T235434Z-8ol_1c30/runs/00-control vs runs/13-control-repeat differs in exactly {seed: 1133376617 vs 2263738815, name}
 - Verified scores: runs/00-control/fold_0/selected_checkpoint.json score 0.8932217359542847 (epoch 06) vs pinned reference 0.8965816694263277
 - Campaign prior work: autoresearch/campaigns/medial-lateral-transfer/prior-work.md (1A macro +0.000217; 1C local 0.892538 vs 0.892360; rejected pooled adapter and its retired independent arm)
-- Rejected adapter result: docs/validation/results/2026-09-20-compartment-adapter-result.md; run outputs/training/compartment-control, predictions 753249bf...
+- Rejected adapter result: docs/validation/results/pooling-and-attention/2026-09-20-compartment-adapter-result.md; run outputs/training/compartment-control, predictions 753249bf...
 - Evaluator margin definitions used by both proposals' exploitation claims: src/knee_abnormality/evaluation/metrics.py:93-111 (logit_margin, margin_auc, COMPARTMENT_PAIRS)
 - proposal_admission in this assignment: both new ideas have dependencies_satisfied=true with no unresolved dependencies; active_incumbent_ideas is empty, so both are pure additions on historical-control
 
@@ -640,7 +640,7 @@ Evidence:
 - Parent source attention/head construction: .../recovery/historical-source-20260920T215302Z-e086c1eb/source/src/knee_abnormality/modeling/model.py:109-114 (attention Sequential 256->128->12), :133 (head Linear(256,12))
 - Pooling and readout path: same model.py:196-201 (_attention_scores plain branch) and :216-223 (float32 autocast-disabled pooled/logits block)
 - Pinned recipe switches: .../source/configs/training.yaml:83 dropout 0.0, :85 gated_attention false, :86 residual_readout false
-- Campaign contract: prior-work.md and docs/validation/results/2026-09-20-compartment-adapter-result.md for the rejected pooled adapter these proposals are distinguished from
+- Campaign contract: prior-work.md and docs/validation/results/pooling-and-attention/2026-09-20-compartment-adapter-result.md for the rejected pooled adapter these proposals are distinguished from
 - Cross-family attention cosines 0.363/0.314 same-side vs 0.054/0.243 within-family, off-diagonal mean 0.138; difference-vector alignment 0.234 — researcher report exhausted_directions
 - Co-occurrence: 111 doubly-exclusive validation studies, 102 same diseased side; opposite-side subset n=9, meniscus 8/9 vs OA 5/9 — researcher report exhausted_directions
 
@@ -1033,17 +1033,17 @@ The researcher's CPU header audit adds usable geometry evidence for image-space 
 
 Admitted contralateral-mirror-token-comparison. I ranked it second, behind the reserved head. It is the first campaign mechanism that compares a compartment's tokens with the homologous tokens of the other compartment in the same image. Every earlier arm ties, shares or penalises single-token, pooled-vector or output evidence. It targets the measured OA assignment weakness: OA margin AUC is 0.866 versus 0.971 for meniscus, and lateral OA drops inside medial-positive studies. It keeps the raw evidence, so both-positive cases stay representable. It commutes with whole-knee reflection, adds no batch keys or metadata, and leaves the other eight targets' forward path unchanged. It is also cheap and pre-registers a matched attribution control (row-flip partner). New header evidence supports the column mirror: coronal and axial columns run along patient X in 259/259 and 172/173 series, and FOV-centre offsets have a median of about 2 mm against a 20 mm token pitch. It goes ahead of the tied-classifier and axis-agreement ideas. The tied classifier is closest to already-tested tie/share arms. The axis-agreement idea constrains attention geometry rather than supplying new comparative evidence.
 
-I have left anatomy-supervised-compartment-evidence-split proposed, not admitted, and not parked. Its gate is trained to predict "medial of the knee midline" per token from image content. At inference that is image-based medial/lateral (side) inference. docs/research/knee-side-and-location.md:205-206 records image-based side inference as deferred by user instruction. The campaign's general permission for "anatomical assignment" does not clearly override a specific user deferral, and the researcher flagged the same issue. It also reuses the plumbing of the invalid axis arm, and its side labels rest on a 128-study header estimate, not on fold-0 coverage. It needs explicit user confirmation before admission. If the user confirms, the proposal's own rule applies: if shared-family-level-channel is accepted, re-express this idea as a replacement, not a stack.
+I have left anatomy-supervised-compartment-evidence-split proposed, not admitted, and not parked. Its gate is trained to predict "medial of the knee midline" per token from image content. At inference that is image-based medial/lateral (side) inference. docs/research/geometry-and-views/knee-side-and-location.md:205-206 records image-based side inference as deferred by user instruction. The campaign's general permission for "anatomical assignment" does not clearly override a specific user deferral, and the researcher flagged the same issue. It also reuses the plumbing of the invalid axis arm, and its side labels rest on a 128-study header estimate, not on fold-0 coverage. It needs explicit user confirmation before admission. If the user confirms, the proposal's own rule applies: if shared-family-level-channel is accepted, re-express this idea as a replacement, not a stack.
 
 Unresolved concerns:
 - contralateral-mirror-token-comparison: its assumption that the backbone does not already encode within-knee asymmetry at stride 32 is unmeasured. So is the share of compartment attention on coronal/axial versus sagittal tokens, which bounds the meniscus effect.
 - contralateral-mirror-token-comparison: the column mirror assumes the image centre is near the knee midline. Offsets at the p90 tail (6–7 mm, about a third of a token) and any series outside the header sample may pair non-homologous tissue. The invalid-partner mask covers only visual validity, not this misalignment.
 - contralateral-mirror-token-comparison: the Δ stream adds capacity (about 49k parameters) to the four compartment rows. Attributing any gain to the homologous comparison needs the row-flip matched control, not only the macro verdict.
-- anatomy-supervised-compartment-evidence-split: it conflicts with the user's recorded deferral of image-based side inference (docs/research/knee-side-and-location.md:205-206). It needs user confirmation before admission, and fold-0 gate-supervision coverage is also unknown.
+- anatomy-supervised-compartment-evidence-split: it conflicts with the user's recorded deferral of image-based side inference (docs/research/geometry-and-views/knee-side-and-location.md:205-206). It needs user confirmation before admission, and fold-0 gate-supervision coverage is also unknown.
 
 Evidence:
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/medial-lateral-transfer/jobs/researcher-20260921T025959Z-9d82f946/report.json (proposals, header-geometry evidence, exhausted directions)
-- /home/claudio/src/knee-abnormality/docs/research/knee-side-and-location.md:204-206 (image-based side inference deferred by user instruction)
+- /home/claudio/src/knee-abnormality/docs/research/geometry-and-views/knee-side-and-location.md:204-206 (image-based side inference deferred by user instruction)
 - /home/claudio/src/knee-abnormality/autoresearch/campaigns/medial-lateral-transfer/prior-work.md:80-98 (retired side/compartment variants; knee-side embedding ignored)
 
 ## completion-20260921T032637Z-a72abef3
@@ -1282,7 +1282,7 @@ Evidence:
 - candidate source src/knee_abnormality/modeling/model.py:140-151, 216-260, 327-346 (head shrink, pooling route, geometry-free tokens)
 - candidate source src/knee_abnormality/training/lightning.py:35-51 (new params in head_lr groups; ndim<2 excluded from decay)
 - /home/claudio/src/knee-abnormality/data/folds/all_5fold_v3/protocol.json (targets index 2,3 = Medial/Lateral Meniscus)
-- /home/claudio/src/knee-abnormality/docs/research/medial-lateral-transfer.md:36-46 (1A: shared 256-d vector over full tokens, independent biases; meniscus +0.0027/+0.0034, macro +0.0002)
+- /home/claudio/src/knee-abnormality/docs/research/geometry-and-views/medial-lateral-transfer.md:36-46 (1A: shared 256-d vector over full tokens, independent biases; meniscus +0.0027/+0.0034, macro +0.0002)
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/medial-lateral-transfer/jobs/developer-20260921T042159Z-ea2d1a63/report.json (CPU build, shape and allclose checks, -256 parameter delta)
 
 ## review-20260921T044048Z-5053944f
@@ -1344,7 +1344,7 @@ I ranked it after the reserved head and the already-queued bilateral arm, for tw
 - **Small locality gain.** In the researcher's own receptive-field data, the stride-16 cells cut the opposite-half input share only from about 0.31 to 0.23.
 - **Attention is still stride-32.** The shared evidence is tent-pooled back onto stride-32 anchors and weighted by the existing stride-32 attention. The OA medial/lateral attention overlap of 0.64–0.70 still limits OA separation.
 
-Ownership: `docs/backlog/big-bets.md#intermediate-stride-16-feature-fusion` is a generic backlog plan that changes the token grid for all labels, not a campaign. This arm is a compartment-only scalar evidence path confined to the campaign's editable directories, so it does not take over or pre-empt that bet. Any result informs the bet but does not stand in for it.
+Ownership: `docs/backlog/untried-ideas.md#views-and-fields` is a generic backlog plan that changes the token grid for all labels, not a campaign. This arm is a compartment-only scalar evidence path confined to the campaign's editable directories, so it does not take over or pre-empt that bet. Any result informs the bet but does not stand in for it.
 
 anatomy-supervised-compartment-evidence-split stays proposed. This event gives no new basis to queue it.
 
@@ -1360,7 +1360,7 @@ Evidence:
 - outputs/autoresearch/medial-lateral-transfer/jobs/researcher-20260921T042159Z-33bd411d/scratch/evidence-summary.md (receptive-field, token-score and plane-attention tables)
 - outputs/autoresearch/medial-lateral-transfer/jobs/researcher-20260921T042159Z-33bd411d/scratch/{erf.py,token_scores.py,plane_attention.py,token_scores_halves.json}
 - outputs/autoresearch/medial-lateral-transfer/jobs/researcher-20260921T032728Z-3519d993/scratch/crosstalk.py (lateral OA AUC 0.722 against medial-only negatives vs 0.909 against sibling-negative negatives)
-- docs/backlog/big-bets.md#intermediate-stride-16-feature-fusion (ownership overlap assessed; not pre-empted)
+- docs/backlog/untried-ideas.md#views-and-fields (ownership overlap assessed; not pre-empted)
 
 ## completion-20260921T045639Z-9edf74f5
 
@@ -1487,7 +1487,7 @@ I admitted both proposals. Neither has dependencies (proposal_admission shows bo
 
 pair-oriented-hemifield-attention is ranked second, right behind the reserved head. It goes after the most stable weakness the researcher measured: cross-talk on sibling-diseased negatives. Lateral OA scores 0.722 there against 0.909 on sibling-healthy negatives. That OA stratum sits mid-pack across 26 runs, so the weakness is structural, not luck in the reference run. The fix works in the forward path. It adds four zero-initialised scalars, and at κ=0 it matches control B exactly. It needs no new batch keys or metadata.
 
-On scope, I judge that the user's deferral of image-based side inference (docs/research/knee-side-and-location.md:205-206) does not block it:
+On scope, I judge that the user's deferral of image-based side inference (docs/research/geometry-and-views/knee-side-and-location.md:205-206) does not block it:
 - It has no side classifier, no side supervision and no knee-side labels.
 - It sharpens an orientation the model's own compartment attention already encodes. That orientation is a medial-minus-lateral displacement in the image frame, which commutes with reflection.
 - That puts it in the same class as the admitted cross-family axis agreement, not the held anatomy gate. The anatomy gate is supervised per token on geometry-derived medial/lateral labels.
@@ -1513,7 +1513,7 @@ Unresolved concerns:
 Evidence:
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/medial-lateral-transfer/jobs/researcher-20260921T045705Z-0c75907a/report.json (proposals, exhausted_directions: run spread, cross-talk ceiling, orientation probe)
 - /home/claudio/src/knee-abnormality/outputs/autoresearch/medial-lateral-transfer/jobs/researcher-20260921T045705Z-0c75907a/scratch/plane_side_attention.{py,json,log}, crosstalk_ceiling.py, run_spread.py
-- /home/claudio/src/knee-abnormality/docs/research/knee-side-and-location.md:205-206 (image-based side inference deferred by user instruction)
+- /home/claudio/src/knee-abnormality/docs/research/geometry-and-views/knee-side-and-location.md:205-206 (image-based side inference deferred by user instruction)
 - /home/claudio/src/knee-abnormality/autoresearch/campaigns/medial-lateral-transfer/findings.md:1036-1046 (the earlier hold on anatomy-supervised-compartment-evidence-split)
 
 ## review-20260921T054035Z-199f279b

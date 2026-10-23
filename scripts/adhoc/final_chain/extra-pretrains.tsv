@@ -1,0 +1,3 @@
+focalnet-rebuild-pretrain	focalnet	configs/focalnet-rebuild-pretrain.yaml	0	1698999170	pretrain	remote		teacher-decision
+mambavision-rebuild-pretrain	mambavision	configs/mambavision-rebuild-pretrain.yaml	0	752222899	pretrain	remote		teacher-decision
+efficientvit-rebuild-pretrain	efficientvit	configs/efficientvit-rebuild-pretrain.yaml	0	1726674044	pretrain	remote		teacher-decision

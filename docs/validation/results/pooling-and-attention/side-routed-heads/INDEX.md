@@ -1,0 +1,12 @@
+# Side-routed heads results
+
+| Read when | Document |
+|---|---|
+| Reviewing the first three side-routed builds against the fixes-and-removals reference: per-label tables, what the side head and boundaries learned, the router drawings and knee-rotation census, the investigation of runs 1 and 2, the attention prior's learned peaks | [2026-10-05 first to third builds](2026-10-05-first-to-third-builds.md) |
+| Checking the octant design of the fifth build (routing table, soft-cut widths, one learned rotation), the auxiliary-loss removal of the fourth, the octant sketches or the patient-motion measurement between series | [2026-10-05 fourth and fifth builds](2026-10-05-fourth-and-fifth-builds.md) |
+| Reviewing runs 6 to 11: hard octants, soft gradient through the cuts and own routes for MCL, Effusion and Baker's, frames inferred per study, stride-16 tokens, landmark frames and the first routed v4.0 report targets | [2026-10-06 octant builds](2026-10-06-octant-builds.md) |
+| Reviewing where each label's attention falls by height and core, the eighteen-region build with overlap assignment (runs 12 to 16), the yardstick check across the line, or the stopped ResNet-50 run 17 | [2026-10-06 eighteen regions](2026-10-06-eighteen-regions.md) |
+| Reviewing hard cuts on the regions (runs 18 to 23): the core taken from the side labels, wider tables, per-knee nod, the meniscus-spot frame, or the division search over the heads' attention (sectors, core, ring) | [2026-10-06 hard-cut regions](2026-10-06-hard-cut-regions.md) |
+| Checking the adopted run 24 (build, per-label result, attention-temperature sweep, Kaggle attempts), the four-anchor frame, ACL at all heights, the old recipe's attention against run 24's, or why ACL and Medial Meniscus trail the old recipe | [2026-10-06 spot-frame reference](2026-10-06-spot-frame-reference.md) |
+| Looking up any run of the line in one table, which cuts labels hold, runs 28 to 31 (spot-placed cuts, held cuts with balanced pull, the searched division), ×1 against ×4, the runs ranked, or the ResNet-50 on run 24's recipe | [2026-10-06 held cuts and summary](2026-10-06-held-cuts-and-summary.md) |
+| Checking the 2026-10-07 manual work on the campaign incumbent: crop offsets and the sunflower prediction pattern, crops rotated by each knee's frame, the failed bend measurement, the femur-lean run | [2026-10-07 manual runs after the campaign](2026-10-07-manual-runs-after-the-campaign.md) |

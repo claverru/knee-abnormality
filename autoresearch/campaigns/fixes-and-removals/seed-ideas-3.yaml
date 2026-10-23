@@ -13,7 +13,7 @@ ideas:
     bypassed in training/lightning.py); half_knee_mil_loss is not computed. Nothing else
     changes; the own-side mask stays.
   precedents:
-  - 'docs/validation/results/2026-09-24-knee-geometry-campaign.md #3: the adoption.'
+  - 'docs/validation/results/campaigns-and-queues/2026-09-24-knee-geometry-campaign.md #3: the adoption.'
   - 'plane-specialization #21, half-knee MIL per plane: -0.0006.'
   novelty: First removal of the loss by itself.
   coverage: Training only; the two meniscus labels of studies with a known side.
@@ -37,8 +37,8 @@ ideas:
     own_side is true for every token and the two meniscus labels attend to the whole knee.
     Nothing else changes; the half-knee loss stays.
   precedents:
-  - 'docs/validation/results/2026-09-24-knee-geometry-campaign.md #4: the mask on the fitted midline alone, -0.0018.'
-  - 'docs/validation/results/2026-09-23-side-mask-and-token-attention.md: the trained side mask.'
+  - 'docs/validation/results/campaigns-and-queues/2026-09-24-knee-geometry-campaign.md #4: the mask on the fitted midline alone, -0.0018.'
+  - 'docs/validation/results/pooling-and-attention/2026-09-23-side-mask-and-token-attention.md: the trained side mask.'
   novelty: First removal of the mask from the adopted bundle.
   coverage: The two meniscus labels of studies with a known side.
   exploitation: Per-label deltas on Medial and Lateral Meniscus; attention share on the other side for the two labels.
@@ -57,7 +57,7 @@ ideas:
     similar per-type job in the attention; the readouts may now be redundant.
   mechanism: model.plane_readout false. Nothing else changes.
   precedents:
-  - 'docs/validation/results/2026-10-01-revisits-campaign.md: plane-contrast readouts +0.0009, dense per-plane readouts -0.0052.'
+  - 'docs/validation/results/campaigns-and-queues/2026-10-01-revisits-campaign.md: plane-contrast readouts +0.0009, dense per-plane readouts -0.0052.'
   novelty: First test of the readouts with the view label bias in place.
   coverage: Every label of every study.
   exploitation: Per-label deltas against those of the adoption run; the view_label_bias values against the incumbent's.
@@ -78,7 +78,7 @@ ideas:
     In KneeAbnormalityModel._pooling_tokens the detail_view_embedding term is not added. The
     parameter stays in the model, unused. Nothing else changes.
   precedents:
-  - 'docs/validation/results/2026-10-02-smart-crops-campaign.md: the views were adopted with the embedding in place.'
+  - 'docs/validation/results/crops-and-views/2026-10-02-smart-crops-campaign.md: the views were adopted with the embedding in place.'
   novelty: First removal of the embedding.
   coverage: Coronal and sagittal tokens of every study.
   exploitation: Per-label deltas; the norm of the incumbent's embedding as context for how much it carried.
@@ -100,8 +100,8 @@ ideas:
     _report_attribute_step is not run (trainer.report_attribute_loss_weight cannot be 0 in the
     config schema, so the addition is bypassed in training/lightning.py). Nothing else changes.
   precedents:
-  - 'docs/validation/results/2026-10-01-revisits-campaign.md: report-attribute heads removed, -0.0006, 10% faster.'
-  - 'docs/validation/results/2026-09-25-report-attribute-heads.md: the adoption, +0.00105 and 0.940 against 0.938 public.'
+  - 'docs/validation/results/campaigns-and-queues/2026-10-01-revisits-campaign.md: report-attribute heads removed, -0.0006, 10% faster.'
+  - 'docs/validation/results/labels-and-losses/2026-09-25-report-attribute-heads.md: the adoption, +0.00105 and 0.940 against 0.938 public.'
   novelty: First removal on the current views.
   coverage: Training only.
   exploitation: Per-label deltas against those of the 2026-10-01 removal; training time.

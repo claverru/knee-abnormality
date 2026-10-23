@@ -1,6 +1,6 @@
 # Pretraining-input campaign
 
-**Closed: stopped by the user on 2026-10-05 at about 11:33 CEST after 32 scored runs; nothing adopted ([results](../../../docs/validation/results/2026-10-05-pretraining-input-campaign.md)).** It tried to close the gap between what we feed the
+**Closed: stopped by the user on 2026-10-05 at about 11:33 CEST after 32 scored runs; nothing adopted ([results](../../../docs/validation/results/campaigns-and-queues/2026-10-05-pretraining-input-campaign.md)).** It tried to close the gap between what we feed the
 Refined-RadImageNet backbone and what it was pretrained on, on a ResNet-10t reference: the
 intensity mapping of the fluid-sensitive series, the pretraining's own augmentations, our
 augmentations that move the input away from the pretraining statistics, and the authors' mask

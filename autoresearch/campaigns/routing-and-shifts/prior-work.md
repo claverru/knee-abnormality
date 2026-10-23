@@ -1,7 +1,7 @@
 # Prior work for the routing-and-shifts campaign
 
 The summary the researcher checks proposals against. Tables, drawings and every run's details
-are in the [plan and runs](../../../docs/ongoing/side-routed-heads.md); the first campaign on
+are in the [plan and runs](../../../docs/modeling/side-routed-heads.md); the first campaign on
 the design is [side routing](../side-routing/INDEX.md), and learned view placement was studied
 in [learnable views](../learnable-views/INDEX.md).
 

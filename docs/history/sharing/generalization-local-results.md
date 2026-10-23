@@ -26,7 +26,7 @@ of the leading models.
 
 This is not the first reversal: the earlier Tonylin experiment improved local
 AUC from 0.889506 to 0.892306 while public AUC fell from 0.929 to 0.921.
-See the [label comparison](../../validation/results/2026-09-13-tonylin-label-comparison.md).
+See the [label comparison](../../validation/results/labels-and-losses/2026-09-13-tonylin-label-comparison.md).
 An older learning-rate/training-budget comparison also reversed. The new results
 strengthen an existing warning about ranking transfer.
 

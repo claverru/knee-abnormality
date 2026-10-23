@@ -13,9 +13,9 @@ ideas:
       target while retaining the twelve-output main balanced BCE. Final predictions
       use the independent main heads. Start with a justified family, not a sweep.
     precedents:
-      - docs/research/medial-lateral-transfer.md#candidate-3-training-only-shared-disease-supervision
-      - docs/validation/results/2026-09-14-meniscus-soft-coupling-result.md
-      - docs/validation/results/2026-09-20-compartment-adapter-result.md
+      - docs/research/geometry-and-views/medial-lateral-transfer.md#candidate-3-training-only-shared-disease-supervision
+      - docs/validation/results/labels-and-losses/2026-09-14-meniscus-soft-coupling-result.md
+      - docs/validation/results/pooling-and-attention/2026-09-20-compartment-adapter-result.md
       - autoresearch/campaigns/medial-lateral-transfer/prior-work.md
     novelty: >-
       Changes training supervision rather than tying final classifier weights or
@@ -63,8 +63,8 @@ ideas:
       representation. Explicitly distinguish appearance used for classification
       from location/context used for assignment when the design calls for it.
     precedents:
-      - docs/research/medial-lateral-transfer.md#candidate-2-shared-disease-features-independent-decisions
-      - docs/research/knee-side-and-location.md#5-separate-attention-inputs-from-pooled-appearance
+      - docs/research/geometry-and-views/medial-lateral-transfer.md#candidate-2-shared-disease-features-independent-decisions
+      - docs/research/geometry-and-views/knee-side-and-location.md#5-separate-attention-inputs-from-pooled-appearance
       - docs/history/sharing/2026-09-13-compartment-attention-diagnosis.md
     novelty: >-
       Shares disease features before pooling rather than only adapting pooled

@@ -2637,7 +2637,7 @@ ideas:
     and prediction_image_multiplier as they are). Replaces nothing.'
   precedents:
   - 'run-notes.md, section "Cross-run analysis by a subagent": the x1 against x4 figures.'
-  - 'docs/backlog/big-bets.md, "Pooling head at the inference bag size": the same
+  - 'docs/backlog/untried-ideas.md, "Pooling head at the inference bag size": the same
     aim by another route.'
   novelty: First change to what the pools see in training; no new head, loss or inference
     change.

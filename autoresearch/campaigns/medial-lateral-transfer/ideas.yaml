@@ -12,9 +12,9 @@ ideas:
     while retaining the twelve-output main balanced BCE. Final predictions use the
     independent main heads. Start with a justified family, not a sweep.
   precedents:
-  - docs/research/medial-lateral-transfer.md#candidate-3-training-only-shared-disease-supervision
-  - docs/validation/results/2026-09-14-meniscus-soft-coupling-result.md
-  - docs/validation/results/2026-09-20-compartment-adapter-result.md
+  - docs/research/geometry-and-views/medial-lateral-transfer.md#candidate-3-training-only-shared-disease-supervision
+  - docs/validation/results/labels-and-losses/2026-09-14-meniscus-soft-coupling-result.md
+  - docs/validation/results/pooling-and-attention/2026-09-20-compartment-adapter-result.md
   - autoresearch/campaigns/medial-lateral-transfer/prior-work.md
   novelty: Changes training supervision rather than tying final classifier weights
     or adding only a pooled inference adapter. Start from the current incumbent, without
@@ -95,8 +95,8 @@ ideas:
     Explicitly distinguish appearance used for classification from location/context
     used for assignment when the design calls for it.
   precedents:
-  - docs/research/medial-lateral-transfer.md#candidate-2-shared-disease-features-independent-decisions
-  - docs/research/knee-side-and-location.md#5-separate-attention-inputs-from-pooled-appearance
+  - docs/research/geometry-and-views/medial-lateral-transfer.md#candidate-2-shared-disease-features-independent-decisions
+  - docs/research/geometry-and-views/knee-side-and-location.md#5-separate-attention-inputs-from-pooled-appearance
   - docs/history/sharing/2026-09-13-compartment-attention-diagnosis.md
   novelty: Shares disease features before pooling rather than only adapting pooled
     vectors. Unlike 1C, it need not force meniscus and OA to share the same medial/lateral
@@ -200,13 +200,13 @@ ideas:
     reproduces the reference exactly; the twelve public logits, their order and the
     inference entrypoints are unchanged.'
   precedents:
-  - 'docs/validation/results/2026-09-20-compartment-adapter-result.md: rejected pooled
+  - 'docs/validation/results/pooling-and-attention/2026-09-20-compartment-adapter-result.md: rejected pooled
     shared adapter; meniscus family and margin both negative against control B; prevalence-domination
     explanation.'
-  - 'docs/validation/results/2026-09-14-meniscus-soft-coupling-result.md: isotropic
+  - 'docs/validation/results/labels-and-losses/2026-09-14-meniscus-soft-coupling-result.md: isotropic
     weight coupling reduced classifier distance 20.5% and lost macro 0.0015 and meniscus
     0.0041.'
-  - 'docs/research/medial-lateral-transfer.md#why-biological-similarity-does-not-require-identical-classifiers:
+  - 'docs/research/geometry-and-views/medial-lateral-transfer.md#why-biological-similarity-does-not-require-identical-classifiers:
     shared features do not imply one optimal shared classifier.'
   - 'autoresearch/campaigns/medial-lateral-transfer/prior-work.md: 1A/1B/1C archived-recipe
     evidence and the retirement of the adapter''s independent arm.'
@@ -337,19 +337,19 @@ ideas:
     attention maps are mirror images of each other, so every study trains the shared
     selection rule in both roles.'
   precedents:
-  - 'docs/metadata/knee-side-policy-audit.md: 96.14% assignment, fold-0 counts, coordinate
+  - 'docs/metadata/knee-side/knee-side-policy-audit.md: 96.14% assignment, fold-0 counts, coordinate
     rule and abstentions.'
-  - 'docs/metadata/knee-side-coordinate-investigation.md: positive median physical
+  - 'docs/metadata/knee-side/knee-side-coordinate-investigation.md: positive median physical
     centre X means left knee; agreement by threshold and vendor.'
   - 'docs/modeling/retired-side-and-compartment-variants.md#knee-side-embedding: study-constant
     side vector tied the champion and its checkpoint ignored side; archived sources
     available.'
-  - 'docs/validation/results/2026-09-15-attention-prior-result.md: per-target Gaussian
+  - 'docs/validation/results/pooling-and-attention/2026-09-15-attention-prior-result.md: per-target Gaussian
     coordinate priors regressed 0.002177 and were retired with the model''s patient
     points; the priors barely moved from initialisation.'
-  - 'docs/research/knee-side-and-location.md#3-use-coordinates-with-a-common-anatomical-orientation:
-    side-signed patient X as an unimplemented approach, owned by docs/backlog/big-bets.md#position-and-knee-side.'
-  - 'docs/history/sharing/2026-09-13-compartment-attention-diagnosis.md and docs/research/medial-lateral-transfer.md#1c-imposed-a-real-attention-constraint:
+  - 'docs/research/geometry-and-views/knee-side-and-location.md#3-use-coordinates-with-a-common-anatomical-orientation:
+    side-signed patient X as an unimplemented approach, owned by docs/backlog/untried-ideas.md#position-and-knee-side.'
+  - 'docs/history/sharing/2026-09-13-compartment-attention-diagnosis.md and docs/research/geometry-and-views/medial-lateral-transfer.md#1c-imposed-a-real-attention-constraint:
     1C''s learned compartment vector is explicitly not a fixed patient-coordinate
     sign or an image-half mask.'
   - 'src/knee_abnormality/data/preprocessing/preparation.py: `patient_maps` already
@@ -482,15 +482,15 @@ ideas:
     biases are irrelevant at export. This is the training-only counterpart of exchange
     symmetry: it asks the pair to be mutually decodable rather than identical.'
   precedents:
-  - 'docs/validation/results/2026-09-14-meniscus-soft-coupling-result.md: the isotropic
+  - 'docs/validation/results/labels-and-losses/2026-09-14-meniscus-soft-coupling-result.md: the isotropic
     weight-distance version, measured and retired; do not restart its coefficient
     sweep.'
-  - 'docs/research/medial-lateral-transfer.md#candidate-3-training-only-shared-disease-supervision:
+  - 'docs/research/geometry-and-views/medial-lateral-transfer.md#candidate-3-training-only-shared-disease-supervision:
     the shared new auxiliary detector and its required independent-auxiliary control.'
   - 'autoresearch/campaigns/medial-lateral-transfer/ideas.yaml: `shared-disease-auxiliary`,
     currently developing, is the adjacent arm this proposal must be distinguished
     from.'
-  - 'docs/research/medial-lateral-transfer.md#historical-implementation-and-reproduction:
+  - 'docs/research/geometry-and-views/medial-lateral-transfer.md#historical-implementation-and-reproduction:
     1A/1B tied one 256-dimensional vector per family with independent biases; archived-recipe
     evidence only.'
   - 'Evgeniou and Pontil, Regularized Multi-Task Learning, KDD 2004: shared component
@@ -498,7 +498,7 @@ ideas:
     norm with a data-weighted constraint.'
   - 'Du et al., Adapting Auxiliary Losses Using Gradient Similarity, 2018 (https://arxiv.org/abs/1812.02224):
     auxiliary objectives can help or hurt depending on stage and weight.'
-  - 'docs/validation/results/2026-09-20-compartment-adapter-result.md: empirical per-label
+  - 'docs/validation/results/pooling-and-attention/2026-09-20-compartment-adapter-result.md: empirical per-label
     null ranges and the 0.0034 control-to-control macro spread, which bound what any
     single run can resolve.'
   novelty: Constrains the two existing classifiers through their functional interchangeability
@@ -628,10 +628,10 @@ ideas:
     against `data/folds/all_5fold_v3/{targets,studies}.csv`; script and output at
     `/tmp/medial-lateral-probe/` (pair-structure-probe.py, pair-structure.txt, collinearity.txt).
     Reproducible from those two CSVs on CPU.'
-  - 'docs/validation/results/2026-09-20-compartment-adapter-result.md: pooled shared
+  - 'docs/validation/results/pooling-and-attention/2026-09-20-compartment-adapter-result.md: pooled shared
     adapter rejected; meniscus family -0.0114 [-0.0200,-0.0030] and margin -0.0191
     [-0.0392,-0.0034] against control B; prevalence-domination of shared pooled parameters.'
-  - 'docs/validation/results/2026-09-14-meniscus-soft-coupling-result.md: isotropic
+  - 'docs/validation/results/labels-and-losses/2026-09-14-meniscus-soft-coupling-result.md: isotropic
     classifier coupling, macro -0.0015, meniscus -0.0041.'
   - 'autoresearch/campaigns/medial-lateral-transfer/ideas.yaml: `disease-evidence-compartment-routing`
     (queued) shares token features and gives each compartment its own free attention
@@ -783,7 +783,7 @@ ideas:
   - 'New probe (this report): `/tmp/medial-lateral-probe/pair-structure.txt` and `collinearity.txt`,
     derived from the reference''s `fold_0/validation_predictions.csv` and `data/folds/all_5fold_v3/`;
     conditional AUCs, cross-AUCs, joint-group counts and margin AUCs quoted above.'
-  - 'docs/validation/results/2026-09-20-compartment-adapter-result.md: the diagnostic
+  - 'docs/validation/results/pooling-and-attention/2026-09-20-compartment-adapter-result.md: the diagnostic
     that failed was within-study compartment discrimination (margin -0.0191 [-0.0392,-0.0034]);
     this candidate acts on that mechanism directly instead of adding another shared
     route.'
@@ -945,17 +945,17 @@ ideas:
     linear detection at auxiliary weight 0.3, macro -0.00391 [-0.00809, +0.00032],
     diffuse trunk degradation. Both measured arms added capacity or task weight; neither
     restructured the pair''s own channels.'
-  - 'docs/research/medial-lateral-transfer.md#the-six-relevant-experiments: 1A/1B
+  - 'docs/research/geometry-and-views/medial-lateral-transfer.md#the-six-relevant-experiments: 1A/1B
     tied classifiers improved both meniscus targets (+0.002737, +0.003406) and the
     meniscus margin (0.980173 vs 0.972321); load-bearing structural sharing is the
     only historical arm with a positive family signal.'
-  - 'docs/validation/results/2026-09-20-compartment-adapter-result.md: pooled nonlinear
+  - 'docs/validation/results/pooling-and-attention/2026-09-20-compartment-adapter-result.md: pooled nonlinear
     adapter rejected, meniscus family -0.0114 [-0.0200, -0.0030]; evidence against
     adding pooled capacity, not against restructuring existing channels.'
   - 'New diagnostic recomputed on CPU from outputs/training/overnight-20260919T235434Z-8ol_1c30/runs/13-control-repeat/fold_0/validation_predictions.csv
     plus data/folds/all_5fold_v3/{studies,targets}.csv: cross-compartment AUCs, rank
     correlations and the level/difference channel AUCs quoted in the opportunity.'
-  - 'docs/research/medial-lateral-transfer.md#historical-implementation-and-reproduction:
+  - 'docs/research/geometry-and-views/medial-lateral-transfer.md#historical-implementation-and-reproduction:
     1C''s additive sign decomposition on attention scores; this proposal acts on output
     channels, keeps independent attention and does not tie the two families together.'
   novelty: 'No prior campaign or historical arm changed the pair''s output parameterization;
@@ -1094,18 +1094,18 @@ ideas:
     distinction structurally dependent on attention quality, which is the mechanism''s
     main risk.'
   precedents:
-  - 'docs/research/knee-side-and-location.md#5-separate-attention-inputs-from-pooled-appearance:
+  - 'docs/research/geometry-and-views/knee-side-and-location.md#5-separate-attention-inputs-from-pooled-appearance:
     attention over appearance+position+side while pooling appearance for the classifier.
     Recorded as unimplemented; approach 1 (side embedding) was implemented and retired,
     the rest were never built.'
-  - 'docs/research/medial-lateral-transfer.md#the-six-relevant-experiments and #historical-implementation-and-reproduction:
+  - 'docs/research/geometry-and-views/medial-lateral-transfer.md#the-six-relevant-experiments and #historical-implementation-and-reproduction:
     1A/1B shared one 256-d classifier per family with independent attention and biases;
     meniscus +0.002737/+0.003406 and margin 0.980173 vs 0.972321, macro +0.000217,
     public 0.930/0.925.'
-  - 'docs/validation/results/2026-09-14-meniscus-soft-coupling-result.md: isotropic
+  - 'docs/validation/results/labels-and-losses/2026-09-14-meniscus-soft-coupling-result.md: isotropic
     classifier-distance coupling at 0.1, macro -0.001492, meniscus -0.004085; retired.
     This proposal uses a hard tie plus a changed value, not a coupling coefficient.'
-  - 'docs/validation/results/2026-09-20-compartment-adapter-result.md: pooled nonlinear
+  - 'docs/validation/results/pooling-and-attention/2026-09-20-compartment-adapter-result.md: pooled nonlinear
     adapter rejected; adding pooled capacity is not the route, removing pooled shortcut
     content is untested.'
   - 'New diagnostic from the reference predictions (sha d8de136...): meniscus cross
@@ -1266,7 +1266,7 @@ ideas:
   - 'Historical 1A/1B tied meniscus and OA classifiers (docs/modeling/retired-side-and-compartment-variants.md):
     tied parameters, never constrained representation geometry; archived recipe, not
     a control.'
-  - 'Rejected pooled meniscus adapter, outputs/training/compartment-control (docs/validation/results/2026-09-20-compartment-adapter-result.md):
+  - 'Rejected pooled meniscus adapter, outputs/training/compartment-control (docs/validation/results/pooling-and-attention/2026-09-20-compartment-adapter-result.md):
     a shared nonlinear transform of pooled features at inference. Not restored here
     - this proposal adds no inference-time path and no shared transform.'
   - 'Probe: this report''s cross-AUC, co-occurrence and in-sample two-logit refit
@@ -1536,7 +1536,7 @@ ideas:
     \ only from about 0.31 to 0.23.\n- **Attention is still stride-32.** The shared\
     \ evidence is tent-pooled back onto stride-32 anchors and weighted by the existing\
     \ stride-32 attention. The OA medial/lateral attention overlap of 0.64\u20130.70\
-    \ still limits OA separation.\n\nOwnership: `docs/backlog/big-bets.md#intermediate-stride-16-feature-fusion`\
+    \ still limits OA separation.\n\nOwnership: `docs/backlog/untried-ideas.md#views-and-fields`\
     \ is a generic backlog plan that changes the token grid for all labels, not a\
     \ campaign. This arm is a compartment-only scalar evidence path confined to the\
     \ campaign's editable directories, so it does not take over or pre-empt that bet.\
@@ -1594,7 +1594,7 @@ ideas:
     (inconclusive): both operate on already-pooled vectors or logits, which the previous
     report''s in-sample two-logit refit bounds near +0.001 macro-equivalent. This
     arm changes what is pooled and where attention looks, so that bound does not apply.'
-  - 'Rejected pooled meniscus adapter, outputs/training/compartment-control (docs/validation/results/2026-09-20-compartment-adapter-result.md):
+  - 'Rejected pooled meniscus adapter, outputs/training/compartment-control (docs/validation/results/pooling-and-attention/2026-09-20-compartment-adapter-result.md):
     a shared nonlinear transform of pooled features feeding unchanged independent
     heads. Materially different and not restored - here the transform acts on tokens
     before attention, removes rather than adds independent compartment pathways, and
@@ -2125,7 +2125,7 @@ ideas:
     I have left anatomy-supervised-compartment-evidence-split proposed, not admitted,
     and not parked. Its gate is trained to predict "medial of the knee midline" per
     token from image content. At inference that is image-based medial/lateral (side)
-    inference. docs/research/knee-side-and-location.md:205-206 records image-based
+    inference. docs/research/geometry-and-views/knee-side-and-location.md:205-206 records image-based
     side inference as deferred by user instruction. The campaign''s general permission
     for "anatomical assignment" does not clearly override a specific user deferral,
     and the researcher flagged the same issue. It also reuses the plumbing of the
@@ -2176,7 +2176,7 @@ ideas:
     bilateral anatomy, not within-joint compartments.'
   - 'Barman et al., DeepSymNet, ISBI 2019 (IEEE 8759475): explicit hemispheric asymmetry
     features for stroke on CTA. Evidence about the mechanism only.'
-  - 'docs/research/knee-side-and-location.md approach 8 (relational module across
+  - 'docs/research/geometry-and-views/knee-side-and-location.md approach 8 (relational module across
     regions): the unimplemented conceptual ancestor. This proposal is the cheapest
     concrete relational form.'
   - 'mediolateral-mirror-exchange-consistency (running): it mirrors positional anchors
@@ -2309,7 +2309,7 @@ ideas:
     invalid-pose repair are reusable. It failed because model forward read keys absent
     from engine MODEL_BATCH_KEYS. This design reads them only in training_step.'
   - 'Tack et al. 2021, Front. Bioeng. Biotechnol. 10.3389/fbioe.2021.747217 (cited
-    in docs/research/medial-lateral-transfer.md): an auxiliary localization objective
+    in docs/research/geometry-and-views/medial-lateral-transfer.md): an auxiliary localization objective
     improved meniscus classification on OAI without inference-time localization.'
   - "Knee-side embedding (retired; the checkpoint ignored side given as an input)\
     \ and per-target Gaussian coordinate attention priors (\u22120.002177, retired).\
@@ -2623,7 +2623,7 @@ ideas:
     \ across 26 runs, so the weakness is structural, not luck in the reference run.\
     \ The fix works in the forward path. It adds four zero-initialised scalars, and\
     \ at \u03BA=0 it matches control B exactly. It needs no new batch keys or metadata.\n\
-    \nOn scope, I judge that the user's deferral of image-based side inference (docs/research/knee-side-and-location.md:205-206)\
+    \nOn scope, I judge that the user's deferral of image-based side inference (docs/research/geometry-and-views/knee-side-and-location.md:205-206)\
     \ does not block it:\n- It has no side classifier, no side supervision and no\
     \ knee-side labels.\n- It sharpens an orientation the model's own compartment\
     \ attention already encodes. That orientation is a medial-minus-lateral displacement\
@@ -2679,7 +2679,7 @@ ideas:
     \ both) stay representable because the private path is unchanged. The other eight\
     \ targets keep their forward path, and the output stays 12 logits."
   precedents:
-  - "docs/backlog/big-bets.md#intermediate-stride-16-feature-fusion: an unstarted,\
+  - "docs/backlog/untried-ideas.md#views-and-fields: an unstarted,\
     \ generic stride-16 fusion that replaces all labels' tokens with a 14\xD714 grid.\
     \ Ownership overlaps with this proposal."
   - "shared-family-level-channel-20260921T025958Z-2a6d8b47: the zero-gated shared\
@@ -3086,7 +3086,7 @@ ideas:
   - 'Chen et al., NeurIPS 2020, GradDrop (arXiv:2010.06808): masks conflicting task
     gradients at the activation where tasks join. This proposal masks by anatomical
     ownership instead of sign consistency.'
-  - 'PCGrad (Yu et al. 2020; docs/research/medial-lateral-transfer.md#optimization-interference):
+  - 'PCGrad (Yu et al. 2020; docs/research/geometry-and-views/medial-lateral-transfer.md#optimization-interference):
     per-task backward passes are unaffordable here, and the note asks for measured
     conflict first. This refill measured the value-path leak and the head cosines
     (scratch/credit_assignment.py, .json).'
@@ -3664,7 +3664,7 @@ ideas:
   - autoresearch/anatomical-attention.md
   - autoresearch/checkpoint-closure.md
   - docs/modeling/retired-side-and-compartment-variants.md
-  - docs/research/knee-side-and-location.md
+  - docs/research/geometry-and-views/knee-side-and-location.md
   novelty: Explicit learned side-location interaction on the anatomical incumbent,
     not the retired standalone side embedding or another fixed bias-width sweep. Side
     encoding is now explicitly authorized as a compartment-improvement mechanism.
@@ -4158,7 +4158,7 @@ ideas:
     OA. This proposal imposes no constraint.'
   novelty: This is the first mechanism in the campaign that gives the compartment
     readouts anatomical provenance. Earlier arms changed attention, tied or recombined
-    readouts, or added penalties. It is not approach 3 or 5 in docs/research/knee-side-and-location.md,
+    readouts, or added penalties. It is not approach 3 or 5 in docs/research/geometry-and-views/knee-side-and-location.md,
     and it is not a strength or width variant.
   coverage: 'Covers all four compartment targets, all planes and known-side studies.
     Unknown-side studies are exactly unchanged. The other eight targets keep an identical

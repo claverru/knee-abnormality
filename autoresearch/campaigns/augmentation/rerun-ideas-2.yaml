@@ -29,7 +29,7 @@ ideas:
   - 'aligned-image-mixup (this campaign, experiment aligned-image-mixup-20260925T225700Z-2dc20772) trained all ten epochs with the mechanism active (23-25% of studies mixed per epoch) and a x1 in-training validation peak of 0.89622 against the control''s 0.89033, then crashed at checkpoint reload: KneeAbnormalityModel.__init__() missing the required image_mixup argument (checkpoint.py:102). Rerun the same mechanism and loss; the only change is the constructor fix already used by token-feature-mixup.'
   - 'RSNA 2024 lumbar 2nd place (github.com/brendanartley/RSNA-2024-Competition, cfg_stage2_s2_sp1.py): image MixUp p 0.3, alpha 1, with CutMix and manifold MixUp; 3rd and 6th place also used MixUp. Not isolated.'
   - 'Panfilov et al. (arXiv:1908.04126): MixUp improved cross-scanner knee cartilage segmentation (femoral 0.791 -> 0.819, tibial 0.746 -> 0.802).'
-  - 'Public EfficientNet-B0 in this competition: MixUp 0.7914 -> 0.7937, judged noise (docs/research/public-research.md).'
+  - 'Public EfficientNet-B0 in this competition: MixUp 0.7914 -> 0.7937, judged noise (docs/research/competition-and-prior-art/public-research.md).'
   novelty: First MixUp here; alignment by knee side, slot and depth replaces the naive mixing that the anatomical geometry forbids.
   coverage: 30% of training studies per batch; all labels.
   exploitation: Variants B and A share its pairing and loss and move only the mixing point, so the three results rank where mixing helps.

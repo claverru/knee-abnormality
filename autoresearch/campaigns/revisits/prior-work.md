@@ -2,7 +2,7 @@
 
 Where the seeds come from and what ResNet-18 has already measured. Every row is one run and weak
 evidence. Re-scored Δ is ×4 macro AUC on `rebuild_state_v2` with the 80% paired report-group
-interval ([campaign re-scoring](../../../docs/validation/results/2026-09-28-campaign-rescoring.md)).
+interval ([campaign re-scoring](../../../docs/validation/results/validation-and-ensembles/2026-09-28-campaign-rescoring.md)).
 
 ## Seed precedents
 
@@ -20,7 +20,7 @@ interval ([campaign re-scoring](../../../docs/validation/results/2026-09-28-camp
 | No contrast mixing | `rn18-native-contrast-preservation` | ResNet-18 | +0.0006 | (already v2) |
 | GIN replaced by a 13× weaker augmentation | `site-acquisition-mixture-contrast-final` | ResNet-18, sites-out split | −0.0015 | (already v2) |
 | Stochastic depth 0.1 | `rexnet-stochastic-depth-20260926T045526Z-1de7a03e` | ReXNet-200 | +0.0011 | +0.0006 [−0.0013, +0.0025] |
-| Plane/contrast feature adapters | none | — | — | [backlog](../../../docs/backlog/small-changes.md#planecontrast-specific-feature-adapters) |
+| Plane/contrast feature adapters | none | — | — | [backlog](../../../docs/backlog/untried-ideas.md#pooling-and-the-attention-head) |
 | Plane-conditioned BatchNorm | none | — | — | queued in [radimagenet-rn18](../radimagenet-rn18/ideas.yaml) |
 
 Frozen sources for the ported seeds are under `outputs/autoresearch/<campaign>/experiments/<run>/source/`.
@@ -43,7 +43,7 @@ Do not propose these again at the same value
   adjacent residuals (−0.00005), stride-16 tokens (−0.0023), full-width projection (−0.0012).
 - **Head and loss:** asymmetric focal loss (−0.0024), 101-bin head (−0.0139).
 - **Attention temperature:** τ 0.9–1.0 beats 0.75 at inference
-  ([result](../../../docs/validation/results/2026-09-29-rn18-attention-temperature.md)); the campaign
+  ([result](../../../docs/validation/results/pooling-and-attention/2026-09-29-rn18-attention-temperature.md)); the campaign
   scores at τ 1.
 
 ## Dropped from the list

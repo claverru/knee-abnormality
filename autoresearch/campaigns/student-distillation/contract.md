@@ -138,7 +138,7 @@ differences in adjacent columns.
 
 **Confirmed by the user on 2026-10-10.** Applied by the runtime after every run, without a
 manual step: the three numbers are the `acceptance` block of [the definition](campaign.yaml)
-([campaign rule](../../protocol.md#campaign-acceptance-rule)). A run is adopted when all three hold, candidate minus
+([campaign rule](../../protocol.md#adoption-policy)). A run is adopted when all three hold, candidate minus
 incumbent:
 
 | Check | Number |

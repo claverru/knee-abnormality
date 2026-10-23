@@ -2,10 +2,10 @@
 
 The 2026-09-22 exhaustive scan found 33 training series that repeat another series of the same
 study pixel for pixel, in 9 of 4,407 studies. It also found one pair of studies that share all five series. No
-series repeats slices within itself. The same-study filter is queued in the
-[overnight queue](../backlog/overnight.md#next-queue). On 2026-09-22 the user set aside
+series repeats slices within itself. The same-study exact-copy filter was later implemented (its deletions are audited in the
+[deletion-identity census](series-filtering-census/implemented-rule.md#deletion-identity-census-2026-10-05)). On 2026-09-22 the user set aside
 excluding the cross-study copy from training labels; it is noted under
-[training-label exclusions](../backlog/endgame.md#training-label-exclusions). Folds and labels
+[training-label exclusions](../backlog/untried-ideas.md#supervision-and-labels). Folds and labels
 are unchanged.
 
 ## Detection
@@ -36,7 +36,7 @@ Reproduction (CPU only, fresh output directory; `--studies N` limits the scan to
 studies of each split for a trial):
 
 ```bash
-rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.audit_repeated_series --output-dir outputs/analysis/repeated-series-new
+env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.audit_repeated_series --output-dir outputs/analysis/repeated-series-new
 ```
 
 ## Same-study repeats
@@ -83,7 +83,7 @@ The filter has to run per study at inference, so it is simulated with the
 | Extra frame reads per study, mean (max) | 0.42 (12) |
 
 For scale: at x4, prediction already reads about 180 headers and decodes 149 frames per study, at
-0.82 s per study cold on Kaggle ([profile](../inference/2026-09-18-kaggle-x4-profile-after-loading-changes.md#cold-loading-stages-100-studies)).
+0.82 s per study cold on Kaggle ([profile](../inference/profiling/2026-09-18-kaggle-x4-profile-after-loading-changes.md#cold-loading-stages-100-studies)).
 The check therefore adds about 0.3% to frame reads. This is an I/O-count estimate that has not been timed on Kaggle.
 
 Reproduction (CPU only, fresh output directory; ground truth is the audit's
@@ -91,7 +91,7 @@ Reproduction (CPU only, fresh output directory; ground truth is the audit's
 thread, so its indexing time is not the threaded inference loader's, and its frame-read timings are local:
 
 ```bash
-rtk proxy env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.simulate_online_series_dedup --output-dir outputs/analysis/online-series-dedup-new
+env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.simulate_online_series_dedup --output-dir outputs/analysis/online-series-dedup-new
 ```
 
 The exhaustive scan found every same-study relation to be all-or-nothing, so one frame decides

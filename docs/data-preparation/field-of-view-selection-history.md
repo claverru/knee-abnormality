@@ -12,8 +12,8 @@ Baseline3 later selected **0.67 × 0.67 mm**, covering
 0.80 mm previews remain useful evidence about the cost of an 85.12 mm crop,
 but they do not validate 0.67 mm as optimal.
 
-The completed [140-mm crop comparison](../validation/results/2026-09-12-140-mm-crop-result.md)
-subsequently selected **0.625 × 0.625 mm** at 224 pixels, the current default.
+The completed [140-mm crop comparison](../validation/results/crops-and-views/2026-09-12-140-mm-crop-result.md)
+subsequently selected **0.625 × 0.625 mm** at 224 pixels (140 mm), the default until 2026-10-01, when the 120 mm field (0.5357 mm) and later per-type views replaced it (see [current preparation](current-preparation.md)).
 It improved local and public AUC over 150.08 mm. The earlier proposal to expand
 from 0.67 to 0.72 mm (161.28 mm at 224 pixels) is retired; 0.72 mm itself was
 not evaluated, and the crop result does not isolate coverage from pixel spacing.

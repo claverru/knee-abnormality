@@ -19,7 +19,7 @@ ideas:
   precedents:
   - 'gin-intensity-augmentation (this campaign) was parked untested: a runner defect put overrides: {} into every generated training config, the launch gate failed, and the crash used its one repair. The runner now strips the key (supervisor/results.py config_result); the mechanism is unchanged and was never measured.'
   - 'Ouyang et al., Causality-inspired single-source domain generalization (arXiv:2111.12525): GIN alone, on top of affine, elastic, brightness, contrast, gamma and noise, raised cross-centre prostate MRI Dice 56.6 -> 65.1 and cardiac bSSFP -> LGE 76.0 -> 83.8; 2/4/8/16 layers gave 84.3/86.0/85.7/79.2. Segmentation, not classification.'
-  - 'Broader contrast 0.80-1.20 lost -0.0033/-0.0067 and gamma 0.70-1.30 -0.0007 (docs/validation/results/2026-09-20-overnight-hyperparameter-results.md).'
+  - 'Broader contrast 0.80-1.20 lost -0.0033/-0.0067 and gamma 0.70-1.30 -0.0007 (docs/validation/results/campaigns-and-queues/2026-09-20-overnight-hyperparameter-results.md).'
   novelty: First non-monotonic, spatially local intensity remapping in this project; existing intensity augmentation is a global gamma and a global contrast.
   coverage: Every plane and contrast; all labels.
   exploitation: If it helps, a monotone Bezier variant tests whether contrast inversion matters; if it hurts fluid-sensitive labels, that variant is the retry.

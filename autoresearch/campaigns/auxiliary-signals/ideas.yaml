@@ -13,7 +13,7 @@ ideas:
     Nothing else changes.
   precedents:
   - 'Target set 3.1 heads at 0.1: +0.00105 [95% -0.0012, +0.0035], public 0.940 vs
-    0.938 (docs/validation/results/2026-09-25-report-attribute-heads.md).'
+    0.938 (docs/validation/results/labels-and-losses/2026-09-25-report-attribute-heads.md).'
   - 'Coefficient reasoning and failure signs: docs/modeling/report-attribute-heads.md#coefficient.'
   novelty: First measurement of the attribute coefficient.
   coverage: All studies with attribute targets; all labels.
@@ -90,7 +90,7 @@ ideas:
     0.8; log the kept question list.'
   precedents:
   - 'Reliability weights and gates: docs/modeling/report-attribute-heads.md#targets.'
-  - 'Known weak targets and audits: docs/ongoing/report-attribute-extraction.md.'
+  - 'Known weak targets and audits: docs/public-labels/jevk5-report-attribute-extraction.md.'
   - Dropping osteophytes and Hoffa for noise was part of the v3 -> v3.1 change (+0.0003
     vs v3, bundled).
   novelty: First question selection by a fixed reliability rule instead of by hand.
@@ -139,7 +139,7 @@ ideas:
     true; log the removed options and the mean weight lost per question.'
   precedents:
   - 'v3 analysis: Spanish not-mentioned answers, order flips between same-meaning
-    options (docs/ongoing/report-attribute-extraction.md#v3-full-run-analysis-2026-09-25).'
+    options (docs/public-labels/jevk5-report-attribute-extraction.md#v3-full-run-analysis-2026-09-25).'
   - 'Host: silence is an unobserved label (docs/metadata/official-label-criteria.md).'
   - Merging same-meaning options was part of the v3 -> v3.1 change (+0.0003 vs v3,
     bundled).
@@ -180,7 +180,7 @@ ideas:
     drop the options from the heads. Completeness options stay. Setting trainer.report_attribute_targets.drop_hedged_options:
     true; log the removed options and the mean weight lost per question.'
   precedents:
-  - 'Question-set design: hedging is an option (docs/ongoing/report-attribute-extraction.md#question-set-design).'
+  - 'Question-set design: hedging is an option (docs/public-labels/jevk5-report-attribute-extraction.md#question-set-design).'
   - 'Dead options in the v3 analysis: synovitis possible (9 answers).'
   novelty: First treatment of hedged answers as unobserved.
   coverage: 10 questions; small mass, concentrated in the ambiguous studies where
@@ -391,7 +391,7 @@ ideas:
   - '[Cached host criteria](/home/claudio/src/knee-abnormality/docs/metadata/official-label-criteria.md#label-description-discussion-733343-pinned-overview)
     specify high-grade cartilage loss and moderate/large fluid collections. Cartilage
     extent remains a separate requirement.'
-  - '[Extraction analysis](/home/claudio/src/knee-abnormality/docs/ongoing/report-attribute-extraction.md#v3-full-run-analysis-2026-09-25)
+  - '[Extraction analysis](/home/claudio/src/knee-abnormality/docs/public-labels/jevk5-report-attribute-extraction.md#v3-full-run-analysis-2026-09-25)
     documents low-grade discrepancies and mixed small-sample gold results. These auxiliary
     merges do not repair disease labels.'
   novelty: Introduces severity coarsening while conserving every option's probability
@@ -818,7 +818,7 @@ ideas:
   - '[Sealed manifest](/home/claudio/src/knee-abnormality/configs/labels/jevk5-report-attribute-targets-v3.1.json):
     raw-answer, question-set and target-table hashes matched during this review. The
     training-only audit used studies.csv with fold != 3.'
-  - '[Extraction analysis](/home/claudio/src/knee-abnormality/docs/ongoing/report-attribute-extraction.md#v3-full-run-analysis-2026-09-25)
+  - '[Extraction analysis](/home/claudio/src/knee-abnormality/docs/public-labels/jevk5-report-attribute-extraction.md#v3-full-run-analysis-2026-09-25)
     documents option-order bias and systematic mistakes. Agreement between orders
     therefore supports a deterministic hardening rule, but does not establish correctness.'
   - '[Target construction](/home/claudio/src/knee-abnormality/docs/modeling/report-attribute-heads.md#targets)
@@ -1138,7 +1138,7 @@ ideas:
   - 'Clark et al. (arXiv:1909.03683): a bias-only model during training, removed at
     test time.'
   - Vendor label associations (docs/metadata/vendor-label-associations.md) and the
-    v3 analysis of Spanish short reports (docs/ongoing/report-attribute-extraction.md).
+    v3 analysis of Spanish short reports (docs/public-labels/jevk5-report-attribute-extraction.md).
   - 'Noisy-labels campaign: prediction-memory correction rejected (autoresearch/campaigns/noisy-labels/findings.md);
     a different mechanism.'
   novelty: First label-noise model keyed on a report property.
@@ -1197,7 +1197,7 @@ ideas:
     diffusion tensor imaging data (NeuroImage 2017): per-site location and scale adjustment
     of features.'
   - Adopted scanner-confusion-detached-head and its public result (this campaign).
-  - 'Header availability at test time: bias_free.md.'
+  - 'Header availability at test time: docs/modeling/site-bias.md.'
   novelty: First mechanism that uses the scanner at inference, removing its feature
     shift rather than discouraging it.
   coverage: All studies in training, validation and inference; all labels.
@@ -1264,7 +1264,7 @@ ideas:
     -0.0011, +0.0019], largest biases on Synovitis and Effusion (this campaign).'
   - 'Clark et al. (arXiv:1909.03683): a bias-only model during training, removed at
     test time.'
-  - v3 analysis of Spanish short reports and not-mentioned answers (docs/ongoing/report-attribute-extraction.md#v3-full-run-analysis-2026-09-25).
+  - v3 analysis of Spanish short reports and not-mentioned answers (docs/public-labels/jevk5-report-attribute-extraction.md#v3-full-run-analysis-2026-09-25).
   novelty: First label-noise model keyed on how completely a report addressed the
     knee, measured from the permitted v3 answers.
   coverage: All training studies; largest expected effect on labels most often left
@@ -1295,7 +1295,7 @@ ideas:
   title: Training-only logit bias per scanner model (31 x 12) instead of per scanner
     group, dropped at validation and inference
   opportunity: 'On the fold-3 site-signature scorecard (minor-site logit shift against
-    label inflation, bias_free.md), the per-site bias removed the site prior without
+    label inflation, docs/modeling/site-bias.md), the per-site bias removed the site prior without
     disease cost (signature rho -0.52, Synovitis -0.35, Effusion +0.24, major-vendor-only
     delta +0.0005, local +0.00040), while the scanner-model confusion target had the
     purest signature (rho -0.59) but cost disease signal (major-vendor-only -0.0013).
@@ -1373,7 +1373,7 @@ ideas:
   precedents:
   - site-bias-product-of-experts and scanner-model-confusion-target results and sources
     (this campaign).
-  - 'Site-signature scorecard: bias_free.md.'
+  - 'Site-signature scorecard: docs/modeling/site-bias.md.'
   novelty: First combination of a label-prior bias and feature confusion on the site.
   coverage: All training studies; all labels.
   exploitation: If its signature beats both parents without the confusion target's

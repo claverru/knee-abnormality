@@ -13,8 +13,8 @@ ideas:
     every w_cq from the current w_c, reproducing the original predictions apart from summation
     order; missing types contribute zero. Image and token budgets unchanged.
   precedents:
-  - 'Spec: docs/backlog/small-changes.md#planecontrast-specific-readouts'
-  - 'Per-type contribution: docs/validation/results/2026-09-17-type-contribution.md'
+  - 'Spec: docs/backlog/untried-ideas.md#pooling-and-the-attention-head'
+  - 'Per-type contribution: docs/validation/results/pooling-and-attention/2026-09-17-type-contribution.md'
   novelty: First per-type readout; count normalization, gated attention and residual readouts were different changes.
   coverage: All labels.
   exploitation: Check missing-type studies and vendor strata in the diagnostics.

@@ -13,9 +13,9 @@ ideas:
       to all labels. Average pairs within each label before combining labels;
       retain BCE and define the ranking contribution when no pairs exist.
     precedents:
-      - docs/backlog/small-changes.md#ranking-aware-loss
-      - docs/research/auc_loss_approaches.md
-      - docs/research/per-label-losses.md#ranking-needs-usable-study-pairs
+      - docs/backlog/untried-ideas.md#pooling-and-the-attention-head
+      - docs/research/training-objectives/auc_loss_approaches.md
+      - docs/research/training-objectives/per-label-losses.md#ranking-needs-usable-study-pairs
     novelty: >-
       Adopts the existing untrained ranking-hybrid proposal into this campaign.
       The campaign owns its execution; the general backlog remains read-only
@@ -58,9 +58,9 @@ ideas:
       single shared focusing exponent. Retain the baseline class-balancing rule
       initially, and make the exact positive/negative soft-target extension explicit.
     precedents:
-      - docs/research/auc_loss_approaches.md
-      - docs/research/per-label-losses.md#trusted-motivation
-      - docs/research/per-label-losses.md#candidate-losses-and-extensions
+      - docs/research/training-objectives/auc_loss_approaches.md
+      - docs/research/training-objectives/per-label-losses.md#trusted-motivation
+      - docs/research/training-objectives/per-label-losses.md#candidate-losses-and-extensions
     novelty: >-
       A shared objective experiment, not the excluded per-label focal/ranking
       selection plan. The current main recipe uses BCE, with no focusing term.
@@ -98,9 +98,9 @@ ideas:
       rule. Keep targets soft and study exposure uniform. Choose one justified
       shared rule rather than a vector of label-specific coefficients.
     precedents:
-      - docs/backlog/small-changes.md#bce-weighting-and-study-sampling
-      - docs/research/auc_loss_approaches.md#weighting-and-sampling-design-space
-      - docs/validation/results/2026-09-19-balanced-bce-result.md
+      - docs/backlog/untried-ideas.md#supervision-and-labels
+      - docs/research/training-objectives/auc_loss_approaches.md#weighting-and-sampling-design-space
+      - docs/validation/results/labels-and-losses/2026-09-19-balanced-bce-result.md
     novelty: >-
       Imports only the unimplemented loss-weighting proposal, not the study or
       batch sampling alternatives. Different weights arise from the same formula
@@ -138,8 +138,8 @@ ideas:
       combination for all labels on a shared epoch or step schedule. Fit the whole
       schedule inside the original ten epochs; do not append a continuation.
     precedents:
-      - docs/research/per-label-losses.md#candidate-losses-and-extensions
-      - docs/research/auc_loss_approaches.md
+      - docs/research/training-objectives/per-label-losses.md#candidate-losses-and-extensions
+      - docs/research/training-objectives/auc_loss_approaches.md
       - autoresearch/campaigns/losses/seed-ideas.yaml
     novelty: >-
       Changes when the shared ranking term contributes, not which labels receive

@@ -277,7 +277,7 @@ Evidence:
 - outputs/autoresearch/oblique-x4/jobs/researcher-20260922T145144Z-bef067e9/scratch/evidence/pair_decomposition.{py,txt}
 - outputs/autoresearch/oblique-x4/jobs/researcher-20260922T145144Z-bef067e9/scratch/evidence/shift_by_kind.txt (Coronal0 OA and medial-meniscus logits 0.27 lower than k_05)
 - outputs/autoresearch/oblique-x4/jobs/researcher-20260922T145144Z-bef067e9/scratch/evidence/ax1_detail.txt
-- docs/validation/results/2026-09-16-label-private-crops-result.md (zero-init FiLM stayed near zero)
+- docs/validation/results/crops-and-views/2026-09-16-label-private-crops-result.md (zero-init FiLM stayed near zero)
 
 ## completion-20260922T151919Z-f4520165
 

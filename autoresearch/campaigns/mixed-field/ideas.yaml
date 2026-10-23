@@ -12,7 +12,7 @@ ideas:
     and prediction; nothing else changes.
   precedents:
   - 150 to 140 mm at 224 px gained +0.003 local and +0.007 public on ReXNet-200, confounded
-    with the sharper spacing (docs/research/input-resolution.md).
+    with the sharper spacing (docs/research/geometry-and-views/input-resolution.md).
   - Learned zoom read every slice at 0.875 mm and lost 0.0228, almost all on detail
     labels; effusion gained 0.006 (docs/history/crop-selection-investigation.md).
   novelty: First field change on ResNet-18, rebuild_state_v2 and all_5fold_scanner_v2.
@@ -56,7 +56,7 @@ ideas:
   - 'Per-label crops, 112 mm at 0.5 mm on 75% of slices: -0.0011 overall, ACL +0.0111,
     lateral meniscus -0.0102, fracture -0.0085 (docs/history/crop-selection-investigation.md).'
   - 130 mm at 224 px tied overall and lost on MCL, Baker's cyst, effusion and medial
-    meniscus (docs/research/input-resolution.md).
+    meniscus (docs/research/geometry-and-views/input-resolution.md).
   novelty: Resolution finer than 0.625 mm on every slice has never been run at any
     field.
   coverage: All studies and labels; expected to help ACL, menisci and cartilage labels
@@ -104,7 +104,7 @@ ideas:
   precedents:
   - Scale augmentation by resampling is standard in multi-scale training of detectors;
     here the wider draws add real anatomy instead of padding.
-  - 'docs/research/input-resolution.md: the stored field of view is 160 mm at the
+  - 'docs/research/geometry-and-views/input-resolution.md: the stored field of view is 160 mm at the
     median, so the ring holds real pixels in about half the series.'
   novelty: No run has varied the decoded field during training.
   coverage: All studies and labels; inference inputs are unchanged.
@@ -194,7 +194,7 @@ ideas:
   precedents:
   - '0.5 mm crops: ACL +0.0111, synovitis +0.0077, medial OA +0.0057 (docs/history/crop-selection-investigation.md).'
   - 'What 120 mm cuts, measured 2026-10-01: the central joint stays inside; more than
-    20 mm of popliteal tissue is cut in 34% of sagittal series (docs/research/input-resolution.md#what-a-narrow-field-cuts).'
+    20 mm of popliteal tissue is cut in 34% of sagittal series (docs/research/geometry-and-views/input-resolution.md#what-a-narrow-field-cuts).'
   novelty: No run has paired a field narrower than 140 mm with a wider one.
   coverage: All studies and labels; slices decoded at 120 mm carry no periphery, so
     Baker's cyst, MCL and fracture rest on the 160 mm slices of each series.
@@ -240,7 +240,7 @@ ideas:
   - 'revisits campaign, plane-contrast-readouts on ResNet-18: +0.0009, 80% [+0.0001,
     +0.0017], accepted; dense-plane-readouts: -0.0052 (prior-work.md, Precedent table).'
   - 'Multi-scale review: a secondary branch counts only with its own readout path
-    (docs/research/multiscale-features-knee-mri.md).'
+    (docs/research/geometry-and-views/multiscale-features-knee-mri.md).'
   novelty: Readout weights split by field of view, not by plane or contrast.
   coverage: All studies and labels.
   exploitation: The divergence of each w_cf from its initialization per epoch and
@@ -463,8 +463,8 @@ ideas:
     in the joint pool with the field embedding; the other wide tokens are dropped.
   precedents:
   - 'Multi-scale review: concatenation and mean fusion ignored the fine-only signal,
-    per-location fusion recovered it (docs/research/multiscale-features-knee-mri.md).'
-  - GLNet-style global and local branches fuse feature maps by position (docs/research/learned-crop-selection.md).
+    per-location fusion recovered it (docs/research/geometry-and-views/multiscale-features-knee-mri.md).'
+  - GLNet-style global and local branches fuse feature maps by position (docs/research/geometry-and-views/learned-crop-selection.md).
   novelty: Position-wise fusion of two fields of one slice; no earlier run registered
     two views.
   coverage: All studies and labels, every slice at both fields.
@@ -510,7 +510,7 @@ ideas:
     size the batch carries. No other change to training behaviour.'
   precedents:
   - 150 to 140 mm at 224 px gained +0.003 local and +0.007 public on ReXNet-200, confounded
-    with the sharper spacing (docs/research/input-resolution.md).
+    with the sharper spacing (docs/research/geometry-and-views/input-resolution.md).
   - Learned zoom read every slice at 0.875 mm and lost 0.0228, almost all on detail
     labels; effusion gained 0.006 (docs/history/crop-selection-investigation.md).
   - 'field-160-single: both attempts blocked on the activation-signature conflict;
@@ -575,7 +575,7 @@ ideas:
   - 'Single-plane inference on the ReXNet control (older split and labels): axial
     alone loses 0.15-0.22 on the menisci and 0.084 on ACL but only 0.006 on effusion
     and 0.001 on Baker''s cyst; synovitis loses 0.017 from axial or sagittal alone
-    (docs/validation/results/2026-09-27-single-plane-inference.md).'
+    (docs/validation/results/pooling-and-attention/2026-09-27-single-plane-inference.md).'
   novelty: Unequal field shares that differ by plane; the earlier mixes split every
     series evenly.
   coverage: All studies and labels. Coronal and most sagittal slices keep full 120
@@ -630,7 +630,7 @@ ideas:
     +0.0011 ([-0.0003, +0.0024]), field-160-single-logged -0.0034, mixed-field-140-160
     -0.0013; 120 against 160 directly +0.0046 (95% [+0.0016, +0.0076]), outputs/analysis/m/mixed-field-120-vs-160.'
   - 'Label reliance by series type: outputs/analysis/t/type-importance-20260917/label_type_importance.csv
-    (docs/validation/results/2026-09-17-plane-contrast-importance.md); older labels
+    (docs/validation/results/pooling-and-attention/2026-09-17-plane-contrast-importance.md); older labels
     and backbone, indicative only.'
   - 'Acquired resolution by contrast: outputs/analysis/i/input-resolution-research-20260915/acquisition/series_acquisition.parquet
     (23,173 series): finer-axis resolution at or above 0.5 mm in 50% of series, at

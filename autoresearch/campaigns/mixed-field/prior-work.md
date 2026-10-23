@@ -1,7 +1,7 @@
 # Mixed-field prior work
 
 Field, resolution and multi-stream evidence the seeds build on. Sources:
-[input resolution](../../../docs/research/input-resolution.md),
+[input resolution](../../../docs/research/geometry-and-views/input-resolution.md),
 [crop-selection investigation](../../../docs/history/crop-selection-investigation.md),
 [plane-specific backbones](../../../docs/history/plane-backbones.md), the
 [RadImageNet ResNet-18 campaign](../radimagenet-rn18/findings.md) and the `revisits` campaign
@@ -31,7 +31,7 @@ run's own control and are not comparable across rows.
 ## Geometry
 
 All from the 300-series sample of
-[input resolution](../../../docs/research/input-resolution.md#field-of-view-and-joint-position)
+[input resolution](../../../docs/research/geometry-and-views/input-resolution.md#field-of-view-and-joint-position)
 (middle slice, about 97 series per plane).
 
 - **Stored images:** field of view median 160 mm (p5 140), pixel median 0.31 mm, about 2×
@@ -45,7 +45,7 @@ All from the 300-series sample of
   | Coronal | 49% | 25% | 9% | 1% | 0% |
   | Axial | 59% | 29% | 16% | 10% | 6% |
 - **What 120 mm cuts**
-  ([measured 2026-10-01](../../../docs/research/input-resolution.md#what-a-narrow-field-cuts)):
+  ([measured 2026-10-01](../../../docs/research/geometry-and-views/input-resolution.md#what-a-narrow-field-cuts)):
   the condyles, plateau, menisci, cruciates and patellar cartilage stay inside. The periphery does
   not: more than 20 mm of popliteal tissue is cut in 34% of sagittal series (1% at 140 mm), more
   than 10 mm on a coronal side in 30% (5–6%), and less than 40 mm of tibia remains below the joint

@@ -337,7 +337,7 @@ ideas:
     is today. The scale embedding of the view stays.'
   precedents:
   - 'near-misses #6, side-normalized 3D position in place of 1D and 2D, computed centre,
-    ReXNet recipe: +0.0008 hard, -0.0006 soft, PF OA +0.0061; rejected (docs/validation/results/2026-09-25-near-misses-campaign.md;
+    ReXNet recipe: +0.0008 hard, -0.0006 soft, PF OA +0.0061; rejected (docs/validation/results/campaigns-and-queues/2026-09-25-near-misses-campaign.md;
     mechanism in autoresearch/campaigns/near-misses/seed-ideas-2.yaml, whose branches
     and fallbacks this seed keeps).'
   - 'near-misses #13, the same with each slice''s normal added: -0.0017 hard, +0.0011
@@ -874,7 +874,7 @@ ideas:
     public score without it); it used the computed centre as a fixed input and raw
     rather than side-normalized coordinates.
   - 'near-misses #6, side-normalized 3D position in place of 1D and 2D, computed centre,
-    ReXNet recipe: +0.0008 hard, -0.0006 soft, PF OA +0.0061; rejected (docs/validation/results/2026-09-25-near-misses-campaign.md).'
+    ReXNet recipe: +0.0008 hard, -0.0006 soft, PF OA +0.0061; rejected (docs/validation/results/campaigns-and-queues/2026-09-25-near-misses-campaign.md).'
   novelty: First run with the side-normalized 3D position from a learned centre beside
     the 1D and 2D embeddings; completes the two-by-two with learned-centre-fit and
     knee-frame-3d-position.
@@ -951,7 +951,7 @@ ideas:
   precedents:
   - 'revisits, ema-0999-buffer-average (RadImageNet ResNet-18 recipe, existing option,
     BatchNorm statistics averaged with the weights, no refresh): -0.0004 at decay
-    0.999 and -0.0032 at 0.9995, both rejected (docs/validation/results/2026-10-01-revisits-campaign.md).
+    0.999 and -0.0032 at 0.9995, both rejected (docs/validation/results/campaigns-and-queues/2026-10-01-revisits-campaign.md).
     The four earlier EMA runs with a BatchNorm refresh were invalid on runtime; no
     refresh here.'
   - 'src/knee_abnormality/training/lightning.py: on_train_batch_end, validation_step,
@@ -1026,7 +1026,7 @@ ideas:
     outputs/autoresearch/learnable-views/experiments/knee-frame-3d-position-20261002T204955Z-1592c25c/source,
     modeling/spatial_tokens.py and modeling/model.py.'
   - 'near-misses #6, side-normalized 3D position in place of 1D and 2D, computed centre,
-    ReXNet recipe: +0.0008 hard, -0.0006 soft, PF OA +0.0061; rejected (docs/validation/results/2026-09-25-near-misses-campaign.md).'
+    ReXNet recipe: +0.0008 hard, -0.0006 soft, PF OA +0.0061; rejected (docs/validation/results/campaigns-and-queues/2026-09-25-near-misses-campaign.md).'
   - 'near-misses #13, the same with each slice''s normal added: -0.0017 hard, +0.0011
     soft, PF OA +0.0156.'
   - The September champion's additive 3D embedding on raw centred coordinates was
@@ -3648,7 +3648,7 @@ ideas:
   - 'two-views-every-type, sagittal-fluid-ordered-view-widths and sagittal-fluid-evidence-conditioned-routing
     (this campaign): two views per type with slices split 3 + 2; frozen sources under
     outputs/autoresearch/learnable-views/experiments.'
-  - 'smart-crops campaign (docs/validation/results/2026-10-02-smart-crops-campaign.md):
+  - 'smart-crops campaign (docs/validation/results/crops-and-views/2026-10-02-smart-crops-campaign.md):
     84 mm T1/PD and 93.33 mm fluid adopted over 120 mm, one run each.'
   novelty: First run that trains every size equally and reads the preferred sizes
     from the label bias instead of learning or hand-picking a width.
@@ -4059,7 +4059,7 @@ ideas:
     per view, A and B included. Nothing is learned but the label bias; data.learn_views
     stays empty. Everything else is the incumbent''s.'
   precedents:
-  - 'docs/validation/results/2026-10-02-smart-crops-campaign.md: 84/93 mm against
+  - 'docs/validation/results/crops-and-views/2026-10-02-smart-crops-campaign.md: 84/93 mm against
     120 mm, +0.0022; axial at 130 and 140 mm, no gain; known cost of the zoom on Baker''s
     cyst, -0.0040.'
   - 'two-views-sagittal-fluid and the sagittal-fluid pairs (this campaign): two views

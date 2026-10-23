@@ -14,7 +14,7 @@ without end. Training time 0.3 to 1.2 of the
 control's 2,617 s.
 
 The runtime change, the seed sources and the worktree were not merged; results and cross-checks are in
-[2026-10-17 crop views campaign](../../../docs/validation/results/2026-10-17-crop-views-campaign.md).
+[2026-10-17 crop views campaign](../../../docs/validation/results/crops-and-views/2026-10-17-crop-views-campaign.md).
 
 | Read when | Document |
 |---|---|

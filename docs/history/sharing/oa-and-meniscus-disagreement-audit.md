@@ -30,7 +30,7 @@ sampling and model architecture. Represent explicit low-grade disease separately
 from insufficient report evidence; do not turn unmentioned or unquantified OA
 into a negative. Keep the frozen validation metric and these predetermined
 diagnostics separate. No new labels, training run or architecture change was
-implemented as part of this audit. The later [transfer research](../../research/medial-lateral-transfer.md)
+implemented as part of this audit. The later [transfer research](../../research/geometry-and-views/medial-lateral-transfer.md)
 prioritizes weak meniscus classifier coupling as the first architecture experiment
 and retains OA supervision as a separate factor; no follow-up is scheduled here.
 
@@ -238,7 +238,7 @@ generalizing the supervision finding. If it persists, prepare an OA-only target
 candidate that explicitly separates low-grade disease from high-grade depth and
 extent, retaining unknown evidence as unknown and preserving gold overrides.
 Sigma-40 1C was the competitive control at the time. The later
-[reflection/sigma-40 result](../../validation/results/2026-09-14-reflection-sigma-40-result.md)
+[reflection/sigma-40 result](../../validation/results/sampling/2026-09-14-reflection-sigma-40-result.md)
 selects the independent-head model for current development.
 
 For the resulting training comparison, predeclare the full-fold metric, vendor
@@ -252,9 +252,9 @@ but cannot by themselves resolve an incorrectly specified clinical endpoint.
 ## Artifacts and reproduction
 
 The archived command (`f076a09:docs/history/sharing-sources/audit_sharing_disagreements.py.txt`)
-is preserved with [runtime requirements](../sharing-sources/README.md).
+is preserved with [runtime requirements](../sources/sharing/README.md).
 All evidence is under
-[`outputs/analysis/s/sharing-disagreement-20260914/`](../../../outputs/analysis/s/sharing-disagreement-20260914):
+`outputs/analysis/s/sharing-disagreement-20260914` (deleted):
 
 - `blind_reports.json`, `rubric.json`, `selection_key.json`: frozen sample,
   review instructions and separately stored unblinding information.
@@ -276,7 +276,7 @@ The historical preparation command, run in the pinned 1C checkout or archived
 analysis runtime, is:
 
 ```bash
-rtk proxy env CUDA_VISIBLE_DEVICES= POLARS_MAX_THREADS=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.audit_sharing_disagreements --phase prepare --output outputs/analysis/sharing-disagreement-new
+env CUDA_VISIBLE_DEVICES= POLARS_MAX_THREADS=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.audit_sharing_disagreements --phase prepare --output outputs/analysis/sharing-disagreement-new
 ```
 
 After recording all blinded annotations as `reviews.json`, summarize with the

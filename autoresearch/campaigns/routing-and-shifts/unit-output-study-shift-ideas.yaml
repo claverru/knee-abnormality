@@ -41,7 +41,7 @@ ideas:
   precedents:
   - 'autoresearch/campaigns/learnable-views: nothing per study was tried; shifts per series type looked
     random.'
-  - 'docs/ongoing/side-routed-heads.md: the frame per knee is read from the heads without any marking.'
+  - 'docs/modeling/side-routed-heads.md: the frame per knee is read from the heads without any marking.'
   novelty: First per-study crop placement predicted by the model.
   coverage: Every study in training and at inference; the locator sees every series.
   exploitation: 'Read both multipliers, the per-target deltas, and the logged delta per axis: its
@@ -110,7 +110,7 @@ ideas:
     There is no common point and no projection through the patient maps. Trained by the target loss
     through the sampling grid at the head learning rate.'
   precedents:
-  - 'docs/ongoing/side-routed-heads.md, inter-series motion: 99% of same-plane pairs move under 2.7
+  - 'docs/modeling/side-routed-heads.md, inter-series motion: 99% of same-plane pairs move under 2.7
     mm.'
   novelty: Per-study, per-view placement; the pair with the one-point seed says whether tying the
     planes together matters.

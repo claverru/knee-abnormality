@@ -1,7 +1,7 @@
 # Prior work for the student-distillation campaign
 
 The summary the researcher checks proposals against. The measurements are in
-[two-family out-of-fold distillation](../../../docs/validation/results/2026-10-04-two-family-oof-distillation.md)
+[two-family out-of-fold distillation](../../../docs/validation/results/labels-and-losses/2026-10-04-two-family-oof-distillation.md)
 unless another source is named.
 
 ## The first round
@@ -117,11 +117,11 @@ No rule adopts a +0.001 run reliably from one run; the size of fold 0 is what mo
 
 | Mechanism | Setting | Run | Macro delta | Source |
 |---|---|---|---:|---|
-| 0.5 silver + 0.5 out-of-fold teacher, one family | ResNet-18, fold 0, leaky | `rn18-oof-blend` | +0.0015 (95% [+0.0001, +0.0031]) | [endgame backlog](../../../docs/backlog/endgame.md#out-of-fold-self-distillation) |
+| 0.5 silver + 0.5 out-of-fold teacher, one family | ResNet-18, fold 0, leaky | `rn18-oof-blend` | +0.0015 (95% [+0.0001, +0.0031]) | [endgame backlog](../../../docs/validation/results/labels-and-losses/2026-10-04-two-family-oof-distillation.md) |
 | 0.5 silver + 0.25 + 0.25, two families | Refined ResNet-50, five folds, leaky | `*-rn50-oof-blend-v2-f0..4` | +0.0034 pooled | first round |
 | The same | ReXNet-200, five folds, leaky | `*-rexnet-200-oof-blend-v2-f0..4` | +0.0090 pooled | first round |
-| 0.7 silver + 0.3 teacher of older models | ReXNet-200, fold 0 | image-blend labels, 2026-09-23 | +0.0035, a public tie | [image-blend labels](../../../docs/validation/results/2026-09-23-image-blend-labels-result.md) |
-| Targets changed inside the training step from the model's own predictions (bootstrapped, running average, early-learning regularisation) | ReXNet-200, fold 0 | noisy-labels campaign | none adopted | [noisy-labels campaign](../../../docs/validation/results/2026-09-23-noisy-labels-campaign.md) |
+| 0.7 silver + 0.3 teacher of older models | ReXNet-200, fold 0 | image-blend labels, 2026-09-23 | +0.0035, a public tie | [image-blend labels](../../../docs/validation/results/labels-and-losses/2026-09-23-image-blend-labels-result.md) |
+| Targets changed inside the training step from the model's own predictions (bootstrapped, running average, early-learning regularisation) | ReXNet-200, fold 0 | noisy-labels campaign | none adopted | [noisy-labels campaign](../../../docs/validation/results/labels-and-losses/2026-09-23-noisy-labels-campaign.md) |
 
 ## Open leads
 

@@ -16,9 +16,9 @@ seeds:
   precedents:
   - 'Near-misses run: outputs/autoresearch/near-misses/experiments/plane-contrast-readouts-20260925T020628Z-2efb517d
     (source/ holds the implementation), macro delta -0.0006, 80% [-0.0023, +0.0011] on combined_v1'
-  - 'Re-scoring on rebuild_state_v2: docs/validation/results/2026-09-28-campaign-rescoring.md'
-  - 'Spec: docs/backlog/small-changes.md#planecontrast-specific-readouts'
-  - 'Per-type contribution: docs/validation/results/2026-09-17-type-contribution.md'
+  - 'Re-scoring on rebuild_state_v2: docs/validation/results/validation-and-ensembles/2026-09-28-campaign-rescoring.md'
+  - 'Spec: docs/backlog/untried-ideas.md#pooling-and-the-attention-head'
+  - 'Per-type contribution: docs/validation/results/pooling-and-attention/2026-09-17-type-contribution.md'
   novelty: First per-type readout on the rebuild_state_v2 recipe; count normalization, gated attention and
     residual readouts were different changes.
   coverage: All labels.
@@ -43,4 +43,4 @@ seeds:
   difference: Same mechanism re-run on the current incumbent with the rebuild_state_v2 labels and the
     all_5fold_scanner_v2 split, where its saved near-misses predictions already pass the adoption rule.
   evidence: 'Re-scored +0.0018, 80% [+0.0001, +0.0035] on rebuild_state_v2 (+0.0010 net of the near-misses
-    reference shift); weak, one run, no public check. docs/validation/results/2026-09-28-campaign-rescoring.md'
+    reference shift); weak, one run, no public check. docs/validation/results/validation-and-ensembles/2026-09-28-campaign-rescoring.md'

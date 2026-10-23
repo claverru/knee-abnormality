@@ -45,7 +45,7 @@ ideas:
     0): 0.932905, -0.0004, 80% interval [-0.0014, +0.0005]; frozen source and changes.diff under outputs/autoresearch/learnable-views/experiments/hand-sizes-learned-shifts-20261003T183532Z-8d11d7a5/.'
   - 'autoresearch/campaigns/learnable-views/build-notes.md: shifts within 2.5 mm of the start and
     3 to 7 mm apart between runs; the open question on the affine augmentation hiding the signal.'
-  - 'docs/ongoing/side-routed-heads.md, run 24: regions are read in a frame centred per knee on the
+  - 'docs/modeling/side-routed-heads.md, run 24: regions are read in a frame centred per knee on the
     meniscus spots.'
   novelty: First learned view placement on the routed model.
   coverage: Every coronal and sagittal view of every study, in training and at inference; axial 120
@@ -107,7 +107,7 @@ ideas:
   precedents:
   - 'autoresearch/campaigns/learnable-views: nothing per study was tried; shifts per series type looked
     random.'
-  - 'docs/ongoing/side-routed-heads.md: the frame per knee is read from the heads without any marking.'
+  - 'docs/modeling/side-routed-heads.md: the frame per knee is read from the heads without any marking.'
   novelty: First per-study crop placement predicted by the model.
   coverage: Every study in training and at inference; the locator sees every series.
   exploitation: 'Read both multipliers, the per-target deltas, and the logged delta per axis: its
@@ -154,7 +154,7 @@ ideas:
     There is no common point and no projection through the patient maps. Trained by the target loss
     through the sampling grid at the head learning rate.'
   precedents:
-  - 'docs/ongoing/side-routed-heads.md, inter-series motion: 99% of same-plane pairs move under 2.7
+  - 'docs/modeling/side-routed-heads.md, inter-series motion: 99% of same-plane pairs move under 2.7
     mm.'
   novelty: Per-study, per-view placement; the pair with the one-point seed says whether tying the
     planes together matters.

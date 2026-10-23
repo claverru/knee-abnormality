@@ -14,8 +14,8 @@ ideas:
     steps, 1.6 epochs at 437 steps per epoch), refreshes its BatchNorm statistics before each
     validation, and the averaged weights are validated, selected and scored at x4.'
   precedents:
-  - 'docs/validation/results/2026-09-17-overnight-results.md: 03-ema-0.999, +0.0001 on the older recipe.'
-  - 'docs/validation/results/2026-09-23-noisy-labels-campaign.md: EMA trails the live model until epochs 8-9.'
+  - 'docs/validation/results/campaigns-and-queues/2026-09-17-overnight-results.md: 03-ema-0.999, +0.0001 on the older recipe.'
+  - 'docs/validation/results/labels-and-losses/2026-09-23-noisy-labels-campaign.md: EMA trails the live model until epochs 8-9.'
   novelty: First EMA run on ResNet-18, L2-SP and rebuild_state_v2.
   coverage: All studies and labels.
   exploitation: Per-epoch x1 of the averaged model against the incumbent; the batch-norm refresh time.

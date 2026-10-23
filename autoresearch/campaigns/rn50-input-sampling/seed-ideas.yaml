@@ -62,7 +62,7 @@ ideas:
     pooling of the maps and of the routing takes the 2 by 2 block of cells (2k, 2k+1) to (2k+1, 2k+2) centred on
     the token, edge blocks clipped. The third stage and its 14 by 14 cells are unchanged.'
   precedents:
-  - 'docs/validation/results/2026-10-08-token-grid-alignment.md: the grid at 224 px and the 225 and 257 px runs.'
+  - 'docs/validation/results/crops-and-views/2026-10-08-token-grid-alignment.md: the grid at 224 px and the 225 and 257 px runs.'
   - prior-work.md, The token grid at 224 px.
   novelty: First centred grid at 224 px; no change of image size or compute.
   coverage: Every image; all labels.
@@ -103,7 +103,7 @@ ideas:
   precedents:
   - 'outputs/training/rn18-257-full-9x9-report-loss-off (source_snapshot.zip, effective_config.json): the ResNet-18
     run to follow for what a 257 px image needs in the code.'
-  - docs/validation/results/2026-10-08-token-grid-alignment.md.
+  - docs/validation/results/crops-and-views/2026-10-08-token-grid-alignment.md.
   novelty: First 257 px run on the ResNet-50; the only seed allowed to change the image size.
   coverage: Every image; all labels.
   exploitation: 'Read the macro and all labels against the incumbent at both multipliers, with the training seconds

@@ -1,18 +1,16 @@
 # Independent GPU inference processes
 
-This runtime was implemented on branch `1C` at `3b8c2cc`, overlaid onto the frozen
-[reflection/sigma-40 submission](submissions/2026-09-14-reflection-sigma-40-submission.md), and ported to
-`meniscus-soft-coupling` on 2026-09-15, byte-identical to that submission's runtime
-(`outputs/submission/runtimes/knee-reflection-sigma40-20260914`) at the time. The same day the
-[Kaggle profiling](2026-09-15-kaggle-inference-profiling.md) added per-batch timing, raised the
-default to **16 total loader workers**, and made `auto` precision resolve to FP16 on CUDA devices
+This runtime was implemented on branch `1C` at `3b8c2cc`, first used in the
+[reflection/sigma-40 submission](submissions/early-submission-details.md)
+and ported to the then-current model branch on 2026-09-15. The same day the
+[Kaggle profiling](profiling/2026-09-15-kaggle-inference-profiling.md) added per-batch timing, raised the
+default to 16 total loader workers (`INFERENCE_NUM_WORKERS` was 8 at the end) and made `auto` precision resolve to FP16 on CUDA devices
 without native BF16 (T4), where workers run the backbone in zero-padded 64-image channels-last
 chunks (`use_fixed_backbone_chunks`). The `export` and `infer` recipes default to four studies per
-GPU and 16 total workers. The `main` branch and 1C's submission error handling in `submit.py` were
-not changed.
+GPU.
 
-Start order and GPU-side work since 2026-09-22 on branch `inference-opt`
-([measurement](2026-09-22-kaggle-x4-startup-and-gpu-preparation.md)):
+Start order and GPU-side work added from 2026-09-22 and merged into `main`
+([measurement](profiling/2026-09-22-kaggle-x4-startup-and-gpu-preparation.md)):
 
 - **Coordinator:** `predict.py` does not import torch. It counts GPUs through the CUDA driver
   (`cuda_device_count` in `inference/processes.py`) and spawns the workers about three seconds
@@ -32,7 +30,7 @@ Start order and GPU-side work since 2026-09-22 on branch `inference-opt`
   graph's fixed input, replays and copies out. A cold compile costs about 14–30 s for a family's
   first member at model load and about 0.05 s for each later member of the same family; a
   `compile-cache.bin` shipped in the bundle (`inference.compile_cache`) removes most of it
-  ([compile](2026-10-19-torch-compile-backbone.md)).
+  ([compile](profiling/2026-10-19-torch-compile-backbone.md)).
 - **Images:** the prediction worker's loader skips loader-side preparation
   (`prepare_on_loader=False`), so its batches carry the shared buffers of raw 16-bit rows.
   `predict_loader` page-locks them in place (`cudaHostRegister`), copies them asynchronously,
@@ -48,9 +46,10 @@ ensemble bundle — and predicts its assigned studies. Ensemble members run
 forward on the same decoded, device-resident batch and their per-label sigmoid
 probabilities are averaged before the batch is recorded; see
 [model bundle and offline environment](model-bundle-and-offline-environment.md#multi-checkpoint-ensemble-bundles)
-for the bundle-side contract. With two T4s, the default is **four studies per GPU batch**, with eight
-DataLoader workers per process: eight studies can be in flight across the GPUs,
-with 16 loader workers total. `--batch-size` controls each device's batch;
+for the bundle-side contract. With two T4s, the default is **four studies per GPU batch**; the 2026-09-15 to
+2026-09-17 submissions used eight DataLoader workers per process (16 loader workers
+total, eight studies in flight across the GPUs), and the `INFERENCE_NUM_WORKERS`
+default at the end was 8 in total. `--batch-size` controls each device's batch;
 `--num-workers` is divided across processes. A single visible GPU receives the
 whole worker budget; CPU inference uses one process with CUDA hidden. Small
 datasets use at most one process per study, avoiding empty partitions.
@@ -76,21 +75,12 @@ assignment and output merging. Training continues to use Lightning.
 Export bundles include both entry points and the shared process module. Their
 manifest records `batch_size_scope: per_device`, `num_workers_scope: total`
 and `parallelism: one_process_per_visible_gpu`; the bundled notebook reads the
-recorded batch and worker defaults. The prepared original-1C bundle is
-`outputs/submission/exports/knee-1c-dual-gpu-20260914`, using the same checkpoint hash
-recorded below. Strict CPU model loading and bundle integrity checks passed;
-local inference was not requested. Updated inference source differs from its
-training snapshot, which the manifest records explicitly; model and
-preprocessing identity checks still pass.
+recorded batch and worker defaults.
 
-The first 1A Kaggle execution subsequently exposed a worker request-loading
-error: JSON-mode validation rejected resolved `Path` objects returned by the
-experiment path validators. The corrected archived worker decodes JSON and applies Python-mode
-validation, matching the configuration loader. Export fresh bundles to include
-this fix; the initial prepared `knee-1c-dual-gpu-20260914` bundle predates it.
-
-The local GPU was occupied, so implementation used no local inference, training
-or tests. The subsequent [1A notebook](submissions/2026-09-14-1a-submission-with-two-gpu-processes.md)
-confirmed successful prediction on two T4s. Its three-study example does not
-measure sustained throughput or a full four-study batch. Each model and
-four-study batch must fit independently on its GPU; GPU memory is not pooled.
+The first 1A Kaggle execution exposed a worker request-loading error: JSON-mode validation
+rejected resolved `Path` objects returned by the experiment path validators. The corrected worker
+decodes JSON and applies Python-mode validation, matching the configuration loader; bundles exported
+afterwards carry the fix. The 1A notebook confirmed successful prediction on two T4s
+([details](submissions/early-submission-details.md)); its three-study example did not measure
+sustained throughput or a full four-study batch. Each model and four-study batch must fit
+independently on its GPU, because GPU memory is not pooled.

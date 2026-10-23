@@ -14,7 +14,7 @@ switches.
 waiting for a reply: take the reversible action the contract points to and report it afterwards.
 Anything else is fine as long as the campaign keeps working.
 
-- **Start:** `rtk proxy uv run --locked just autoresearch start CAMPAIGN --provider PROVIDER` from
+- **Start:** `uv run --locked just autoresearch start CAMPAIGN --provider PROVIDER` from
   the campaign's root, or `resume` if it already exists. Leave the built-in watchdog off. Save a
   project memory with the campaign, root and provider.
 - **Monitor page:** on every start or resume, run
@@ -47,7 +47,7 @@ Anything else is fine as long as the campaign keeps working.
 - **Add seeds:** when results or code show a clear gap or fit for the campaign (a defect a run
   exposed, the obvious next step of an accepted idea, a missing cell in a comparison), write
   the seed in a new ideas file in the campaign's directory, list it in the campaign's index and
-  force it: `rtk proxy uv run --locked python -m scripts.tools.autoresearch import-ideas CAMPAIGN
+  force it: `uv run --locked python -m scripts.tools.autoresearch import-ideas CAMPAIGN
   --ideas-file FILE --forced`. Stay inside the campaign's scope and rules.
 - **Fallback:** the supervisor waits out usage limits on its own. When the login check fails or
   every job has been blocked for over 30 minutes, stop the campaign, set `provider` in

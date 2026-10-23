@@ -30,7 +30,7 @@ ideas:
   precedents:
   - 'attributes_v5.md (worktree knee-abnormality-jevk5-attributes-v4), Core against rings: the four
     counts from the v4 answers.'
-  - 'docs/ongoing/side-routed-heads.md: located targets hold on unseen knees (tear place 33%, edema
+  - 'docs/modeling/side-routed-heads.md: located targets hold on unseen knees (tear place 33%, edema
     by compartment 25% explained).'
   novelty: First located target across the core-ring boundary; first extra supervision on ACL's region.
   coverage: Training only; every study with v4 answers for the four questions.
@@ -136,7 +136,7 @@ ideas:
     own route (front_core) and its own readout; the Synovitis output of self.attention is no longer
     used. The Effusion row is not detached, so Synovitis''s loss also trains it.'
   precedents:
-  - 'docs/ongoing/side-routed-heads.md, The runs sorted: Synovitis and PF OA carry about half of the
+  - 'docs/modeling/side-routed-heads.md, The runs sorted: Synovitis and PF OA carry about half of the
     macro variance between runs.'
   - Sharing a classifier across the meniscus pair and the OA triple gave the routed targets +0.0090
     to +0.0131 summed against separate classifiers (runs 4 and 5).
@@ -191,8 +191,8 @@ ideas:
     Contusion''s target loss through the new term; it reads the shared tokens without detaching, as
     the report heads do.'
   precedents:
-  - 'docs/ongoing/side-routed-heads.md: edema by compartment 25% explained on validation knees.'
-  - 'docs/ongoing/side-routed-heads.md, The runs sorted: Contusion -0.0020 top six against bottom
+  - 'docs/modeling/side-routed-heads.md: edema by compartment 25% explained on validation knees.'
+  - 'docs/modeling/side-routed-heads.md, The runs sorted: Contusion -0.0020 top six against bottom
     six.'
   novelty: First use of a located report head at inference.
   coverage: Contusion on every study; the edema reader on every study at inference.

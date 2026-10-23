@@ -82,9 +82,9 @@ ideas:
     table is readable after training: whether ACL moves attention mass to the oblique groups.'
   precedents:
   - autoresearch/anatomical-attention.md (learned family strengths adopted, +0.002331)
-  - docs/validation/results/2026-09-17-plane-contrast-importance.md (label-specific type dependence)
-  - docs/validation/results/2026-09-17-test-time-allocation.md (removal costs and value curves by type)
-  - docs/validation/results/2026-09-15-attention-prior-result.md (a fixed spatial prior regressed -0.002177;
+  - docs/validation/results/pooling-and-attention/2026-09-17-plane-contrast-importance.md (label-specific type dependence)
+  - docs/validation/results/sampling/2026-09-17-test-time-allocation.md (removal costs and value curves by type)
+  - docs/validation/results/pooling-and-attention/2026-09-15-attention-prior-result.md (a fixed spatial prior regressed -0.002177;
     this one is learned from zero)
   - outputs/autoresearch/oblique/experiments/label-view-attention-bias-20260922T120824Z-29aa5863 (retired
     x1 campaign; 0.899295, +0.00177, adoption 80% interval [-0.0002, +0.0037], rejected; +0.0068 on the
@@ -119,12 +119,12 @@ ideas:
     pass equals the reference. The group is known in _prepare_slot from oblique_split; carry it as one
     PreparedSeries field through collate_studies to the model.
   precedents:
-  - docs/validation/results/2026-09-22-oblique-groups-result.md (reference run; per-label localization)
+  - docs/validation/results/sampling/2026-09-22-oblique-groups-result.md (reference run; per-label localization)
   - outputs/analysis/a/acquisition-geometry-20260922/protocol_prior.txt (an oblique flag added after training
     gave -0.0003 to -0.0014, so the gain must come from routing inside the model, not new information)
-  - docs/validation/results/2026-09-14-knee-side-embedding-result.md (a knee-side embedding tied; it marked
+  - docs/validation/results/pooling-and-attention/2026-09-14-knee-side-embedding-result.md (a knee-side embedding tied; it marked
     patient geometry, not acquisition protocol)
-  - docs/backlog/small-changes.md#oblique-embedding (transferred general-backlog entry)
+  - docs/backlog/untried-ideas.md#position-and-knee-side (transferred general-backlog entry)
   - outputs/autoresearch/oblique/experiments/oblique-group-embedding-20260922T115506Z-f5d616dd (retired
     x1 campaign; 0.899287, +0.00176 against the x1 reference, adoption 80% interval [-0.0005, +0.0040],
     rejected; +0.0052 on the 103 split studies)

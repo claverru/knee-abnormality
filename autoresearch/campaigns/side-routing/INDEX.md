@@ -20,4 +20,4 @@ design steps held to nine pre-run guardrails and a run report.
 | Reading the keeper seed that adds the knee-level term to the researcher's separate OA frame | [Separate OA frame with knee-level term](separate-oa-frame-with-knee-level-term-ideas.yaml) |
 | Reading the keeper requeue of the researcher's calibrated report outputs, after its first launch was cancelled at the first adoption | [Calibrated report outputs requeue](calibrated-shared-report-outputs-requeue-ideas.yaml) |
 | Reading the keeper's repairs, adoption decisions and added seeds | [Run notes](run-notes.md) |
-| Reading the design, every run's tables, the drawings and the measurements | [Side-routed shared heads](../../../docs/ongoing/side-routed-heads.md) |
+| Reading the design, every run's tables, the drawings and the measurements | [Side-routed shared heads](../../../docs/modeling/side-routed-heads.md) |

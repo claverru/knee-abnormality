@@ -436,7 +436,7 @@ normalisation statistics per pixel size (`spacing-specific-batch-statistics`).
 
 Decided with the user on 2026-10-02: treat this as an optimisation problem over a flexible
 per-type view configuration, in a new campaign of configuration-only runs. The plan is in
-[view table backlog](../../../docs/backlog/big-bets.md#view-table-and-label-routing); the
+[view table backlog](../../../docs/backlog/untried-ideas.md#views-and-fields); the
 [learnable-views campaign](../learnable-views/INDEX.md) ran first and learned the views by
 gradient instead.
 

@@ -11,7 +11,7 @@ ideas:
     heads, their targets and the trainer.report_attribute_loss_weight term are all absent. Everything
     else exactly as the incumbent at this seed''s turn.'
   precedents:
-  - 'docs/modeling/report-attribute-heads.md and docs/validation/results/2026-09-25-report-attribute-heads.md.'
+  - 'docs/modeling/report-attribute-heads.md and docs/validation/results/labels-and-losses/2026-09-25-report-attribute-heads.md.'
   - 'revisits: rn18-report-attributes-005 (weight 0.05, -0.0004).'
   novelty: First removal of the attribute heads on ResNet-18.
   coverage: All studies and labels.

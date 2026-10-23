@@ -36,7 +36,7 @@ ideas:
     training/lightning.py at on_train_epoch_start; the effective probability is logged each epoch
     and restored on resume.
   precedents:
-  - 'docs/backlog/small-changes.md, Augmentation families: late affine shutdown (hypothesis).'
+  - 'docs/backlog/untried-ideas.md, Augmentation families: late affine shutdown (hypothesis).'
   - 'Affine off -0.0041 [-0.0078, -0.0002] (2026-09-17); strong affine -0.0024 (2026-09-15).'
   novelty: First epoch-dependent augmentation schedule here.
   coverage: Every acquisition in the last two epochs.

@@ -452,4 +452,4 @@ A reference trained on source that differs from the recipe only by removed, inac
 code is declared per campaign ([campaign setup](campaign-setup.md#files-and-startup)).
 The adopted learned-strength reference and the transition of the stopped campaigns
 to it are recorded in the
-[anatomical-attention result](../docs/validation/results/2026-09-21-anatomical-attention-result.md#adoption-and-campaign-transition).
+[anatomical-attention result](../docs/validation/results/pooling-and-attention/2026-09-21-anatomical-attention-result.md#adoption-and-campaign-transition).

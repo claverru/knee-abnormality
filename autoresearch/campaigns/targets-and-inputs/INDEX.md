@@ -6,7 +6,7 @@ a Refined-RadImageNet ResNet-50, and, through seeds the user added while it ran,
 adoptions and tried modules inside the backbone, on fold 2 of `all_5fold_scanner_v2` with fold 2
 of `rn50-aligned-mixing-folds-0-2` as the reference. Adopted and on main: the mask decoder, the OA
 detector beside the shared OA head and average-pool shortcuts
-([result](../../../docs/validation/results/2026-10-13-targets-and-inputs-campaign.md)). Its
+([result](../../../docs/validation/results/campaigns-and-queues/2026-10-13-targets-and-inputs-campaign.md)). Its
 artifacts are in `outputs/autoresearch/targets-and-inputs`; only the incumbent's checkpoint is
 kept. The worktree it ran from is removed, so it cannot be resumed as it stands.
 

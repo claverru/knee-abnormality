@@ -6,7 +6,7 @@ Make the model generalize to imaging sites it never trained on. The hidden test 
 sites absent from training ([sites and test composition](../../../docs/metadata/sites-and-test-composition.md)).
 Trained without five inferred sites, the current recipe loses about 0.01 macro AUC on those sites
 while losing almost nothing from the 23% less training data
-([sites-out diagnostic](../../../docs/validation/results/2026-09-29-sites-out-diagnostic.md)).
+([sites-out diagnostic](../../../docs/validation/results/validation-and-ensembles/2026-09-29-sites-out-diagnostic.md)).
 Find training-time mechanisms that close that gap without costing seen sites.
 
 ## Recipe and reference

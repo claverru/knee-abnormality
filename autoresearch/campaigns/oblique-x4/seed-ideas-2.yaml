@@ -27,14 +27,14 @@ ideas:
     vs additive on the same triplets; the mixture wins on the split subset in 9/9 checkpoint×setting cells.'
   - 'Same artifacts: mean_intact_standard (two passes without the tilted series) gains +0.0000 to +0.0037
     on the subset, so part of the frozen gain is sub-bag ensembling rather than use of the oblique views.'
-  - 'docs/validation/results/2026-09-17-count-normalized-attention-result.md: per-acquisition count normalisation
+  - 'docs/validation/results/pooling-and-attention/2026-09-17-count-normalized-attention-result.md: per-acquisition count normalisation
     was rejected (−0.0035); subset and per-slot variants were never tested. Here learned score levels
     stay intact within each pass.'
-  - 'docs/validation/results/2026-09-17-test-time-allocation.md#repeated-series-in-one-slot: a slot''s
+  - 'docs/validation/results/sampling/2026-09-17-test-time-allocation.md#repeated-series-in-one-slot: a slot''s
     second series adds value, and losing it hurts.'
   - 'autoresearch/campaigns/oblique/prior-work.md: the two-pass average was left to the endgame as a test-time
     policy that re-encodes the study.'
-  - docs/validation/results/2026-09-22-oblique-groups-result.md (reference; split-study MCL −0.058 and
+  - docs/validation/results/sampling/2026-09-22-oblique-groups-result.md (reference; split-study MCL −0.058 and
     PF OA −0.026 vs k_05).
   - Proposed by the retired x1 campaign's researcher; implementation was cancelled by the stop (outputs/autoresearch/oblique/experiments/split-slot-view-mixture-pooling-20260922T125450Z-e32cf52c)
   novelty: 'The first trained use of the only positive frozen oblique measurement. Unlike the endgame
@@ -145,9 +145,9 @@ ideas:
     alike. Per-slot, per-study and run totals equal the reference exactly.
   precedents:
   - outputs/analysis/a/acquisition-geometry-20260922/oblique_reach.txt (windows and run coverage per group)
-  - docs/validation/results/2026-09-17-test-time-allocation.md#repeated-series-in-one-slot (second-series
+  - docs/validation/results/sampling/2026-09-17-test-time-allocation.md#repeated-series-in-one-slot (second-series
     triplets help on frozen models)
-  - docs/validation/results/2026-09-18-overnight-results.md (repeated_series_share took triplets from
+  - docs/validation/results/campaigns-and-queues/2026-09-18-overnight-results.md (repeated_series_share took triplets from
     other types and lost publicly; this split stays inside the slot)
   novelty: The first zero-sum split between the two groups of one slot; the reference and repeated_series_share
     both changed slot totals.

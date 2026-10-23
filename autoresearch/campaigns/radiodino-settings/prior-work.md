@@ -9,13 +9,13 @@ Measured 2026-10-14 on the pretrained weights and the recorded runs; no RadioDIN
 reports 1.35M CT, MRI and ultrasound images), CC BY 4.0. It loads strictly into timm's
 `vit_small_patch16_224.dino`. The choice among medical encoders (RAD-DINO, MedSigLIP,
 BiomedCLIP, Curia, MRI-CORE, OrthoFoundation, OmniRad) is in
-[Hugging Face image encoders](../../../docs/research/huggingface-image-encoders.md#practical-2d-shortlist):
+[Hugging Face image encoders](../../../docs/research/backbones-and-pretraining/huggingface-image-encoders.md#practical-2d-shortlist):
 it is the only one at our size and speed.
 
 ## The adapter
 
 `radiodino_s16` in `src/knee_abnormality/modeling/staged_backbones.py`
-([notes](../../../docs/ongoing/radiodino-backbone.md)):
+([notes](../../../docs/validation/results/backbones/2026-10-15-radiodino-s16.md)):
 
 - The stem is the 16×16 patch convolution plus the patch position embeddings; the CLS token and
   its position embedding are dropped.

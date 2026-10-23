@@ -11,9 +11,9 @@ sampler](physical-sampling/implemented-sampler.md)); the measurements below are
 against the retired fixed-40 sampler and are not automatically valid at the current per-plane
 widths. The fraction was 0.76 when this analysis was written and is **0.867 since 2026-09-19**,
 for realized means of axial 45.1, coronal 35.9 and sagittal 39.0 mm
-([result](../validation/results/2026-09-19-relative-sampler-width-result.md)). Axial now sits above
+([result](../validation/results/sampling/2026-09-19-relative-sampler-width-result.md)). Axial now sits above
 the old fixed 40 and sagittal close to it, while coronal at 35.9 sits just outside the 12–35 mm
-plateau that [per-plane sampler sigma](../validation/results/2026-09-18-per-plane-sigma-cache.md)
+plateau that [per-plane sampler sigma](../validation/results/sampling/2026-09-18-per-plane-sigma-cache.md)
 scored as a gain on the cache — at 0.76 its 31.4 mm was inside it. Several labels keep most of
 their evidence out there. Measured read-only
 from the fold-0 token cache and the depth profiles; scripts and tables in
@@ -33,15 +33,15 @@ from the fold-0 token cache and the depth profiles; scripts and tables in
 - **Not a fix that follows for free:** lifting axial fluid's density at 40–50 mm to the central
   level implies a sigma of roughly 65–80 for that type, while global sigma 60, 80 and 120 were all
   measured worse and 30 tied
-  ([overnight 2026-09-15](../validation/results/2026-09-15-overnight-results.md)). Both follow-ups
+  ([overnight 2026-09-15](../validation/results/campaigns-and-queues/2026-09-15-overnight-results.md)). Both follow-ups
   have since been scored on the caches without the GPU: centre offsets are closed on the map below,
   and per-plane sigma on the token cache makes the axial width itself inert, so widening axial to
   reach this evidence costs nothing measurable and buys nothing measurable
-  ([2026-09-18 per-plane sigma](../validation/results/2026-09-18-per-plane-sigma-cache.md)).
+  ([2026-09-18 per-plane sigma](../validation/results/sampling/2026-09-18-per-plane-sigma-cache.md)).
 - **Limits:** the separation metric behind the evidence shares is small-sample and noisy in tail
   bins, fracture is too sparse to read at all, and geometry cannot recover in-plane tissue
   clipping — the reference point is defined near each series' image centre, so the pixel-based
-  figures in [input resolution](../research/input-resolution.md) remain the only source for the 140 mm
+  figures in [input resolution](../research/geometry-and-views/input-resolution.md) remain the only source for the 140 mm
   crop (sagittal tissue exceeds it in 34% of series, almost all posterior).
 
 ## Spatial importance map
@@ -97,7 +97,7 @@ Support averages 135 studies per voxel but ranges 25-761, highest at the centre.
   **0.092 sagittal, 0.310 coronal, 0.677 axial**, which made the axial draw look about seven times
   as width-sensitive as the sagittal one. Scoring the real selections on the fold-0 token cache
   reverses that: coronal carries the whole effect and axial is flat from 20 to 120 mm
-  ([2026-09-18 per-plane sigma](../validation/results/2026-09-18-per-plane-sigma-cache.md)). Read
+  ([2026-09-18 per-plane sigma](../validation/results/sampling/2026-09-18-per-plane-sigma-cache.md)). Read
   the map for where evidence sits, not for how much a plane's width is worth.
 - **Limits:** the generating code and the per-study utilities are not in this repository, so only
   the extracted field can be re-derived; Fracture has the largest field spread (sd 0.15) on the
@@ -118,7 +118,7 @@ opposed to a per-type offset on one shared draw — is a different and much larg
 GPU: coronal 30 mm is worth +0.00135 macro AUC at the ×1 count, confirmed on both halves and
 keeping its sign to ×4, while axial sigma does nothing at matched prediction movement and a
 sagittal gain does not survive higher counts
-([result](../validation/results/2026-09-18-per-plane-sigma-cache.md)). That measurement, not the
+([result](../validation/results/sampling/2026-09-18-per-plane-sigma-cache.md)). That measurement, not the
 map, now sets the sampler change described below.
 
 The whole map is observational, measured under the current sampler, so rarely-visited depths carry
@@ -160,9 +160,9 @@ T1/PD is fluid 0 / fat 0, fluid is 1/1.
 
 **Settled.** The *overall scale* of the Gaussian is inert. `sampling_sigma_fraction: 0.867` replaced
 the fixed 40 mm and landed at the mean of its two controls, +0.00016 at ×4
-([result](../validation/results/2026-09-19-relative-sampler-width-result.md)); a five-point sweep
+([result](../validation/results/sampling/2026-09-19-relative-sampler-width-result.md)); a five-point sweep
 from 0.60 to 1.10 then came out non-monotone with the control at the bottom, spanning 0.00674, which
-is seed noise ([sweep](../validation/results/2026-09-19-fold-ensembles-and-sigma-sweep.md)).
+is seed noise ([sweep](../validation/results/validation-and-ensembles/2026-09-19-fold-ensembles-and-sigma-sweep.md)).
 Per-type centre offsets were rejected earlier on the importance map.
 
 **Shape was tried once, and neither arm resolved.** The sweep multiplies all three planes by one
@@ -191,12 +191,11 @@ symmetric Gaussian centred on the study centre spends mass anteriorly where slic
 and truncates posteriorly where Baker's cyst and the posterior horns live. A common-factor sweep
 cannot see either: if one plane wants more and another less, scaling both together cancels.
 
-**Still open, and the only item here that is not tried:**
+**Left untried, the only item here:**
 
 - **Re-exporting the slice-importance map with left knees mirrored**, a user action outside this
   repository, which gates
-  [side-conditioned sagittal sampling](../backlog/big-bets.md#position-and-knee-side) and is listed
-  in [next](../ongoing/next.md).
+  [side-conditioned sagittal sampling](../backlog/untried-ideas.md#position-and-knee-side).
 
 The [acquisition geometry](#acquisition-geometry) above is the input to all of these, and is
 preserved independently in

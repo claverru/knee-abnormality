@@ -25,7 +25,7 @@ ideas:
     to its dtype), returned under "view_to_wide". Wide views are unchanged in both
     paths (V is the identity, and they use the grid). Nothing else changes.'
   precedents:
-  - 'docs/validation/results/2026-10-05-code-audit-measurements.md, F01: parity of
+  - 'docs/validation/results/campaigns-and-queues/2026-10-05-code-audit-measurements.md, F01: parity of
     the two TTA variants against the training reflection and their pooled out-of-fold
     scores.'
   - 'docs/data-preparation/reflection-geometry-and-previews.md: 2D anchors stay in
@@ -130,7 +130,7 @@ ideas:
     window at the centre (its offset is 0) and the sagittal window with its fixed
     direction.'
   precedents:
-  - 'docs/validation/results/2026-10-05-code-audit-measurements.md, F04 and F05: 170
+  - 'docs/validation/results/campaigns-and-queues/2026-10-05-code-audit-measurements.md, F04 and F05: 170
     studies with unknown side, 4,400 with a fitted centre.'
   novelty: First separation of "centre known" from "side known".
   coverage: About 3.7% of training studies and the same share of validation; any test
@@ -203,7 +203,7 @@ ideas:
   mechanism: resampled_std.clamp_min_(0) before it is applied. Nothing else changes;
     the probability stays 0.5.
   precedents:
-  - 'docs/validation/results/2026-10-01-revisits-campaign.md: no DSU on ResNet-18,
+  - 'docs/validation/results/campaigns-and-queues/2026-10-01-revisits-campaign.md: no DSU on ResNet-18,
     -0.0013 (80% [-0.0027, -0.0001]), so the mechanism stays.'
   novelty: First run with the scale restricted to non-negative values.
   coverage: Training only, half of the acquisitions.
@@ -289,9 +289,9 @@ ideas:
     the OA logits (logits[:, oa_indices] += correction is skipped); the detector's
     parameters stay in the model, unused. Nothing else changes.
   precedents:
-  - 'docs/validation/results/2026-09-25-near-misses-campaign.md #8: the adoption,
+  - 'docs/validation/results/campaigns-and-queues/2026-09-25-near-misses-campaign.md #8: the adoption,
     PF OA +0.0102.'
-  - 'docs/validation/results/2026-10-03-learnable-views-campaign.md: silent with the
+  - 'docs/validation/results/crops-and-views/2026-10-03-learnable-views-campaign.md: silent with the
     3D position.'
   novelty: First removal of the detector.
   coverage: The three OA labels of every study.
@@ -346,7 +346,7 @@ ideas:
     and strength a tie is the likely outcome.
   mechanism: data.noise_augmentation.probability 0. Nothing else changes.
   precedents:
-  - 'docs/validation/results/2026-09-26-augmentation-campaign.md: the stack was built
+  - 'docs/validation/results/campaigns-and-queues/2026-09-26-augmentation-campaign.md: the stack was built
     around it without testing it.'
   novelty: First removal of the noise augmentation.
   coverage: Training only, 15% of acquisitions.
@@ -372,7 +372,7 @@ ideas:
     cannot be 0 in the config schema, so the addition is bypassed in training/lightning.py);
     half_knee_mil_loss is not computed. Nothing else changes; the own-side mask stays.
   precedents:
-  - 'docs/validation/results/2026-09-24-knee-geometry-campaign.md #3: the adoption.'
+  - 'docs/validation/results/campaigns-and-queues/2026-09-24-knee-geometry-campaign.md #3: the adoption.'
   - 'plane-specialization #21, half-knee MIL per plane: -0.0006.'
   novelty: First removal of the loss by itself.
   coverage: Training only; the two meniscus labels of studies with a known side.
@@ -399,9 +399,9 @@ ideas:
     so own_side is true for every token and the two meniscus labels attend to the
     whole knee. Nothing else changes; the half-knee loss stays.
   precedents:
-  - 'docs/validation/results/2026-09-24-knee-geometry-campaign.md #4: the mask on
+  - 'docs/validation/results/campaigns-and-queues/2026-09-24-knee-geometry-campaign.md #4: the mask on
     the fitted midline alone, -0.0018.'
-  - 'docs/validation/results/2026-09-23-side-mask-and-token-attention.md: the trained
+  - 'docs/validation/results/pooling-and-attention/2026-09-23-side-mask-and-token-attention.md: the trained
     side mask.'
   novelty: First removal of the mask from the adopted bundle.
   coverage: The two meniscus labels of studies with a known side.
@@ -427,7 +427,7 @@ ideas:
     may now be redundant.
   mechanism: model.plane_readout false. Nothing else changes.
   precedents:
-  - 'docs/validation/results/2026-10-01-revisits-campaign.md: plane-contrast readouts
+  - 'docs/validation/results/campaigns-and-queues/2026-10-01-revisits-campaign.md: plane-contrast readouts
     +0.0009, dense per-plane readouts -0.0052.'
   novelty: First test of the readouts with the view label bias in place.
   coverage: Every label of every study.
@@ -451,7 +451,7 @@ ideas:
   mechanism: In KneeAbnormalityModel._pooling_tokens the detail_view_embedding term
     is not added. The parameter stays in the model, unused. Nothing else changes.
   precedents:
-  - 'docs/validation/results/2026-10-02-smart-crops-campaign.md: the views were adopted
+  - 'docs/validation/results/crops-and-views/2026-10-02-smart-crops-campaign.md: the views were adopted
     with the embedding in place.'
   novelty: First removal of the embedding.
   coverage: Coronal and sagittal tokens of every study.
@@ -479,9 +479,9 @@ ideas:
     be 0 in the config schema, so the addition is bypassed in training/lightning.py).
     Nothing else changes.
   precedents:
-  - 'docs/validation/results/2026-10-01-revisits-campaign.md: report-attribute heads
+  - 'docs/validation/results/campaigns-and-queues/2026-10-01-revisits-campaign.md: report-attribute heads
     removed, -0.0006, 10% faster.'
-  - 'docs/validation/results/2026-09-25-report-attribute-heads.md: the adoption, +0.00105
+  - 'docs/validation/results/labels-and-losses/2026-09-25-report-attribute-heads.md: the adoption, +0.00105
     and 0.940 against 0.938 public.'
   novelty: First removal on the current views.
   coverage: Training only.
@@ -668,7 +668,7 @@ ideas:
   precedents:
   - 'run-notes.md, 6: computed-centre-3d-position, its per-label deltas and the detector''s
     corrections.'
-  - 'docs/validation/results/2026-10-03-learnable-views-campaign.md: the detector
+  - 'docs/validation/results/crops-and-views/2026-10-03-learnable-views-campaign.md: the detector
     silent beside the 3D position in 5 of 5 runs; the 3D position with a first-order
     detector +0.0010.'
   novelty: First 3D position without the detector.
@@ -714,7 +714,7 @@ ideas:
   precedents:
   - 'run-notes.md, 6: the parent, its curve, training loss, per-label deltas and branch
     shares.'
-  - 'docs/research/efficientnet-training.md: the September spatial tokens declared
+  - 'docs/research/backbones-and-pretraining/efficientnet-training.md: the September spatial tokens declared
     a 3D-position dropout of 0.10.'
   novelty: First 3D position on this recipe with the position dropped per study.
   coverage: Every token; 15% of studies per training batch without position.
@@ -784,7 +784,7 @@ ideas:
     has 10 entries.'
   precedents:
   - 'run-notes.md, 6: the parent.'
-  - 'docs/validation/results/2026-10-05-code-audit-measurements.md, F05: the centre-fit
+  - 'docs/validation/results/campaigns-and-queues/2026-10-05-code-audit-measurements.md, F05: the centre-fit
     residuals.'
   novelty: First 3D position without sub-centimetre wavelengths.
   coverage: Every token of every study.
@@ -907,7 +907,7 @@ ideas:
     half-knee loss are untouched.'
   precedents:
   - 'run-notes.md, 6: computed-centre-3d-position, a tie with 1D and 2D replaced.'
-  - 'docs/validation/results/2026-10-03-learnable-views-campaign.md: seven replace
+  - 'docs/validation/results/crops-and-views/2026-10-03-learnable-views-campaign.md: seven replace
     runs averaging zero.'
   novelty: First run of the recipe without position embeddings.
   coverage: Every token of every study.

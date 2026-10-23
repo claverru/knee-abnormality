@@ -18,7 +18,7 @@ ideas:
     training behaviour.
   precedents:
   - '150 to 140 mm at 224 px gained +0.003 local and +0.007 public on ReXNet-200, confounded with
-    the sharper spacing (docs/research/input-resolution.md).'
+    the sharper spacing (docs/research/geometry-and-views/input-resolution.md).'
   - 'Learned zoom read every slice at 0.875 mm and lost 0.0228, almost all on detail labels;
     effusion gained 0.006 (docs/history/crop-selection-investigation.md).'
   - 'field-160-single: both attempts blocked on the activation-signature conflict; its

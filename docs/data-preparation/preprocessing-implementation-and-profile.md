@@ -19,7 +19,7 @@ that C improved median loader time by 4.38% and raw-index-plus-loader time by
 audit. Production uses NumPy to avoid ctypes, runtime compilation, a CPU-specific
 binary cache and a compiler dependency in the submission environment. The raw
 comparison and decision record are under
-[`outputs/profiling/normalization-c-vs-numpy-20260912T000001Z`](../../outputs/profiling/normalization-c-vs-numpy-20260912T000001Z).
+`outputs/profiling/normalization-c-vs-numpy-20260912T000001Z` (deleted).
 
 The fixed 128-study experiment used batch size eight, eight persistent workers,
 prefetch factor two and one native/Torch thread per worker. Five post-integration
@@ -37,12 +37,12 @@ returned uint8 pixels with `atol=1`; 10,470 pixels changed, all by one level.
 Compressed, MONOCHROME1, multiframe and selected corrupt cases remain uncovered.
 
 The frozen investigation is under
-[`outputs/profiling/preprocessing-investigation-20260911T205612Z-run2`](../../outputs/profiling/preprocessing-investigation-20260911T205612Z-run2),
+`outputs/profiling/preprocessing-investigation-20260911T205612Z-run2` (deleted),
 and the final NumPy production audit and raw paired timings are under
-[`outputs/profiling/preprocessing-production-numpy-20260912T001501Z`](../../outputs/profiling/preprocessing-production-numpy-20260912T001501Z).
+`outputs/profiling/preprocessing-production-numpy-20260912T001501Z` (deleted).
 The [production integration](production-dicom-integration.md) records the DICOM
 reader and preprocessing package changes. Later percentile and GPU work is planned in the
-[loading speedup](../backlog/loading-speedup/candidates.md).
+[loading speedup](../backlog/untried-ideas.md#inference-loading).
 
 ## Clipping-bound stability across draws
 
@@ -50,7 +50,7 @@ reader and preprocessing package changes. Later percentile and GPU work is plann
 [`measure-intensity-bound-stability`](../../scripts/adhoc/measure_intensity_bound_stability.py)
 on 40 random fold-0 training studies replayed over six training epochs at the current recipe
 (1,338 series draws, 6,432 triplets); artifacts under
-[`outputs/analysis/i/intensity-bound-stability-20260920`](../../outputs/analysis/i/intensity-bound-stability-20260920).
+`outputs/analysis/i/intensity-bound-stability-20260920` (deleted).
 Spread is `(max - min) / median` of an estimator over the draws of one series.
 
 | Estimator of the high bound | Median spread | p90 | Series above the 0.2 contrast range |
@@ -82,10 +82,10 @@ bound. CPU only, refusing an existing output directory. It is historical since i
 to the GPU on 2026-09-22, so run it against the source of `ab49830` or earlier:
 
 ```bash
-rtk proxy uv run --locked python -m scripts.adhoc.measure_intensity_bound_stability --output-dir outputs/analysis/intensity-bound-stability-new --studies 40 --epochs 6
+uv run --locked python -m scripts.adhoc.measure_intensity_bound_stability --output-dir outputs/analysis/intensity-bound-stability-new --studies 40 --epochs 6
 ```
 
-**Effect on the metric, measured 2026-10-12:** bounds from a fixed set of up to seven slices per series, independent of the draw, scored ×1 +0.0006 and ×4 −0.0003 against the reference on the ResNet-50, fold 2, and were not adopted ([result](../validation/results/2026-10-13-targets-and-inputs-campaign.md#inputs-and-augmentation)).
+**Effect on the metric, measured 2026-10-12:** bounds from a fixed set of up to seven slices per series, independent of the draw, scored ×1 +0.0006 and ×4 −0.0003 against the reference on the ResNet-50, fold 2, and were not adopted ([result](../validation/results/campaigns-and-queues/2026-10-13-targets-and-inputs-campaign.md#inputs-and-augmentation)).
 
 ## Earlier profile
 
@@ -129,8 +129,8 @@ updates to audit recomputation under activation checkpointing. Lightning mode us
 precision and configured batch size, and refuses to exhaust its subset.
 
 ```bash
-rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/resnet50.yaml --mode preprocessing --output-dir outputs/profiling/preprocessing-new
-rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/resnet50.yaml --mode gpu --batch-sizes 8 --samples 8 --warmup 1 --steps 2 --output-dir outputs/profiling/gpu-new
-rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/resnet50.yaml --mode loader --batch-sizes 4 --workers 2,4,8 --samples 48 --warmup 2 --steps 6 --threads 16 --output-dir outputs/profiling/loader-new
-rtk proxy uv run --locked python -m scripts.adhoc.profile_training configs/resnet50.yaml --mode lightning --samples 64 --warmup 1 --steps 2 --threads 16 --output-dir outputs/profiling/lightning-new
+uv run --locked python -m scripts.adhoc.profile_training configs/resnet50.yaml --mode preprocessing --output-dir outputs/profiling/preprocessing-new
+uv run --locked python -m scripts.adhoc.profile_training configs/resnet50.yaml --mode gpu --batch-sizes 8 --samples 8 --warmup 1 --steps 2 --output-dir outputs/profiling/gpu-new
+uv run --locked python -m scripts.adhoc.profile_training configs/resnet50.yaml --mode loader --batch-sizes 4 --workers 2,4,8 --samples 48 --warmup 2 --steps 6 --threads 16 --output-dir outputs/profiling/loader-new
+uv run --locked python -m scripts.adhoc.profile_training configs/resnet50.yaml --mode lightning --samples 64 --warmup 1 --steps 2 --threads 16 --output-dir outputs/profiling/lightning-new
 ```

@@ -112,7 +112,7 @@ ideas:
   precedents:
   - 'MambaVision-T without the mask decoder, fold 2: ×4 0.935160, blend with the ResNet-50 +0.001840.'
   - 'VMamba-T was built and timed on 2026-10-13: 1.07 s per 8 studies at batch 4, 15.5 GB; it did not fit batch 8
-    (docs/modeling/mambavision-backbone.md).'
+    (docs/modeling/backbones/mambavision-backbone.md).'
   novelty: First non-causal state-space backbone here.
   coverage: Every study and every label.
   exploitation: 'Read ×4 and ×1 against FocalNet-T and per label, then the blend with the ResNet-50.
@@ -193,7 +193,7 @@ ideas:
   precedents:
   - 'RadioDINO-S/16 with this adapter, fold 2: ×4 0.929641 at best; rates 1.4e-4 to 4e-4 within ±0.0006 at ×4,
     doubled anchors −0.0024 (radiodino-settings campaign).'
-  - 'Swin-T on the MambaVision recipe: ×4 0.937176 (docs/validation/results/2026-10-14-swin-t.md).'
+  - 'Swin-T on the MambaVision recipe: ×4 0.937176 (docs/validation/results/backbones/2026-10-14-swin-t.md).'
   novelty: First boundary-supervised self-supervised backbone here.
   coverage: Every study and every label.
   exploitation: 'Read ×4 and ×1 against FocalNet-T and per label, the located labels first, then the blend

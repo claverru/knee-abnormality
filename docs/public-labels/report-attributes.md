@@ -17,7 +17,7 @@ agreement ([below](#consensus-mean-rule-tested-on-gold)), so it was not trained 
 
 - **Script:** [`check_report_attributes`](../../scripts/adhoc/check_report_attributes.py), CPU only,
   under a minute, no LLM calls; refuses an existing output directory:
-  `rtk proxy uv run --locked python -m scripts.adhoc.check_report_attributes --output-dir outputs/analysis/report-attributes-new`.
+  `uv run --locked python -m scripts.adhoc.check_report_attributes --output-dir outputs/analysis/report-attributes-new`.
 - **Artifacts:** `outputs/analysis/r/report-attributes-20260922/`, holding the tables, input hashes and
   a source snapshot.
 - **Scope:** training rows are folds 1–4 of `all_5fold_scanner_v1` (3,502 studies), with targets
@@ -111,7 +111,7 @@ had at least five sources.
 - **Output:** `data/labels/prepared/combined-v2/` (labels SHA-256 `e8dec30f…`), with
   `preparation.json`. The manifest is
   `configs/labels/combined-v2-label-sources.json`. CPU only, seconds, deterministic:
-  `rtk proxy uv run --locked python -m scripts.adhoc.prepare_grade_aware_labels`, with fresh
+  `uv run --locked python -m scripts.adhoc.prepare_grade_aware_labels`, with fresh
   `--output-dir` and `--output-manifest` paths on a rerun. It fails if any consensus target
   changes.
 
@@ -147,8 +147,8 @@ Choosing where to put them means fitting the gold rates, so no variant is propos
 - **Report-state heads:** the hard negatives are separated by whether the report addressed the
   finding. Learning that attribute teaches reporting behaviour, which fold-0 validation rewards
   and the leaderboard need not
-  ([class-balance exponent](../validation/results/2026-09-21-class-balance-exponent.md)).
+  ([class-balance exponent](../validation/results/labels-and-losses/2026-09-21-class-balance-exponent.md)).
 - **Low-grade targets:** the consensus-mean repair failed its gold check and was not trained on.
   Any label change here would be judged on the leaderboard, not by fold 0 or autoresearch.
 - **Where label error remains:** within report-call classes and in omissions, which only images
-  can resolve; see [image-blended labels](../validation/results/2026-09-23-image-blend-labels-result.md).
+  can resolve; see [image-blended labels](../validation/results/labels-and-losses/2026-09-23-image-blend-labels-result.md).

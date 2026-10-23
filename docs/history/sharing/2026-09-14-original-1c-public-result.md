@@ -14,7 +14,7 @@ score **0.931**, ahead of original 1C by **0.003**.
 All four submissions use their selected fold-0 checkpoint and 2× images.
 The original 1C batch-8 attempt failed without a score; its unchanged-model
 batch-4 retry completed as submission `56225269`, script version `349717410`.
-See [submission evidence](../../inference/submissions/2026-09-14-original-1c-comparison-submission.md)
+See [submission evidence](../../inference/submissions/early-submission-details.md)
 for checkpoint identity, failure details and saved API responses. These results
 used the previous single-GPU inference code.
 

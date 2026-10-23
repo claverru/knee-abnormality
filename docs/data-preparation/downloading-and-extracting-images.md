@@ -6,7 +6,7 @@ credentials; competition rules must already be accepted. No additional package
 or external unzip program is needed.
 
 ```bash
-rtk proxy uv run --locked python -m scripts.tools.download_data
+uv run --locked python -m scripts.tools.download_data
 ```
 
 The destination defaults to `data/raw/`; `--data-dir /absolute/path` changes it.
@@ -44,11 +44,11 @@ an estimate of their size.
 For an overnight run, start a persistent terminal, then run the command above:
 
 ```bash
-rtk proxy tmux new-session -s knee-download
+tmux new-session -s knee-download
 ```
 
 Detach with **Ctrl-b, then d**; reconnect with
-`rtk proxy tmux attach-session -t knee-download`. Keep Windows awake and WSL
+`tmux attach-session -t knee-download`. Keep Windows awake and WSL
 running: tmux survives terminal disconnection, not host sleep or shutdown.
 
 ## Progress, recovery and completion

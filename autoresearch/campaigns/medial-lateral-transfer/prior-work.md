@@ -2,7 +2,7 @@
 
 Current status: stopped on learned-strength-20260921 after the campaign and manual
 follow-ups completed. The cancelled extra run is finalized invalid. See the
-[closure record](../../checkpoint-closure.md) for current reference/source and
+closure record (`autoresearch/checkpoint-closure.md`, removed) for current reference/source and
 state; the startup details below preserve original provenance. The user refreshed
 the queue and broadened the objective on 2026-09-21 as recorded below.
 
@@ -82,7 +82,7 @@ invalid operational record and carries no scientific verdict.
 
 Historical startup record: the campaign was prepared and unstarted at this point. Its draft was written while the external
 `outputs/training/compartment-control` run was active on 2026-09-20. That run has
-now completed and the [result note](../../../docs/validation/results/2026-09-20-compartment-adapter-result.md)
+now completed and the [result note](../../../docs/validation/results/pooling-and-attention/2026-09-20-compartment-adapter-result.md)
 rejects the pooled meniscus adapter. The unstarted campaign now uses control B as
 its reference; no campaign state, acceptance or sealed budget existed to migrate.
 The draft's adapter-off and independent-adapter proposals were withdrawn before
@@ -154,7 +154,7 @@ directory was created during this work.
 
 ## What has already been tried
 
-The [transfer investigation](../../../docs/research/medial-lateral-transfer.md)
+The [transfer investigation](../../../docs/research/geometry-and-views/medial-lateral-transfer.md)
 and [retired implementations](../../../docs/modeling/retired-side-and-compartment-variants.md)
 own the detailed history. These old comparisons used the archived recipe,
 ordinary BCE and x2 validation; their scores are not direct controls for this
@@ -171,9 +171,9 @@ class-balanced-BCE, x1 campaign.
 | Nonlinear pooled meniscus adapter | Completed in `compartment-control`, mode `shared`; rejected after the meniscus-family and within-study discrimination regressions. Keep as evidence, not a starting winner; do not repeat or restore its retired independent arm. |
 
 For exact classifier-coupling diagnostics and uncertainty, use the
-[completed result](../../../docs/validation/results/2026-09-14-meniscus-soft-coupling-result.md).
+[completed result](../../../docs/validation/results/labels-and-losses/2026-09-14-meniscus-soft-coupling-result.md).
 For anatomy-related precedents, use the
-[position backlog](../../../docs/backlog/big-bets.md#position-and-knee-side).
+[position backlog](../../../docs/backlog/untried-ideas.md#position-and-knee-side).
 Historical proposals marked unimplemented in older research notes may have later
 results; follow the linked implementation and outcome before calling them new.
 
@@ -199,7 +199,7 @@ sharing-versus-capacity questions.
 The [disagreement audit](../../../docs/history/sharing/oa-and-meniscus-disagreement-audit.md)
 found OA annotation issues and acquisition sensitivity. These are interpretation
 limits, not proof of the cause of earlier sharing failures. OA label repair was later
-superseded by the [label rebuild](../../../docs/public-labels/label-rebuild.md).
+superseded by the [label rebuild](../../../docs/public-labels/label-rebuild/INDEX.md).
 Generic shared-loss and triplet-selection work remain in their respective
 campaigns. Anatomical routing belongs here only when it serves the transfer
 hypothesis and fits this campaign's fixed data and compute rules.

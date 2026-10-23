@@ -38,7 +38,7 @@ ideas:
     equal logits and a side flip still swaps medial and lateral exactly. The seven own-channel
     targets are unchanged. Nothing else changes.
   precedents:
-  - 'docs/ongoing/side-routed-heads.md, Fourth run and Fifth run: Medial OA and Lateral OA with and without the front of their side; S113 0.953 and S114 0.952.'
+  - 'docs/modeling/side-routed-heads.md, Fourth run and Fifth run: Medial OA and Lateral OA with and without the front of their side; S113 0.953 and S114 0.952.'
   - 'autoresearch/campaigns/side-routing/run-notes.md, front-and-up-region-for-pf-oa: per-target and localisation deltas of 2026-10-06.'
   novelty: First explicit knee-level term beside the routed evidence; earlier builds gave a target other compartments' evidence only through overlapping regions.
   coverage: >-

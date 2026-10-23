@@ -16,4 +16,4 @@
 | Recording ideas, their ancestry and completed outcomes | [Idea registry](ideas.yaml) |
 | Checking the live queue | [Backlog](backlog.yaml) |
 | Reviewing campaign decisions | [Findings](findings.md) |
-| Reading the outcome: every result, the adoptions, the transfer to three ReXNet-200s (S73, S74, S77), the τ sweep and the closure | [Campaign result](../../../docs/validation/results/2026-09-28-plane-specialization-campaign.md) |
+| Reading the outcome: every result, the adoptions, the transfer to three ReXNet-200s (S73, S74, S77), the τ sweep and the closure | [Campaign result](../../../docs/validation/results/campaigns-and-queues/2026-09-28-plane-specialization-campaign.md) |

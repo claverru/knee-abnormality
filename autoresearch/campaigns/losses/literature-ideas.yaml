@@ -28,8 +28,8 @@ ideas:
       relative count of misordered and near-correct pairs. Keep delta=1 shared;
       define finite margin bounds, zero-error and empty-pool behavior before launch.
     precedents:
-      - docs/research/auc_loss_approaches.md#5-roc-star
-      - docs/research/auc_loss_approaches.md#3-pairwise-squared-hinge-ranking
+      - docs/research/training-objectives/auc_loss_approaches.md#5-roc-star
+      - docs/research/training-objectives/auc_loss_approaches.md#3-pairwise-squared-hinge-ranking
       - https://github.com/iridiumblue/roc-star/blob/master/rocstar.py
       - autoresearch/campaigns/losses/ideas.yaml (shared-ranking-memory-bank)
       - outputs/autoresearch/losses/experiments/shared-bce-ranking-20260920T112958Z-a2e23db7/comparison/comparison.json
@@ -111,8 +111,8 @@ ideas:
       is no pseudo-label correction or hardening. Apply this exact formula to
       every label for the existing full training schedule.
     precedents:
-      - docs/research/auc_loss_approaches.md#11-hill-loss
-      - docs/research/per-label-losses.md#candidate-losses-and-extensions
+      - docs/research/training-objectives/auc_loss_approaches.md#11-hill-loss
+      - docs/research/training-objectives/per-label-losses.md#candidate-losses-and-extensions
       - https://arxiv.org/abs/2112.07368
       - https://github.com/xinyu1205/robust-loss-mlml/blob/master/src/loss_functions/losses.py
       - outputs/autoresearch/losses/experiments/shared-balanced-focal-20260920T113454Z-c1fe7f53/comparison/comparison.json
@@ -188,8 +188,8 @@ ideas:
       both balancing rules. Preserve uniform study exposure; explicitly identify
       this as an adaptation of a method motivated by class-aware resampling.
     precedents:
-      - docs/research/auc_loss_approaches.md#10-distribution-balanced-loss
-      - docs/backlog/small-changes.md#bce-weighting-and-study-sampling
+      - docs/research/training-objectives/auc_loss_approaches.md#10-distribution-balanced-loss
+      - docs/backlog/untried-ideas.md#supervision-and-labels
       - https://arxiv.org/abs/2007.09654
       - https://github.com/wutong16/DistributionBalancedLoss
       - outputs/autoresearch/losses/experiments/shared-biproportional-weights-20260920T141757Z-d567131d/comparison/comparison.json

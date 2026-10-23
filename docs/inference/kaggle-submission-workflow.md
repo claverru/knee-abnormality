@@ -7,17 +7,16 @@ upload it, launch an offline Kaggle notebook, fetch its outputs, submit a saved
 version and poll the score. Notebook execution and hidden-test scoring still
 run on Kaggle. This does not provide local access to the hidden test set.
 
-Verified on 2026-09-10 against the installed Kaggle CLI/API 2.0.2, its public
-SDK and the official CLI documentation. A read-only
+Verified on 2026-09-10 against the Kaggle CLI/API 2.0.2 (the version pinned for the whole
+project), its public SDK and the official CLI documentation. A read-only
 `competitions list --group entered -s rsna-knee-abnormality-detection -v`
 request succeeded and returned `userHasEntered=True`: authentication and
-competition entry were already in place. That research step performed no
-uploads or submissions; the later baseline3 workflow uses the resulting
-commands. The client reported 2.2.2 available; the training environment remains
-on the pinned 2.0.2 interface.
+competition entry were in place. That research step performed no uploads or
+submissions; the baseline3 workflow used the resulting commands. The client
+reported 2.2.2 available; the project stayed on the pinned 2.0.2 interface.
 
 The commands below follow the installed 2.0.2 interface. Prefix each with
-`rtk proxy uv run --locked` when invoking it from this repository.
+`uv run --locked` when invoking it from this repository.
 
 | Step | Local command or configuration |
 |---|---|
@@ -71,8 +70,9 @@ An illustrative `NOTEBOOK_DIR/kernel-metadata.json` is:
 }
 ```
 
-These are example paths and IDs. The baseline3 artifact section records the
-actual bundle, Dataset and notebook versions used later.
+These are example paths and IDs. The
+[early submission details](submissions/early-submission-details.md) record the actual bundle, dataset
+and notebook versions of the baseline3 submission.
 The [notebook metadata specification](https://github.com/Kaggle/kaggle-cli/blob/main/docs/kernels_metadata.md)
 supports data attachments, privacy, Internet access and accelerator selection.
 Set `enable_internet` explicitly: installed 2.0.2's implementation defaults it
@@ -85,7 +85,7 @@ Wait for successful completion and verify `submission.csv` before submitting
 that exact version. For example, if the returned version is 3:
 
 ```bash
-rtk proxy uv run --locked kaggle competitions submit rsna-knee-abnormality-detection \
+uv run --locked kaggle competitions submit rsna-knee-abnormality-detection \
   -k YOUR_USERNAME/knee-inference -v 3 -f submission.csv -m "Fold 0"
 ```
 
@@ -103,11 +103,10 @@ Remaining website steps and monitoring limits:
   the CLI tutorial; this account has already entered. Any requested account
   verification also needs to be completed through Kaggle's account flow.
 - No final-submission selection or team-management operation was found in
-  the inspected supported CLI/public competition API. Plan to use the website
-  to choose the two final submissions and manage any team changes.
-- Since about 2026-09-20, participants report GPU kernels stuck in `QUEUED` for hours. One says
-  re-pushing after 10–15 minutes works and waiting does not. Leave margin before the final
-  deadline ([re-sweep](../research/2026-09-28-public-resweep.md#rules-and-logistics)).
+  the inspected supported CLI/public competition API; the two final selections are made on the
+  website.
+- From about 2026-09-20, participants reported GPU kernels stuck in `QUEUED` for hours; one said
+  re-pushing after 10–15 minutes works and waiting does not ([re-sweep](../research/competition-and-prior-art/2026-09-28-public-resweep.md#rules-and-logistics)).
 - **A GPU notebook can sit in `RUNNING` without executing (2026-10-04, S103 and S104).** Five of
   eight GPU pushes that day showed "Running" for 7 to 45 minutes with an empty log, not even the
   kernel's start-up warnings; the CPU notebook started at once. Neither the time limit (`-t 32400`
@@ -126,9 +125,10 @@ Remaining website steps and monitoring limits:
   Detailed hidden-run debugging and official runtime reporting may still need
   the website. Locally recorded notebook timings measure only its visible run.
 
-These limits came from API and client inspection. The active baseline3 attempt
-exercises the supported workflow but does not replace the final successful
-scored-run check.
+These limits came from API and client inspection; the baseline3 and later scored submissions
+exercised the supported workflow end to end.
+
+The submit job cannot pick up a notebook version that has already completed: S126 was submitted by hand from the notebook's first completed version with `api.competition_submit_code("submission.csv", description, COMPETITION, notebook, version, False)` after the job lost it in Kaggle's queue (its output was not downloaded and validated first). The job's description also showed `tau1` for a bundle with per-label temperatures (S147).
 
 ## Cancelling a notebook run
 
@@ -163,7 +163,7 @@ notebook stuck in the queue, since every sample started within 8 seconds.
 
 ## Notebook assembly and submission workflow
 
-1. Export the selected checkpoint with the fast preparation command above.
+1. Export the selected checkpoint with the [export recipe](justfile-recipes.md#export-and-submit-a-checkpoint).
    Local prediction checks are optional, requested separately when investigating
    preprocessing, target order, precision or model-loading changes.
 2. Attach the competition data and the frozen model/code/dependency bundle to
@@ -176,9 +176,8 @@ notebook stuck in the queue, since every sample started within 8 seconds.
 4. Load the offline dependencies/code and run the shared inference command
    with the chosen precision/runtime settings. Infer study membership from
    the mounted inputs, validate the output contract and write the named CSV.
-5. Reuse recorded memory/runtime measurements for routine submissions. Profile
-   separately when a new model or sampling budget needs an estimate. The
-   three-example run and local training throughput do not establish full
+5. Reuse recorded memory/runtime measurements for routine submissions; a new model or sampling budget
+   needed its own profile. The three-example run and local training throughput do not establish full
    hidden-test runtime.
 6. Disable Internet, then push and run a version with the
    [local CLI workflow](#control-the-workflow-from-the-local-cli). After a
@@ -196,7 +195,7 @@ Kaggle: it uploads the bundle, runs its notebook on the visible test as `NOTEBOO
 with `KNEE_COMPILE_CACHE_OUTPUT` set, so the first GPU worker packs its inductor and Triton cache
 after compiling the backbones, and adds that file to the local bundle and its manifest. The worker
 unpacks a shipped cache before compiling, which saves about 14 s of model load
-([compile](2026-10-19-torch-compile-backbone.md)). Kaggle unpacks uploaded `.tar` files, hence the
+([compile](profiling/2026-10-19-torch-compile-backbone.md)). Kaggle unpacks uploaded `.tar` files, hence the
 `.bin` name.
 
 Bundle readiness records successful packaging checks. `scripts.pipeline.submit` refuses an

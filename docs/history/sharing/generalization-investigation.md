@@ -9,10 +9,10 @@ The intervention results below come from the previously completed
 ## Conclusions and scope
 
 This investigation preserves the earlier five-model comparison recovered from
-`1C` at `3b8c2cc`. The later [reflection/sigma-40 comparison](../../validation/results/2026-09-14-reflection-sigma-40-result.md)
+`1C` at `3b8c2cc`. The later [reflection/sigma-40 comparison](../../validation/results/sampling/2026-09-14-reflection-sigma-40-result.md)
 added **0.892360 validation AUC and 0.936 public AUC**, selecting independent
 heads at sigma 40 as the current baseline. Tables and correlations below retain
-the original analysis cohort. The [transfer research](../../research/medial-lateral-transfer.md)
+the original analysis cohort. The [transfer research](../../research/geometry-and-views/medial-lateral-transfer.md)
 owns the current shortlist; historical proposals below are not scheduled work.
 
 The subsequent [blinded disagreement and acquisition audit](oa-and-meniscus-disagreement-audit.md)
@@ -47,18 +47,18 @@ variable study costs as concrete candidates for poor scaling.
 ## Reproduction and artifacts
 
 The archived CPU analysis command (`f076a09:docs/history/sharing-sources/analyze_sharing_generalization.py.txt`)
-requires its [original runtime](../sharing-sources/README.md), not current
+requires its [original runtime](../sources/sharing/README.md), not current
 `main`. It joins the saved predictions to frozen
 targets, checks study identity/probabilities, calculates target/subset metrics,
 resamples report groups and fingerprints its inputs. It refuses an existing
 output directory:
 
 ```bash
-rtk proxy env CUDA_VISIBLE_DEVICES= POLARS_MAX_THREADS=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.analyze_sharing_generalization --output outputs/analysis/sharing-generalization-new
+env CUDA_VISIBLE_DEVICES= POLARS_MAX_THREADS=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 uv run --locked python -m scripts.adhoc.analyze_sharing_generalization --output outputs/analysis/sharing-generalization-new
 ```
 
 The completed evidence is in
-[`outputs/analysis/s/sharing-generalization-20260914/`](../../../outputs/analysis/s/sharing-generalization-20260914):
+`outputs/analysis/s/sharing-generalization-20260914` (deleted):
 
 - `analysis.json`, `target_metrics.csv` and the archived analysis source: primary
   comparison, bootstrap, epoch curves, input hashes and submission timing.

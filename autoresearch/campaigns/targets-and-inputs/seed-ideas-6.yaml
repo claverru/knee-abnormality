@@ -71,7 +71,7 @@ ideas:
     unchanged.
   precedents:
   - 'run-notes.md, run 5: the decoder on the 28 by 28 grid, adopted.'
-  - 'docs/backlog/big-bets.md, anatomy masks, segmentation before the labels.'
+  - 'docs/backlog/untried-ideas.md, anatomy masks, segmentation before the labels.'
   novelty: First mask supervision at the first stage's resolution.
   coverage: The studies with prepared volumes; four times the supervised cells of run 5 (about 57 million per epoch).
   exploitation: >-

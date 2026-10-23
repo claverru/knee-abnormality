@@ -13,7 +13,7 @@ Where each seed comes from, the evidence behind its order, and the directions al
   pre-adoption control `k05-clean`, 16 of its 17 candidates were positive; they lost mainly to
   the adopted run's lucky seed.
 - **Noisy-labels campaign:** [findings](../noisy-labels/findings.md). Seed 5 comes from it; its
-  per-label analysis is in `docs/ongoing/early-learning-regularization.md`.
+  per-label analysis is in `docs/history/early-learning-regularization.md`.
 - **RSNA lumbar solution** (claverru/RSNA-lumbar): side-free per-side samples, heads shared
   across sides and levels, and side-normalized coordinates with slice normals. Seeds 4, 8 and 13
   adapt it.

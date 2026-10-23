@@ -38,7 +38,7 @@ candidate uses the incumbent's recorded training seed
 A matched seed does not keep a sampling candidate paired with its incumbent: any
 change to the drawn inputs diverges training from the first batch, and a
 same-seed sampling perturbation moved fold-0 macro AUC by up to 0.0031
-([evidence](../../../docs/validation/results/2026-09-17-ranked-filtered-result.md)).
+([evidence](../../../docs/validation/results/sampling/2026-09-17-ranked-filtered-result.md)).
 Interpret single-run gains with that noise in mind; the adoption rule is unchanged.
 
 ## Reference and fixed constraints

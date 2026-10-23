@@ -16,8 +16,8 @@ ideas:
     branch on report_attribute_loss_weight > 0; training/report_attributes.py) and read the manifest
     the config already names (paths.report_attribute_manifest, target set v4.0). Nothing else changes.
   precedents:
-  - 'docs/validation/results/2026-09-25-report-attribute-heads.md: the adoption, +0.00105 at x4, 0.940 against 0.938 public.'
-  - 'docs/backlog/small-changes.md, removals of active mechanisms: heads off -0.0006 on the 2026-10-01 recipe.'
+  - 'docs/validation/results/labels-and-losses/2026-09-25-report-attribute-heads.md: the adoption, +0.00105 at x4, 0.940 against 0.938 public.'
+  - 'docs/backlog/untried-ideas.md, removals of active mechanisms: heads off -0.0006 on the 2026-10-01 recipe.'
   - 'autoresearch/campaigns/anatomy-recipe: the loss switched off, x4 0.927291.'
   novelty: First run with the heads on the ResNet-50 on the current recipe.
   coverage: Every training study with report attributes; a training-only loss.
@@ -53,7 +53,7 @@ ideas:
     untouched. Nothing else changes.
   precedents:
   - 'docs/modeling/scanner-confusion-head.md: the adoption and its evidence, S67 0.948.'
-  - 'docs/validation/results/2026-09-30-rn18-l2sp-no-confusion.md: L2-SP added and the head removed together, 0.943 for both S86 and S82.'
+  - 'docs/validation/results/validation-and-ensembles/2026-09-30-rn18-l2sp-no-confusion.md: L2-SP added and the head removed together, 0.943 for both S86 and S82.'
   novelty: First run of the head together with L2-SP, and on the ResNet-50.
   coverage: Every training study with a scanner group; a training-only loss on the pooled tokens.
   exploitation: >-
@@ -86,7 +86,7 @@ ideas:
     no per-view, per-label term to the attention. Nothing else changes.
   precedents:
   - 'docs/modeling/current-model.md, adoption history, 2026-10-03: the adoption and its control.'
-  - 'docs/validation/results/2026-10-03-learnable-views-campaign.md: the bias as the learned recipe''s own gain (+0.0017).'
+  - 'docs/validation/results/crops-and-views/2026-10-03-learnable-views-campaign.md: the bias as the learned recipe''s own gain (+0.0017).'
   novelty: First removal on the ResNet-50 and on the current recipe.
   coverage: The attention of every label over every view.
   exploitation: >-
@@ -127,8 +127,8 @@ ideas:
     knee_side_sign, knee_center_x_mm and the middle slice's patient map, zero where the side or the
     geometry is unknown, not the learned frame's axis. PF OA and the other labels get no bias.
   precedents:
-  - 'docs/validation/results/2026-09-21-anatomical-attention-result.md: the adoption, +0.0023.'
-  - 'docs/validation/results/2026-10-01-revisits-campaign.md: its removal, +0.0009 at x4 (80% [+0.0002, +0.0016]).'
+  - 'docs/validation/results/pooling-and-attention/2026-09-21-anatomical-attention-result.md: the adoption, +0.0023.'
+  - 'docs/validation/results/campaigns-and-queues/2026-10-01-revisits-campaign.md: its removal, +0.0009 at x4 (80% [+0.0002, +0.0016]).'
   novelty: First run of the bias with the routed shared heads and on the ResNet-50.
   coverage: Four labels' attention; other labels only through the shared token features.
   exploitation: >-

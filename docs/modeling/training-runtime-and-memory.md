@@ -75,15 +75,15 @@ Use full-run timing and memory from the current baseline above for planning.
 These measurements come from the dropped
 [crop-selection runs](../history/crop-selection-investigation.md). Their 300 px canvases hold
 1.79× the pixels of 224 px triplets, so the measurements apply to any larger-input run, such as
-the deferred [280 px test](../backlog/endgame.md#bigger-images) at 1.56×.
+the deferred [280 px test](../backlog/untried-ideas.md#views-and-fields) at 1.56×.
 The restored baseline, like `00-baseline`, uses 16 workers and `prefetch_factor: 2`, and has no
 separate validation worker count. The crop-era `trainer.validation_num_workers` field was
 removed. A larger-input run should revisit both settings.
 
-The first [crop-selection run](../validation/results/2026-09-15-crop-selection-result.md) was
+The first [crop-selection run](../validation/results/crops-and-views/2026-09-15-crop-selection-result.md) was
 killed by the Linux out-of-memory killer during epoch 8. WSL got 30 GB of the host's
 64 GB by default; after the
-[per-label crops run](../validation/results/2026-09-16-per-label-crops-result.md) was killed the
+[per-label crops run](../validation/results/crops-and-views/2026-09-16-per-label-crops-result.md) was killed the
 same way, through 7–8 GB of loader shared memory, WSL was raised to 47 GiB.
 - **Batch sizes:** 300 px canvases make validation batches about 200 MB and training
   batches about 100 MB of padded uint8 images.
@@ -132,8 +132,7 @@ recipe before the changes).
 - **The step is not loader-bound.** The GPU executes about 180 ms of kernels per step; the rest
   is the main thread issuing about 5,500 small operations and waiting at about 265 points that
   force a GPU synchronisation (boolean indexing, `nonzero`, `.item()`, `unique`, Python branches
-  on tensor values), most of them in the augmentation and geometry code. Removing those would
-  let CPU and GPU work overlap; it was not attempted.
+  on tensor values), most of them in the augmentation and geometry code. Removing them was done on 2026-10-14 (sync-free training step, commit 9f277d4). Audit on the ResNet-50 student recipe (`configs/rn50-distilled-student.yaml` (never committed)), RTX PRO 6000 with an EPYC 7543 host: 281 synchronisations per step, 199 ms of an 809 ms step blocked in them, 7,749 kernel launches, GPU busy 71%. The changes: training logging as masked sums read once per epoch; `solve_ex`/`inv_ex` and a closed-form Rodrigues rotation in place of `linalg` error checks and `matrix_exp`; per-step constants built on the device and cached; `torch._assert_async` checks; contrast mixing vectorised over study and plane groups and image augmentations drawing their parameters up front, in the original order, with `nonzero_static`; GIN normalising per series index instead of `unique`. Parity: same weights on 64 validation studies at ×4, mean difference 7e-8 (max 6e-6) on the ConvNeXt student, 2.5e-6 (max 7e-4) after merging main's model split, ResNet-50 student 3.6e-6 (max 4e-4); the first 12 losses stay within the 0.001 spread of two old-code runs. Speed: 275–276 ms to 258 ms per step (260 ms after the merge, −6%), synchronisations 281 to 50, GPU busy 84%. About 50 sites remain: kornia inside affine, gamma, contrast and noise (13); the slice-mask `nonzero` in `_encode_crops` and `_augment_images` (5); feature-statistics augmentation (4); `_log_views`, the masked target loss, anatomy centre checks and soft-tissue routing (about 15); the count reads of contrast mixing and augmentation; Lightning's step logging. Sites are listed with `torch.cuda.set_sync_debug_mode("warn")` over a few real steps.
 - **What gave the gain, in order:** only the middle channel of each canvas is sent to the GPU
   when `slice_channels` is `repeated_middle` (33 MB instead of 99 MB per batch; 270 to 246 ms);
   `model.channels_last: true` (304 to 291 ms; on ResNet-18 the changing image count per step

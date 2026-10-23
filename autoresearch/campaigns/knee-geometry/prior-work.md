@@ -6,7 +6,7 @@ marked with their source; hypotheses are marked as such.
 ## How the model uses side today
 
 **Anatomical attention**, adopted 2026-09-21, +0.0023 macro AUC
-([record](../../anatomical-attention.md)):
+(`autoresearch/anatomical-attention.md`, removed):
 
 - Every token gets a signed medial position
   `medial_mm = knee_side_sign × (patient_x − knee_center_x_mm)` (`modeling/model.py`,
@@ -82,7 +82,7 @@ Measured 2026-09-23 from headers, 4,410 studies
   centred on the scanner origin, 33 conflicting metadata, 15 coordinates contradicting metadata,
   14 text only, 1 bilateral tag (`outputs/analysis/k/knee-side-policy-20260914/studies.parquet`).
 - **Bilateral studies**
-  ([contralateral knee](../../../docs/research/series-filtering-signals.md#contralateral-knee)):
+  ([contralateral knee](../../../docs/research/data-and-validation/series-filtering-signals/findings-by-case.md#contralateral-knee)):
   seven training studies hold two full knee protocols (Philips, `SENSE_HR_KNEE_AC`, one contiguous
   `SeriesNumber` block per knee, X sign separates the knees); `…42012883` has one stray sagittal
   series from the other side. Which knee the study labels describe is undocumented. Today 7 of
@@ -91,17 +91,17 @@ Measured 2026-09-23 from headers, 4,410 studies
   bias or mask. A robust refit alone would validate them with half the tokens on the wrong side.
 - Rule-based side from coordinates: centre-X sign agrees with explicit tags in 97.72% of 2,151
   studies, 99.23% with |X| > 20 mm
-  ([knee-side coordinates](../../../docs/metadata/knee-side-coordinate-investigation.md#agreement-and-potential-coverage)).
+  ([knee-side coordinates](../../../docs/metadata/knee-side/knee-side-coordinate-investigation.md#agreement-and-potential-coverage)).
 
 ## Cross-talk and the side mask
 
 - **Inference-only masking** on `k05-clean` raised AUC against sibling-positive negatives by
   +0.008 to +0.013 but lowered it against sibling-clean negatives; macro flat (+0.0002)
-  ([result](../../../docs/validation/results/2026-09-23-sibling-masking.md)).
+  ([result](../../../docs/validation/results/labels-and-losses/2026-09-23-sibling-masking.md)).
 - **Receptive field** (medial-lateral-transfer campaign): a stride-32 token 64 px from the
   midline takes about 30% of its input from the other image half, so a pooling mask does not
   remove sibling pixels from each token.
-- **Trained side mask, `side-mask`** ([result](../../../docs/validation/results/2026-09-23-side-mask-and-token-attention.md#trained-side-mask-side-mask); 2026-09-23, `model.compartment_evidence: side_mask` on the
+- **Trained side mask, `side-mask`** ([result](../../../docs/validation/results/pooling-and-attention/2026-09-23-side-mask-and-token-attention.md#trained-side-mask-side-mask); 2026-09-23, `model.compartment_evidence: side_mask` on the
   `sibling-masking` branch, patch in
   `outputs/analysis/s/side-mask-vs-k05-clean/side_mask.patch`, applies to `d914079`): the four
   compartment labels attend only to own-side tokens plus the ±10 mm band; unknown side or invalid
@@ -161,7 +161,7 @@ guide. Family deltas:
   old sampler's envelope; the dip and humps do not.
 - **Per-plane width on frozen checkpoints:** coronal narrower than 40 mm gains (+0.00135 at
   30 mm, sign held to ×4), axial width is inert, a sagittal ×1 gain did not survive higher counts
-  ([result](../../../docs/validation/results/2026-09-18-per-plane-sigma-cache.md)).
+  ([result](../../../docs/validation/results/sampling/2026-09-18-per-plane-sigma-cache.md)).
 - **Density gate on `k05-clean`** (measured 2026-09-23, real prediction pipeline with only
   `select_triplets` swapped; baseline reproduces the saved predictions to 5.5e-5; triplet counts
   match; `outputs/analysis/t/two-peak-sagittal-gate-20260923/result.md`):
@@ -180,10 +180,10 @@ guide. Family deltas:
   rejected centres) was worth about 0 and was retired; its x was not side-normalized and it sat
   beside the 1D and 2D embeddings
   ([lineage](../../../docs/history/model-lineage.md#five-embedding-predecessor),
-  [champion without 3D](../../../docs/inference/submissions/2026-09-15-champion-without-3d-at-inference.md)).
+  [champion without 3D](../../../docs/inference/submissions/early-submission-details.md)).
 - **Token graph** (kNN message passing with LPS offsets) stayed near initialization in both
   fold-0 runs ([lineage](../../../docs/history/model-lineage.md#retired-token-graph)).
-- **`token-attention`** ([result](../../../docs/validation/results/2026-09-23-side-mask-and-token-attention.md#global-token-attention-token-attention); 2026-09-23, branch `token-attention`, patch in
+- **`token-attention`** ([result](../../../docs/validation/results/pooling-and-attention/2026-09-23-side-mask-and-token-attention.md#global-token-attention-token-attention); 2026-09-23, branch `token-attention`, patch in
   `outputs/analysis/t/token-attention-vs-k05-clean/token_attention.patch`): one pre-norm transformer
   block over each study's valid tokens with 3D RoPE on raw patient LPS (not side-normalized,
   relative only), 1D and 2D embeddings dropped, reflected studies negate x. Against `k05-clean`:

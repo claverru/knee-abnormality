@@ -23,7 +23,7 @@ handling. There is no new format support, inversion, LUT or windowing.
 The benchmark (`scripts/adhoc/benchmark_dataloader_optimizations.py`, removed; last in
 commit `aec290d`) used the actual `KneeStudyDataset` and production collation.
 Its independent `production-reference` used frozen preprocessing and dataset
-code in `scripts/adhoc/dataloader_reference/` (last in commit `204d29c`). Both timing candidates perform the same raw series discovery and
+code in `scripts/adhoc/dataloader_reference/` (removed) (last in commit `204d29c`). Both timing candidates perform the same raw series discovery and
 start with empty application slice indexes. Source inventories and copied
 snapshots include nested modules with project-relative paths. The exporter
 copied the package successfully, and isolated imports resolved every new module
@@ -88,8 +88,8 @@ does not establish 1× training throughput or full-dataset correctness.
 Evidence, including the archived development plan, original/reference and
 package audits, supplemental selection hashes, final source/configuration
 snapshots, dependency versions, fixtures and all timing pairs, is under
-[`outputs/profiling/dicom-integration-20260912`](../../outputs/profiling/dicom-integration-20260912).
-The [final summary](../../outputs/profiling/dicom-integration-20260912/final/summary.json)
+`outputs/profiling/dicom-integration-20260912` (deleted).
+The final summary (deleted)
 records the gate and unrounded ratios. It was produced by the `dicom-suite`
 mode of the removed benchmark (`aec290d:scripts/adhoc/benchmark_dataloader_optimizations.py`,
 invoked as `python -m scripts.adhoc.benchmark_dataloader_optimizations

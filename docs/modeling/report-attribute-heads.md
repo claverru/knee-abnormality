@@ -4,12 +4,12 @@
 
 **Part of the recipe since 2026-09-25** (user decision): on target set 3.1 the heads scored
 +0.00105 ×4 macro and 0.940 public against 0.938
-([result](../validation/results/2026-09-25-report-attribute-heads.md)). Training only: one
+([result](../validation/results/labels-and-losses/2026-09-25-report-attribute-heads.md)). Training only: one
 auxiliary prediction per report-attribute question beside the unchanged disease loss. The
-attributes come from the [JevK5 extraction](../ongoing/report-attribute-extraction.md). On the
+attributes come from the [JevK5 extraction](../public-labels/jevk5-report-attribute-extraction.md). On the
 ResNet-18 recipe, removing them cost −0.0006 ×4 (80% [−0.0011, −0.0001]) and halving the
 coefficient to 0.05 cost −0.0004, so they stay
-([revisits campaign](../validation/results/2026-10-01-revisits-campaign.md#other-runs)).
+([revisits campaign](../validation/results/campaigns-and-queues/2026-10-01-revisits-campaign.md#other-runs)).
 
 ## Configuration
 
@@ -45,7 +45,7 @@ targets, the question set and the source run by SHA-256. The current set is 3.1:
   depth "not mentioned", "normal" and "only elsewhere"; cartilage extent "no loss" and "only
   elsewhere"; bone-on-bone into full thickness. The merged pairs mean the same for the disease and
   flipped between option orders on 600–1,369 reports each
-  ([analysis](../ongoing/report-attribute-extraction.md#v3-full-run-analysis-2026-09-25)).
+  ([analysis](../public-labels/jevk5-report-attribute-extraction.md#v3-full-run-analysis-2026-09-25)).
 - **Reliability weight per question and study:** one minus the total-variation distance between
   the forward-order and reverse-order distributions after merging. Mean 0.86; 4% of cells fall
   below 0.5. Lowest by question: cartilage extent (0.73–0.78), Baker's size (0.76), cartilage

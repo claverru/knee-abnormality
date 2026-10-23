@@ -19,7 +19,7 @@ ideas:
   precedents:
   - autoresearch/campaigns/triplet-sampling/ideas.yaml (physical-span-standardized-triplets,
     queued, never trained)
-  - docs/research/input-resolution.md#acquisition-all-24371-train-series
+  - docs/research/geometry-and-views/input-resolution.md#acquisition-all-24371-train-series
   - docs/data-preparation/physical-sampling/implemented-sampler.md
   novelty: Re-queued by explicit user instruction on 2026-09-21 from the stopped triplet-sampling
     campaign, where it was queued but never implemented or trained. The only earlier
@@ -97,7 +97,7 @@ ideas:
     up posterior subcutaneous fat. Fall back to the image centre whenever the landmark
     is not found. Placement is deterministic per series in validation and inference.'
   precedents:
-  - docs/research/input-resolution.md#field-of-view-and-joint-position (joint offsets,
+  - docs/research/geometry-and-views/input-resolution.md#field-of-view-and-joint-position (joint offsets,
     tissue width, placement reopened 2026-09-21)
   - outputs/analysis/i/input-resolution-research-20260915/images/common.py joint_line
     heuristic (cross-plane agreement within 10 mm in 96-98% of studies; not validated
@@ -106,7 +106,7 @@ ideas:
     (tissue width and offsets per plane)
   - docs/history/crop-selection-investigation.md (learned crop selection dropped 2026-09-16;
     its anatomical-glimpse option was never run)
-  - docs/validation/results/2026-09-12-140-mm-crop-result.md
+  - docs/validation/results/crops-and-views/2026-09-12-140-mm-crop-result.md
   novelty: 'Added by the user on 2026-09-21. Unlike the dropped crop-selection work
     it learns nothing and changes neither resolution nor coverage of slices: one window
     per slice, the same size, moved to anatomy. Tissue-centring alone was rejected
@@ -252,8 +252,8 @@ ideas:
   precedents:
   - docs/history/crop-selection-investigation.md#what-the-runs-established (attention-based
     selection beat random by only 0.004 there; normalized attention entropy 0.97-0.99)
-  - docs/research/auc_loss_approaches.md#adaptive-allocation
-  - docs/backlog/big-bets.md#adaptive-training-allocation
+  - docs/research/training-objectives/auc_loss_approaches.md#adaptive-allocation
+  - docs/backlog/untried-ideas.md#augmentation-sampling-and-intensity
   novelty: 'Added by the user on 2026-09-21. The triplet-sampling campaign allowed
     training feedback but proposed only static geometric mechanisms. Differs from
     learned crop selection: no new model, no learned placement in validation or inference,
@@ -419,9 +419,9 @@ ideas:
     rare labels evenly across the epoch's batches, drawn from the training seed and
     epoch. Only batch membership and order change.
   precedents:
-  - docs/validation/results/2026-09-19-balanced-bce-result.md
-  - docs/research/auc_loss_approaches.md#weighting-and-sampling-design-space
-  - docs/backlog/small-changes.md#bce-weighting-and-study-sampling
+  - docs/validation/results/labels-and-losses/2026-09-19-balanced-bce-result.md
+  - docs/research/training-objectives/auc_loss_approaches.md#weighting-and-sampling-design-space
+  - docs/backlog/untried-ideas.md#supervision-and-labels
   novelty: Added by the user on 2026-09-21. Changes batch composition without changing
     visit frequency or loss weights, so it does not overlap class-balanced BCE's weighting.
   coverage: Every study still appears once per epoch; exposure per study is identical
@@ -475,10 +475,10 @@ ideas:
     effect.'
   - 'docs/history/triplet-budget-allocation.md: training-time counts matter; test-time
     counts barely do. A-priori type reallocations were rejected.'
-  - "docs/backlog/overnight.md#candidates-for-later-queues: fewer slices cost \u2212\
+  - "docs/validation/run-comparison-and-diagnostics.md#overnight-launcher: fewer slices cost \u2212\
     0.0041 and \u22120.0051; denser budgets are memory-blocked. outputs/training/k_05/fold_0/timing.json:\
     \ peak 19.6 GiB."
-  - docs/backlog/big-bets.md#adaptive-training-allocation and docs/research/auc_loss_approaches.md#adaptive-allocation
+  - docs/backlog/untried-ideas.md#augmentation-sampling-and-intensity and docs/research/training-objectives/auc_loss_approaches.md#adaptive-allocation
     own exposure and weight feedback, and the entropy-floor, smoothing and bounds
     cautions. This idea changes neither exposure nor weights.
   - 'triplet-sampling findings proposals-20260919T190312Z-3039dad1 item 4a: per-triplet
@@ -609,20 +609,20 @@ ideas:
     \ a single moved window, \u22120.00095, reject. Its tissue mask and IOP axis helpers\
     \ are reusable; its joint-line estimator and draw-dependent reference slice are\
     \ not."
-  - 'docs/research/input-resolution.md#field-of-view-and-joint-position: FOV median
+  - 'docs/research/geometry-and-views/input-resolution.md#field-of-view-and-joint-position: FOV median
     160 mm; sagittal AP width 146 mm; overhang table; ''only a wider field helps'';
     2026-09-21 decision to keep 140 mm/0.625 mm.'
-  - 'docs/validation/results/2026-09-15-two-crops-result.md and docs/history/crop-selection-investigation.md:
+  - 'docs/validation/results/crops-and-views/2026-09-15-two-crops-result.md and docs/history/crop-selection-investigation.md:
     learned smaller crops at a changed size and resolution cost 0.003; coverage mattered
     as much as resolution. That is a different mechanism.'
   - "docs/data-preparation/peripheral-coverage.md#spatial-importance-map: surviving\
     \ hemisphere contrasts. PF OA anterior +1.85; effusion superior +1.23; Baker's\
     \ posterior \u22121.23 and inferior \u22120.90."
-  - "docs/research/input-resolution.md#field-of-view-and-joint-position: 150\u2192\
+  - "docs/research/geometry-and-views/input-resolution.md#field-of-view-and-joint-position: 150\u2192\
     140 mm gave +0.003 local (confounded with resolution); 128\u2013130 mm crops lost\
     \ MCL, Baker's, effusion and medial meniscus."
   - "Per-label correlation computed this session from the assignment's per_label deltas\
-    \ and docs/validation/results/2026-09-21-class-balance-exponent.md: span vs anchor\
+    \ and docs/validation/results/labels-and-losses/2026-09-21-class-balance-exponent.md: span vs anchor\
     \ r=0.72; span and anchor vs k1\u2212k05 r=0.43 and 0.59."
   novelty: 'This is the first mechanism in the registry to act on in-plane coverage
     at bag level. anatomy-anchored-crop-placement moved one window per series and
@@ -751,9 +751,9 @@ ideas:
   - "researcher-20260921T224526Z-92a4b780, exhausted directions: thin-series slab\
     \ averaging was dismissed for small reach (2\u20134% of triplets). This idea covers\
     \ every series with 5 or more slices in a run and aims at coverage, not harmonization."
-  - "docs/validation/results/2026-09-16-restored-code-hyperparameter-runs.md and docs/backlog/overnight.md#candidates-for-later-queues:\
+  - "docs/validation/results/campaigns-and-queues/2026-09-16-restored-code-hyperparameter-runs.md and docs/validation/run-comparison-and-diagnostics.md#overnight-launcher:\
     \ fewer slices cost \u22120.0041 and \u22120.0051; denser budgets are memory-blocked."
-  - "docs/validation/results/2026-09-17-test-time-allocation.md: \xD72 evaluation\
+  - "docs/validation/results/sampling/2026-09-17-test-time-allocation.md: \xD72 evaluation\
     \ count \u2248 +0.0035 on frozen checkpoints (training counts \u22120.00346 against\
     \ default)."
   - "Probe: outputs/autoresearch/sampling/jobs/researcher-20260921T233929Z-cdc19f71/scratch/probe/SUMMARY.md\
@@ -1037,7 +1037,7 @@ ideas:
   - 'plane-coupled-depth-targets (this campaign, reject, -0.0004): more depth co-location
     without pixel-level fusion did nothing, consistent with late fusion being unable
     to use registration.'
-  - "docs/validation/results/2026-09-17-type-contribution.md (fluid share and efficiency;\
+  - "docs/validation/results/pooling-and-attention/2026-09-17-type-contribution.md (fluid share and efficiency;\
     \ coronal and sagittal T1/PD lead medial and lateral OA) and 2026-09-17-test-time-allocation.md\
     \ (removal costs: T1/PD \u22640.002, fluid 0.006-0.007)."
   - 'researcher-20260921T224526Z-92a4b780 exhausted note called cross-contrast registered
