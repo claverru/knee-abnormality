@@ -35,7 +35,8 @@ LIVE = "Used by a live process"
 UNFINISHED = "Run without a selection record"
 ACTIVE = "Campaign is not stopped"
 SUBMITTED = "Source of a submitted bundle in the ledger"
-ONGOING = "Named in docs/ongoing"
+ONGOING = "Named in docs/ongoing or the final solution"
+PRETRAINING = "Last checkpoint of a pretraining, the start weights of later stages"
 UNRECORDED = "Result not recorded in the docs or a campaign state"
 NO_RULE = "No rule covers this location"
 ATTENTION = (UNFINISHED, UNRECORDED, NO_RULE)
@@ -157,6 +158,8 @@ def measure(path: Path) -> dict[str, int]:
 def read_text(folders: Iterable[Path]) -> str:
     parts = []
     for folder in folders:
+        if folder.is_file():
+            parts.append(folder.read_text(errors="ignore"))
         for current, names, files in os.walk(folder):
             names[:] = [name for name in names if name not in SKIPPED_FOLDERS]
             for name in files:
@@ -317,6 +320,10 @@ def scan_folds(
                 scan.add(file, "checkpoints", SUBMITTED, "")
             elif hold:
                 scan.add(file, "checkpoints", hold, "")
+            elif file.name == "last.ckpt" and any(
+                name.endswith("-pretrain") for name in names
+            ):
+                scan.add(file, "checkpoints", PRETRAINING, "")
             elif file.name == "last.ckpt":
                 scan.add(
                     file, "checkpoints", None, "Resume checkpoint of a finished run"
@@ -337,7 +344,7 @@ def scan_folds(
                     file,
                     "checkpoints",
                     None,
-                    "Recorded run outside docs/ongoing and the ledger",
+                    "Recorded run outside docs/ongoing, the final solution and the ledger",
                 )
 
 
@@ -371,7 +378,7 @@ def scan_exports(scan: Scan, exports: Path, submitted: set[Path]) -> None:
                 path,
                 "exports",
                 keep or (UNRECORDED if unrecorded and path.is_file() else None),
-                "Export weights of a model outside docs/ongoing and the ledger",
+                "Export weights of a model outside docs/ongoing, the final solution and the ledger",
             )
 
 
@@ -410,7 +417,7 @@ def scan_arrays(scan: Scan, outputs: Path) -> None:
                     path,
                     "arrays",
                     keep,
-                    "Regenerable array of an investigation outside docs/ongoing",
+                    "Regenerable array of an investigation outside docs/ongoing and the final solution",
                 )
 
 
@@ -594,7 +601,11 @@ def main() -> None:
     commands, open_paths = processes()
     scan = Scan(
         roots=roots,
-        ongoing=read_text(root / "docs" / "ongoing" for root in roots),
+        ongoing=read_text(
+            path
+            for root in roots
+            for path in (root / "docs" / "ongoing", root / "docs" / "final-solution.md")
+        ),
         docs=read_text(root / "docs" for root in roots),
         code=read_text(
             root / name
