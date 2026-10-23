@@ -2,8 +2,8 @@
 
 The next label pass should first repair specific rule failures, then address OA depth and
 extent. This audit reviewed report text and existing predictions; it did not inspect MRI
-images, change labels, or launch training. Proposed work is in the
-[v3.2 investigation backlog](../backlog/big-bets.md#v32-label-threshold-and-rule-review).
+images, change labels, or launch training. The targeted follow-up is recorded in
+[v3.2 labels and comparison](2026-10-19-v32-labels.md).
 
 ## Inputs and method
 

@@ -6,35 +6,6 @@ move its entry to [ongoing work](../ongoing/INDEX.md) and remove it from this fi
 Entries under [parked](#parked-until-a-specific-need) wait for a concrete need before they become
 candidates. Each entry says whether its motivation is measured or a hypothesis.
 
-## v3.2 label threshold and rule review
-
-**Measured premise, improvement unmeasured.** The [v3.1 audit](../public-labels/2026-10-19-v31-label-audit.md)
-found a review-coverage gap, specific rule failures and 29 OA lower-target candidates whose
-reports describe low-grade or tiny lesions. Another 17 OA candidates lack sufficient depth or
-extent evidence. This is one label-quality investigation, with staged changes; implementation
-and training have not started.
-
-1. Re-read every rule-changed cell that conflicts with an explicit report verdict, including
-   the fracture, contusion and meniscus cases in the audit. Preserve separate fields for
-   fracture acuity, bone-containing fragment/donor site and chondral-only lesions. Prevent
-   an uncertain second finding from overriding definite qualifying meniscal morphology.
-   Distinguish explicit contusion negation from silence and generic osteochondral injury.
-   Reassess ACL caps where chronicity or bundle count substitutes for fiber-disruption severity;
-   a redacted fracture date must not establish that a fracture is old or healed.
-2. Re-read OA reports by compartment with separate depth, extent/size, grading system,
-   negation and uncertainty fields, each tied to an evidence span. Start with the 46 unreviewed
-   OA candidates, then apply the same policy across the full table. Keep low-grade/measured-small
-   lesions separate from unsized high-grade lesions. Numeric targets need independent evidence;
-   do not substitute raw image-model scores or set every ambiguous report to negative.
-3. Review MRI images for the largest model/report conflicts and the three paired meniscus
-   reversals before changing their targets. Use this to distinguish report localization,
-   model side mapping and model prediction errors.
-4. Freeze adjudications and an independent evaluation set before measuring the resulting
-   labels. Keep the source v3.1 table immutable and gold overrides intact. The user launches
-   paired control/candidate training with the same recipe, fold and seed; compare both on
-   identical frozen targets and image-reviewed labels. Label-table agreement with targets
-   used to design the rules is not evidence of training improvement.
-
 ## Position and knee side
 
 **The supervised anatomical-attention sequence is closed:** learned family strengths
