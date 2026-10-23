@@ -24,7 +24,10 @@ Commands run with `rtk proxy uv run --locked python -m`. Five submissions a day,
    code: `scripts.pipeline.export --checkpoint CKPT... --output OUT/exports/NAME
    --image-multiplier M --attention-temperature T`, adding `--reflection-tta` when wanted. Several
    checkpoints make an ensemble; at x6 an ensemble needs `--inference-batch-size 2
-   --inference-num-workers 8`. `manifest.json` must say `ready`.
+   --inference-num-workers 8`. The default `--backbone graph` compiles each member's backbone and
+   captures it in a CUDA graph; pass `--backbone eager` for an ensemble whose graph pools do not fit
+   the T4 (about 0.31 GiB per member on top of the weights; 20 mixed ConvNeXt, NextViT and
+   ResNet-50 members peaked at 12.6 of 14.6 GiB at x4). `manifest.json` must say `ready`.
 3. **Launch.** `scripts.tools.submission_job start --bundle OUT/exports/NAME
    --dataset claverru/knee-NAME --notebook NOTEBOOK --record RECORD --label "LABEL"
    --sequence NN`.
@@ -35,8 +38,11 @@ Commands run with `rtk proxy uv run --locked python -m`. Five submissions a day,
    - Slugs: 6 to 50 characters.
    - `start` prints the job's unit name, `UNIT` below.
 4. **Watch.** `scripts.tools.submission_job status --record RECORD` gives the state and the seconds
-   of each stage; `logs` prints the runner log. The job submits the notebook version itself and
-   ends at `submission_complete` with the public score.
+   of each stage; `logs` prints the runner log. A bundle without `compile-cache.bin` first gets
+   one: the job uploads it, runs a `NOTEBOOK-cache` notebook on the visible test
+   (`compile_cache_running`), adds the cache to the local bundle and re-verifies it
+   (`compile_cache_built`). It then submits the notebook version itself and ends at
+   `submission_complete` with the public score.
 5. **Record.** `scripts.tools.update_submission_ledger`, then the score in `docs/ongoing/` and the
    run's result document.
 
@@ -45,15 +51,17 @@ Commands run with `rtk proxy uv run --locked python -m`. Five submissions a day,
 Relaunch when either holds:
 
 - the notebook is **queued**: `kaggle kernels status NOTEBOOK` still says `QUEUED` a minute after
-  the record reached `notebook_running`;
+  the record reached `notebook_running` (or `compile_cache_running`, for the record's
+  `compile_cache_notebook`);
 - the `notebook_running` stage has lasted **double** that of a similar reference: the same stage in
   the record of an earlier submission with the same backbone, member count, multiplier and TTA.
 
 To relaunch:
 
 1. `systemctl --user stop UNIT`.
-2. `rtk proxy uv run --locked kaggle kernels delete -y NOTEBOOK`. Deleting the notebook ends its
-   run and frees the slug and title.
+2. `rtk proxy uv run --locked kaggle kernels delete -y NOTEBOOK` (or the compile-cache notebook).
+   Deleting the notebook ends its run and frees the slug and title. A bundle that already holds
+   `compile-cache.bin` skips the cache build on the next start.
 3. `start` again with the same arguments and a new record path, such as `OUT/records/NAME-r2.json`.
 
 Repeat until a notebook completes.

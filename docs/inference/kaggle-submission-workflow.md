@@ -191,6 +191,14 @@ notebook stuck in the queue, since every sample started within 8 seconds.
    score and reported runtime. Inspect failed-run logs before retrying and
    keep final selections explicit before the deadline.
 
+Before uploading a bundle that lacks `compile-cache.bin`, `scripts.pipeline.submit` builds it on
+Kaggle: it uploads the bundle, runs its notebook on the visible test as `NOTEBOOK-cache`
+with `KNEE_COMPILE_CACHE_OUTPUT` set, so the first GPU worker packs its inductor and Triton cache
+after compiling the backbones, and adds that file to the local bundle and its manifest. The worker
+unpacks a shipped cache before compiling, which saves about 14 s of model load
+([compile](2026-10-19-torch-compile-backbone.md)). Kaggle unpacks uploaded `.tar` files, hence the
+`.bin` name.
+
 Bundle readiness records successful packaging checks. `scripts.pipeline.submit` refuses an
 existing record path, an unready bundle and a notebook whose latest run is still active, and
 writes each remote response to the record before advancing. The remote notebook

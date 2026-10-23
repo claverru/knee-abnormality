@@ -103,6 +103,11 @@ def predict_request(request: PredictionRequest) -> dict:
     sys.modules["wandb"] = None
     from knee_abnormality.evaluation.predictions import make_prediction_frame
     from knee_abnormality.inference.checkpoint import load_models
+    from knee_abnormality.inference.compile_cache import (
+        COMPILE_CACHE_OUTPUT,
+        pack_compile_cache,
+        use_compile_cache,
+    )
     from knee_abnormality.inference.engine import (
         BACKBONE_CHUNK_IMAGES,
         predict_loader,
@@ -127,7 +132,17 @@ def predict_request(request: PredictionRequest) -> dict:
     )
     if actual_precision == "fp16":
         for model in models:
+            model.backbone.half()
+    if actual_precision == "fp16" and request.backbone == "graph":
+        cache = use_compile_cache(request.checkpoint.parent)
+        for model in models:
             use_fixed_backbone_chunks(model, request.config.data.image_size)
+        if (
+            cache is not None
+            and request.worker_index == 0
+            and COMPILE_CACHE_OUTPUT in os.environ
+        ):
+            pack_compile_cache(cache, Path(os.environ[COMPILE_CACHE_OUTPUT]))
     loaded = time.perf_counter()
     study_ids, predictions, records = predict_loader(
         models,
@@ -176,6 +191,9 @@ def predict_request(request: PredictionRequest) -> dict:
         "forward_seconds": sum(record["forward_seconds"] for record in records),
         "images": sum(record["images"] for record in records),
         "peak_allocated_gib": torch.cuda.max_memory_allocated() / 2**30
+        if device.type == "cuda"
+        else None,
+        "peak_reserved_gib": torch.cuda.max_memory_reserved() / 2**30
         if device.type == "cuda"
         else None,
         "batches": records,

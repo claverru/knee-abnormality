@@ -7,11 +7,15 @@ measured step has a dated profile in [inference](../inference/INDEX.md#runtime-a
 ## State on 2026-10-23
 
 **In main: the loader buffer pool, the early worker exit, the startup page pre-read, exported
-checkpoints that keep only the network, and convolution and linear weights stored in FP16.** The
-compiled backbone and its compile cache stay on branch `inference-speed`, uncommitted, which stays
-alive for the rest of the competition; single-model efficiency submissions are prepared from it.
-Open: a validation-fold score with the pool, and re-recording `kaggle_startup_pages.json` when
-Kaggle's image changes.
+checkpoints that keep only the network, and convolution and linear weights stored in FP16. Exports
+choose `--backbone graph` (default: the backbone compiled inside its CUDA graph, with the compile
+cache the submission job builds) or `--backbone eager` (for ensembles whose graph pools do not
+fit); both hold the backbone in FP16 on the GPU.** Compiled graphs fit a 20-member ensemble that
+plain graphs could not ([compile](../inference/2026-10-19-torch-compile-backbone.md#a-graph-sized-ensemble)).
+The FP16 backbone takes another 0.8–1.0 GiB off that ensemble's peak, with predictions within
+0.002. Branch `inference-speed` stays alive for the rest of the competition. Open: a
+validation-fold score with the pool, and re-recording `kaggle_startup_pages.json` when Kaggle's
+image changes.
 
 ## State on 2026-10-19
 

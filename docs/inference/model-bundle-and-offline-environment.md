@@ -117,6 +117,21 @@ builds an ensemble bundle instead:
   was confirmed to keep the pre-ensemble `manifest.json`/`config.json` schema
   and to reproduce a plain forward pass bit for bit.
 
+### Backbone mode
+
+`export.py --backbone` records how the FP16 backbone runs on Kaggle, in `manifest.json`'s
+`runtime.backbone` and `config.json`'s `inference.backbone`; `verify_bundle` rejects a mismatch.
+In both modes the prediction worker holds each member's backbone in FP16.
+
+- `graph` (default): `use_fixed_backbone_chunks` compiles the backbone (`torch.compile`, static
+  64-image chunks) and captures it as one CUDA graph per member. `scripts.pipeline.submit` first
+  builds `compile-cache.bin` on Kaggle and adds it to the bundle.
+- `eager`: no compile and no capture, for ensembles whose per-member graph pools do not fit the
+  GPU. The bundle's submission description carries `eager`.
+
+The choice is per bundle because the graph pools depend on the members' families, not only their
+count ([compile](2026-10-19-torch-compile-backbone.md#a-graph-sized-ensemble)).
+
 ### Reflection test-time augmentation (TTA2)
 
 `export.py --reflection-tta` (off by default) turns on mirror test-time

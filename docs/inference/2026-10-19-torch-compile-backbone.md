@@ -7,9 +7,11 @@ every family and 32% faster on a 10-member ensemble, with predictions within 0.0
 ×4, compiled alone does not pay (its kernel launches take the loaders' CPU), but compiled inside
 the existing CUDA graph cuts the worker wall by 30–42 s in paired same-session runs and S167's
 session by 34 s on average over three fresh sessions per arm. Adopted on 2026-10-20 on the
-`inference-speed` branch only, uncommitted there: its `use_fixed_backbone_chunks` compiles the
-backbone before its capture, and its `scripts.pipeline.submit` builds the compile cache on a Kaggle
-T4 and ships it in the bundle. Main keeps the uncompiled CUDA-graph path.**
+`inference-speed` branch and in main on 2026-10-23 as the default `--backbone graph` export:
+`use_fixed_backbone_chunks` compiles the backbone before its capture, and `scripts.pipeline.submit`
+builds the compile cache on a Kaggle T4 and ships it in the bundle. Compiled graphs also keep
+smaller pools: a 20-member ensemble that runs out of memory with plain graphs fits with compiled
+ones.**
 
 Code under test: `use_compiled_backbone` in `inference/engine.py` (probe bundles; production still
 uses `use_fixed_backbone_chunks`). Labs: `profile_kaggle_inference` conditions `compile-lab`,
@@ -174,6 +176,34 @@ scored **0.964 public**, 2nd of thirteen 0.964s, above every other single model 
 - The cache notebook sat in Kaggle's queue twice and was relaunched (records `-r2`, `-r3`).
 - Visible run: model load 18.6 s with the cache, verification 12.6 s, τ 0.85 confirmed in the
   runtime log.
+
+## A graph-sized ensemble
+
+20 members of the S188 pool (7 ConvNeXt-T, 7 NextViT-S, 6 ResNet-50, FP32 weights) as one bundle,
+×4, batch 2, 8 workers, mirror TTA, 40 studies, Kaggle 2×T4, one session per arm
+(`outputs/profiling/kaggle-x20-compiled-graph-20261023`):
+
+| | Plain graphs | Compiled graphs | `--backbone graph` (compiled, FP16 backbone) | `--backbone eager` (FP16 backbone) |
+|---|---|---|---|---|
+| Result | CUDA out of memory | complete | complete | complete |
+| Graph pools | 9.86 GiB (from the error) | about 6.25 GiB (reserved 9.76 GiB after capture, 3.51 GiB allocated) | — | none |
+| Peak reserved per GPU | above 14.4 GiB | 12.29, 12.60 GiB | 11.51, 11.58 GiB | 8.61, 9.20 GiB |
+| Model load | — | 96 s, cold | 81 s, cold | 12 s |
+| Prediction, 20 studies per GPU | — | 163, 152 s | 139, 150 s | 223, 224 s |
+| Max \|Δ\| against compiled graphs | — | — | 0.0020 (mean 7.5e-5) | 0.0021 (mean 8.2e-5) |
+
+The last two columns are main's code at 2026-10-23 on the same members
+(`outputs/profiling/kaggle-x20-{graph,eager}-mode-20261023`), without a compile cache; the largest
+batches held 272 and 296 images.
+
+- **Compiling cuts the per-member pool from about 0.49 to 0.31 GiB.** S166 ran 20 members with
+  plain graphs; this mix did not fit, so the graph limit depends on the families, not on a member
+  count.
+- **The FP16 backbone takes another 0.8–1.0 GiB off the peak** and leaves 3 GiB of headroom on
+  40 studies; predictions move by at most 0.002.
+- **Eager forwards are about 50% slower** (223 against 139–150 s per GPU) but load in 12 s; on
+  40 studies the cold compile evens the two walls (250 against 254 s), and the compile cache and
+  a full test set favour the graph.
 
 ## Rejected
 

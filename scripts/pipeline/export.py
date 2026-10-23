@@ -36,6 +36,7 @@ from knee_abnormality.inference.checkpoint import (
     read_checkpoint,
     validate_checkpoint,
 )
+from knee_abnormality.inference.processes import BackboneMode
 from knee_abnormality.kaggle import (
     BACKBONE_WHEELS,
     KAGGLE_PLATFORM,
@@ -113,6 +114,10 @@ class ExportCLI(CLISettings):
     reflection_tta: bool = Field(
         default=False,
         description="Also run each member on the mirrored batch and average per study by reflection eligibility",
+    )
+    backbone: BackboneMode = Field(
+        default="graph",
+        description="FP16 backbone on Kaggle: graph compiles it and captures one CUDA graph per member, with a compile cache the submission job builds; eager runs it uncaptured, for ensembles whose graph pools do not fit the GPU",
     )
 
 
@@ -455,6 +460,7 @@ def export_bundle(args: ExportCLI) -> dict:
                     "image_multiplier": args.image_multiplier,
                     "attention_temperature": temperatures[0],
                     "reflection_tta": args.reflection_tta,
+                    "backbone": args.backbone,
                 },
             }
             (temporary / "config.json").write_text(
@@ -521,6 +527,7 @@ def export_bundle(args: ExportCLI) -> dict:
                     "image_multiplier": args.image_multiplier,
                     "attention_temperature": 1.0,
                     "reflection_tta": args.reflection_tta,
+                    "backbone": args.backbone,
                 },
             }
             (temporary / "config.json").write_text(
@@ -637,12 +644,13 @@ def export_bundle(args: ExportCLI) -> dict:
                 "image_multiplier": args.image_multiplier,
                 "attention_temperature": runtime_attention_temperature,
                 "reflection_tta": args.reflection_tta,
+                "backbone": args.backbone,
                 "batch_size": args.inference_batch_size,
                 "batch_size_scope": "per_device",
                 "num_workers": args.inference_num_workers,
                 "num_workers_scope": "total",
                 "parallelism": "one_process_per_visible_gpu",
-                "automatic_precision_policy": "native CUDA BF16, other CUDA FP16 with fixed backbone chunks warmed at the input size, CPU FP32",
+                "automatic_precision_policy": "native CUDA BF16, other CUDA FP16 with the backbone in FP16 and, for the graph backbone, compiled fixed chunks captured at the input size, CPU FP32",
             },
             "unmet_prerequisites": unmet,
             "ready": not unmet,
