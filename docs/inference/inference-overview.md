@@ -27,7 +27,7 @@ The [generalization and inference investigation](../history/sharing/generalizati
 compares reflection, 1A, 1B and original 1C using their actual GPU, worker and
 batch settings. Submission-to-completion waits of 13m36s–17m38s include queue
 and scoring delays; they do not establish hidden-data inference speed or the
-efficiency-prize runtime, and carry at least 128 s of queueing noise
+efficiency-prize runtime, and carry queueing noise of unmeasured size
 ([efficiency leaderboard](efficiency-leaderboard.md#each-pick-is-a-measurement-of-our-hidden-runtimes)).
 The saved visible notebooks contain only three studies.
 

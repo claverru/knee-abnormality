@@ -6,7 +6,7 @@
 |---|---|
 | Checking submission state and inference context | [Inference and efficiency overview](inference-overview.md) |
 | Checking submission rules and the output contract | [Submission requirements and output contract](submission-requirements-and-output-contract.md) |
-| Interpreting the efficiency leaderboard | [Efficiency leaderboard](efficiency-leaderboard.md) |
+| Interpreting the efficiency leaderboard: which selected submission it ranks, its one-day lag, the AUC-to-runtime rate, our rank history | [Efficiency leaderboard](efficiency-leaderboard.md) |
 | Pricing runtime in AUC: seconds per thousandth, whether TensorRT, fewer images, mirror TTA or ensembles pay | [2026-10-16 efficiency exchange rate](2026-10-16-efficiency-exchange-rate.md) |
 | Building frozen inference bundles and offline environments | [Repository readiness and model bundle](model-bundle-and-offline-environment.md) |
 | Preparing exports and detached submissions | [Fast submission preparation](fast-submission-preparation.md) |
