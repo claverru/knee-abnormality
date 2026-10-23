@@ -32,6 +32,7 @@ from knee_abnormality.inference.checkpoint import (
     bake_attention_temperature,
     checkpoint_model,
     ensemble_member_path,
+    half_precision_weights,
     read_checkpoint,
     validate_checkpoint,
 )
@@ -52,6 +53,7 @@ BUNDLED_SCRIPTS = (
     "scripts/pipeline/predict.py",
     "scripts/pipeline/predict_worker.py",
 )
+BUNDLED_DATA = ("src/knee_abnormality/inference/kaggle_startup_pages.json",)
 INFERENCE_DISTRIBUTIONS = (
     "kornia",
     "pytorch-lightning",
@@ -131,6 +133,7 @@ def _bundled_files() -> list[str]:
             path.relative_to(PROJECT_ROOT).as_posix()
             for path in sorted(package.rglob("*.py"))
         ),
+        *BUNDLED_DATA,
         *BUNDLED_SCRIPTS,
     ]
 
@@ -150,8 +153,13 @@ def _portable_config(config: ExperimentConfig, fold: int) -> dict:
 
 
 def _inference_checkpoint(checkpoint: dict, config: dict) -> dict:
-    allowed = ("state_dict", "epoch", "global_step", "pytorch-lightning_version")
+    allowed = ("epoch", "global_step", "pytorch-lightning_version")
     result = {name: checkpoint[name] for name in allowed if name in checkpoint}
+    result["state_dict"] = {
+        key: value
+        for key, value in checkpoint["state_dict"].items()
+        if key.startswith("model.")
+    }
     result["hyper_parameters"] = deepcopy(checkpoint["hyper_parameters"])
     result["hyper_parameters"]["config"] = config
     return result
@@ -453,9 +461,19 @@ def export_bundle(args: ExportCLI) -> dict:
                 json.dumps(bundle_config, indent=2) + "\n", encoding="utf-8"
             )
             exported = _inference_checkpoint(member.checkpoint, config)
-            TorchCheckpointIO().save_checkpoint(exported, temporary / "model.ckpt")
             portable_config = load_config(temporary / "config.json")
             validate_checkpoint(exported, portable_config, targets)
+            exported = half_precision_weights(
+                exported,
+                checkpoint_model(
+                    exported,
+                    portable_config,
+                    targets,
+                    torch.device("cpu"),
+                    temperatures[0],
+                ),
+            )
+            TorchCheckpointIO().save_checkpoint(exported, temporary / "model.ckpt")
             checkpoint_model(
                 exported,
                 portable_config,
@@ -524,12 +542,16 @@ def export_bundle(args: ExportCLI) -> dict:
                 )
                 exported = _inference_checkpoint(member.checkpoint, portable)
                 validate_checkpoint(exported, validated, targets)
-                checkpoint_model(
+                model = checkpoint_model(
                     exported, validated, targets, torch.device("cpu"), temperature
                 )
-                baked = bake_attention_temperature(
-                    exported, validated, targets, temperature
+                baked = half_precision_weights(
+                    bake_attention_temperature(
+                        exported, validated, targets, temperature
+                    ),
+                    model,
                 )
+                checkpoint_model(baked, validated, targets, torch.device("cpu"), 1.0)
                 member_path = ensemble_member_path(temporary / "models", index)
                 TorchCheckpointIO().save_checkpoint(baked, member_path)
                 training_source = _training_source(member.path)

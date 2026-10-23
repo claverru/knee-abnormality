@@ -141,6 +141,29 @@ def bake_attention_temperature(
     return baked
 
 
+HALF_PRECISION_LAYERS = (
+    torch.nn.Conv1d,
+    torch.nn.Conv2d,
+    torch.nn.Conv3d,
+    torch.nn.Linear,
+)
+
+
+def half_precision_weights(checkpoint: dict, model: KneeAbnormalityModel) -> dict:
+    names = {
+        f"model.{module_name}.{name}"
+        for module_name, module in model.named_modules()
+        if isinstance(module, HALF_PRECISION_LAYERS)
+        for name, _ in module.named_parameters(recurse=False)
+    }
+    halved = dict(checkpoint)
+    halved["state_dict"] = {
+        key: value.half() if key in names else value
+        for key, value in checkpoint["state_dict"].items()
+    }
+    return halved
+
+
 ENSEMBLE_MEMBER_GLOB = "member-*.ckpt"
 
 
