@@ -17,6 +17,7 @@ from knee_abnormality.autoresearch.runtime.isolation import (
     environment,
 )
 from knee_abnormality.autoresearch.runtime.layout import campaign_fold
+from knee_abnormality.autoresearch.runtime.remote import launcher
 from knee_abnormality.autoresearch.runtime.storage import (
     alive,
     atomic_write,
@@ -72,6 +73,7 @@ class JobMixin:
             "gpu": gpu,
         }
         if kind == "training":
+            spec["host"] = self.state.get("host")
             spec["gpu_lock"] = str(
                 self.root / "outputs/autoresearch/.gpu-locks" / f"{gpu}.lock"
             )
@@ -95,6 +97,20 @@ class JobMixin:
             directory / "worker.log",
             directory / "launcher.json",
             environment(self.root),
+        )
+
+    def hosted(self, name, command, cwd, uploads, downloads):
+        host = self.state.get("host")
+        if host is None:
+            return command
+        return launcher(
+            host,
+            name,
+            command,
+            cwd,
+            [self.root, *uploads],
+            downloads,
+            self.root / "uv.lock",
         )
 
     def submit(self, *args, **kwargs):

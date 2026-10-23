@@ -43,6 +43,7 @@ from knee_abnormality.autoresearch.runtime.layout import (
     comparison_path,
     fold_dir,
 )
+from knee_abnormality.autoresearch.runtime.remote import interpreter
 from knee_abnormality.autoresearch.runtime.storage import (
     atomic_write,
     read_json,
@@ -383,8 +384,9 @@ class ExperimentMixin:
         cache = Path.home() / ".cache"
         if cache.exists():
             writable.append(cache)
+        host = self.state.get("host")
         training = [
-            sys.executable,
+            interpreter(host),
             "-m",
             "scripts.pipeline.train",
             str(config_path),
@@ -399,23 +401,30 @@ class ExperimentMixin:
             kind,
             source,
             sandbox(
-                [
-                    sys.executable,
-                    "-P",
-                    str(self.root / "scripts/tools/preflight_training.py"),
-                    "--config",
-                    str(config_path),
-                    "--fold",
-                    str(campaign_fold(self.state)),
-                    "--output",
-                    str(directory / "preflight"),
-                    "--command",
-                    json.dumps(training),
-                ],
+                self.hosted(
+                    f"{kind}-{directory.name}",
+                    [
+                        interpreter(host),
+                        "-P",
+                        str(self.root / "scripts/tools/preflight_training.py"),
+                        "--config",
+                        str(config_path),
+                        "--fold",
+                        str(campaign_fold(self.state)),
+                        "--output",
+                        str(directory / "preflight"),
+                        "--command",
+                        json.dumps(training),
+                    ],
+                    source,
+                    [source, config_path, limits_path],
+                    [directory / "training", directory / "preflight"],
+                ),
                 source,
                 writable,
                 gpu=True,
                 readonly=[source, config_path, limits_path],
+                network=host is not None,
             ),
             payload=payload,
             timeout=timeout,
@@ -452,8 +461,9 @@ class ExperimentMixin:
             raise ValueError("Launch-time reference predictions changed")
         if sha256(Path(self.state["headers"])) != self.state["headers_sha256"]:
             raise ValueError("Acquisition metadata changed")
+        host = self.state.get("host")
         command = [
-            sys.executable,
+            interpreter(host),
             "-m",
             "scripts.tools.compare_fold_runs",
             "--reference",
@@ -514,19 +524,26 @@ class ExperimentMixin:
             "comparison",
             self.root,
             sandbox(
-                [
-                    sys.executable,
-                    "-m",
-                    "scripts.tools.autoresearch",
-                    "compare",
-                    "--config",
-                    str(command_file),
-                    "--root",
-                    str(self.root),
-                ],
+                self.hosted(
+                    f"comparison-{directory.name}",
+                    [
+                        interpreter(host),
+                        "-m",
+                        "scripts.tools.autoresearch",
+                        "compare",
+                        "--config",
+                        str(command_file),
+                        "--root",
+                        str(self.root),
+                    ],
+                    self.root,
+                    [base, Path(self.state["headers"]), command_file],
+                    [directory / "comparison"],
+                ),
                 self.root,
                 [directory],
                 readonly=[directory / "source", directory / "training"],
+                network=host is not None,
             ),
             payload={"experiment": exp["id"]},
             timeout=remaining,

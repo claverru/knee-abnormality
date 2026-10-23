@@ -64,7 +64,7 @@ def run_job(directory: Path):
                             },
                         )
                         return
-                    if not gpu_available(spec["gpu"]):
+                    if not gpu_available(spec["gpu"], spec.get("host")):
                         write_json(
                             directory / "receipt.json",
                             {"exit_code": GPU_BUSY, "error": "GPU busy", "seconds": 0},

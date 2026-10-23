@@ -11,6 +11,8 @@ from pydantic import (
     model_validator,
 )
 
+from knee_abnormality.autoresearch.runtime.remote import TrainingHost
+
 PACKAGE = PurePosixPath("src/knee_abnormality")
 RECIPE = "configs/campaign.yaml"
 PROTECTED_SOURCES = tuple(
@@ -211,6 +213,7 @@ class Campaign(BaseModel):
     budget: Budget
     policy: CampaignPolicy
     chain: ChainReference | None = None
+    training_host: TrainingHost | None = None
 
     @computed_field
     @property

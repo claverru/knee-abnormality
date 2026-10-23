@@ -247,6 +247,7 @@ class Supervisor(JobMixin, ExperimentMixin, ResultMixin, SchedulingMixin, Monito
             "policy": self.policy.model_dump(mode="json"),
             "provider": provider,
             "gpu": gpu,
+            "host": self.campaign["training_host"],
             "status": "calibrating",
             "reason": None,
             "pause_kind": None,
