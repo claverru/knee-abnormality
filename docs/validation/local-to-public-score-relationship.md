@@ -28,7 +28,9 @@ What follows from that:
   which metric agrees, and prefer a leaderboard result over a sub-0.005 fold-0 difference when the
   two disagree ([validation strategy](validation-strategy.md#what-a-comparison-can-resolve)).
 - Compare only submissions that differ in the trained model. Test density, attention temperature
-  and the label table each move the public score by more than recent recipe changes do.
+  and the label table each move the public score by more than recent recipe changes do. Tune τ
+  on the board or on radiologist labels only, never on silver: see
+  [attention temperature](results/2026-10-22-attention-temperature.md).
 
 ## Earlier working notes
 
