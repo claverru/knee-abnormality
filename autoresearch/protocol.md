@@ -34,7 +34,8 @@ idea that needs a source change. The numerical acceptance and resource gates
 remain shared code and cannot be disabled by a topic policy.
 
 No submissions or publication are authorized. Experiments are limited to local
-training and local validation; never submit to Kaggle, upload models or predictions,
+training and local validation, or to the one
+[training host](runtime.md#training-host) a campaign names; never submit to Kaggle, upload models or predictions,
 publish datasets or notebooks, or launch remote evaluation jobs. Public research
 and documentation may be read.
 

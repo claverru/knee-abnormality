@@ -1,4 +1,3 @@
-import sys
 from pathlib import Path
 
 from knee_abnormality.autoresearch.campaign.binding import parent_changed
@@ -6,6 +5,7 @@ from knee_abnormality.autoresearch.campaign.completion import completion_blocker
 from knee_abnormality.autoresearch.campaign.definition import RECIPE
 from knee_abnormality.autoresearch.runtime.gpu import gpu_available
 from knee_abnormality.autoresearch.runtime.isolation import sandbox
+from knee_abnormality.autoresearch.runtime.remote import interpreter
 from knee_abnormality.autoresearch.supervisor.prompts import (
     FORCED_SEED_INSTRUCTIONS,
 )
@@ -52,23 +52,31 @@ class SchedulingMixin:
             return
         base = Path(self.state["base"])
         destination = self.output / "baseline"
+        host = self.state.get("host")
         self.submit(
             "calibration",
             base,
             sandbox(
-                [
-                    sys.executable,
-                    "-m",
-                    "knee_abnormality.autoresearch.cli",
-                    "calibrate",
-                    "--config",
-                    str(base / RECIPE),
-                    "--destination",
-                    str(destination),
-                ],
+                self.hosted(
+                    "calibration",
+                    [
+                        interpreter(host),
+                        "-m",
+                        "knee_abnormality.autoresearch.cli",
+                        "calibrate",
+                        "--config",
+                        str(base / RECIPE),
+                        "--destination",
+                        str(destination),
+                    ],
+                    base,
+                    [base],
+                    [destination],
+                ),
                 base,
                 [destination],
                 readonly=[base],
+                network=host is not None,
             ),
             timeout=14400,
         )
@@ -160,7 +168,7 @@ class SchedulingMixin:
             and claimed
             and claimed["stage"] == "prepared"
             and running is None
-            and gpu_available(self.state["gpu"])
+            and gpu_available(self.state["gpu"], self.state.get("host"))
         ):
             self.training(claimed)
         return False

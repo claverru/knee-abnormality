@@ -384,8 +384,9 @@ violations cannot produce acceptance.
 
 ## Boundaries and prerequisites
 
-Only local training and local validation are authorized. No Kaggle submissions,
-uploads, publication, or remote jobs. Candidate configuration, baseline replay,
+Only local training and local validation are authorized, or those of a campaign's
+[training host](#training-host). No Kaggle submissions, uploads, publication, or other
+remote jobs. Candidate configuration, baseline replay,
 training and comparison processes have networking disabled. Cache the existing
 pretrained weights before starting; training uses offline model loading. Research
 agents may read public sources through their CLI tools.
@@ -396,6 +397,43 @@ headers, and the selected authenticated CLI. Startup refuses missing isolation o
 API-only authentication. Ordinary code checks GPU availability and holds a GPU lease
 shared by local campaigns before launching. External processes can still compete for
 the GPU; their interference cannot increase the sealed budget.
+
+### Extra training data
+
+A recipe with `extra_training` trains on external pseudo-labelled studies only: it is the
+pretraining stage, and the fold's studies serve validation. The training ledger records no
+batches, because the external studies lie outside the sealed cohort; the wall-clock range budget
+covers their time. Joint training, which interleaved fold and external batches, was removed: see
+[retired fastMRI-chain pieces](../docs/history/fastmri-chain-retired-pieces.md#joint-training-with-external-batches).
+
+### Training host
+
+A campaign with a `training_host` block in `campaign.yaml` (address, port, user, key, root) runs
+its calibration, trainings and comparisons on that machine; a campaign without it runs them
+locally. Agents, review, the queue, decisions and every record stay local.
+
+- **Launch:** the job the supervisor starts is a local launcher
+  (`knee_abnormality.autoresearch.runtime.remote`). It copies the campaign root, the candidate's
+  source and the job's inputs to the same absolute paths on the host, starts the same command
+  there and prints its log.
+- **Same paths:** the host exposes the project's `data` and `outputs` at the local absolute
+  paths, as links, so configs and recorded paths resolve on both machines.
+- **Records:** every 20 seconds the launcher brings the job's output folder back, without
+  checkpoints, so the budget, the activation check and the decision read local files.
+  Checkpoints stay on the host.
+- **Environment:** `<root>/environment` on the host is synchronised from the campaign root's
+  `uv.lock` whenever its hash differs.
+- **GPU:** the supervisor reserves the host's GPU, so a local campaign and a hosted one run side
+  by side.
+- **Stop:** the launcher refreshes a heartbeat on the host; a guard there ends the job when the
+  heartbeat is five minutes old, so a cancelled, timed-out or crashed launcher ends its run.
+- **Worker crash:** every job runs with Python's fault handler on. When a training exits because
+  a data-loader worker died of a segmentation fault, and a fresh training still fits the run's
+  time limit, the launcher discards the partial run and starts the same command again from
+  scratch, once, and says so in the job's log.
+- **Network:** the launcher needs the network locally. On the host the job runs without a
+  sandbox when its container cannot provide one; the user accepts that per host, and no
+  credentials, agents or records go there.
 
 Researchers and orchestrators receive read-only repository views. Developers edit
 isolated source; documentation, scripts and harness code are read-only mounts. A

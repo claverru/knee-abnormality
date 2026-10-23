@@ -68,7 +68,10 @@ class Start(CampaignCommand, GpuChoice):
     def cli_cmd(self) -> None:
         def action(supervisor, current):
             preflight(self.provider, supervisor.root)
-            supervisor.initialize(self.provider, gpu_uuid(self.gpu))
+            supervisor.initialize(
+                self.provider,
+                gpu_uuid(self.gpu, supervisor.campaign["training_host"]),
+            )
             supervisor.launch()
 
         control("start", self, action)

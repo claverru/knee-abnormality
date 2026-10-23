@@ -29,6 +29,9 @@ permissions using the same runtime.
    get 6), `budget` ([training budget](#training-budget)) and
    `policy`. The recipe's single `validation.folds` entry is the campaign fold, and the
    control must be trained on it. Artifacts go to `outputs/autoresearch/<id>`.
+   An optional `training_host` block (address, port, user, key, root) runs the campaign's
+   calibration, trainings and comparisons on that machine
+   ([training host](runtime.md#training-host)); its reference must be timed there.
    The control must match the starting effective recipe apart from name, seed,
    output path and `reference_equivalences`. A topic the loop chains on an incumbent
    instead takes a `chain` block (predecessor, incumbent, source, run, prediction hash):
