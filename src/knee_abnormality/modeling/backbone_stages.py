@@ -97,7 +97,9 @@ class FocalNetStages(StemStages):
                         or child.dilation != (1, 1)
                         or child.groups != 1
                     ):
-                        raise ValueError("FocalNet pointwise projection geometry changed")
+                        raise ValueError(
+                            "FocalNet pointwise projection geometry changed"
+                        )
                     setattr(module, name, FocalNetPointwise(child))
 
     def _padded(self, tensor: torch.Tensor) -> torch.Tensor:

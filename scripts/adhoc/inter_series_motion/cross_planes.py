@@ -39,14 +39,20 @@ def load_volume(s):
 def reformat(a, ia, b, vol, pos, shape, offset=(0.0, 0.0)):
     origin = a.ipp[ia] - b.ipp[0]
     ii, jj = np.meshgrid(
-        np.arange(shape[0], dtype=np.float64) + offset[0], np.arange(shape[1], dtype=np.float64) + offset[1], indexing="ij"
+        np.arange(shape[0], dtype=np.float64) + offset[0],
+        np.arange(shape[1], dtype=np.float64) + offset[1],
+        indexing="ij",
     )
     col = (origin @ b.u + jj * (a.u @ b.u) + ii * (a.v @ b.u)) / b.ps[1]
     row = (origin @ b.v + jj * (a.u @ b.v) + ii * (a.v @ b.v)) / b.ps[0]
     t = pos[0] + origin @ b.n + jj * (a.u @ b.n) + ii * (a.v @ b.n)
     k = np.interp(t, pos, np.arange(len(pos)), left=-1, right=-1)
-    mask = (k >= 0) & (row >= 0) & (row <= b.rows - 1) & (col >= 0) & (col <= b.cols - 1)
-    out = map_coordinates(vol, [np.maximum(k, 0), row, col], order=1, mode="constant", cval=0.0)
+    mask = (
+        (k >= 0) & (row >= 0) & (row <= b.rows - 1) & (col >= 0) & (col <= b.cols - 1)
+    )
+    out = map_coordinates(
+        vol, [np.maximum(k, 0), row, col], order=1, mode="constant", cval=0.0
+    )
     out = out * mask
     scale = np.percentile(out[mask], 99) if mask.any() else 1.0
     return np.sqrt(np.clip(out / max(scale, 1e-6), 0, 2)).astype(np.float32), mask
@@ -122,7 +128,11 @@ def work(args):
         line = np.cross(a.n, b.n)
         line = line / np.linalg.norm(line)
         across = np.cross(a.n, line)
-        for kind, offset in (("pair", (0.0, 0.0)), ("synthetic", SYNTH)) if synthetic else (("pair", (0.0, 0.0)),):
+        for kind, offset in (
+            (("pair", (0.0, 0.0)), ("synthetic", SYNTH))
+            if synthetic
+            else (("pair", (0.0, 0.0)),)
+        ):
             try:
                 m = measure(a, b, vol, pos, offset)
             except Exception:
@@ -172,7 +182,13 @@ def work(args):
 def main():
     cfg = Settings()
     series = pl.read_csv(cfg.data_root / "raw" / "train_series.csv")
-    studies = pl.read_csv(cfg.data_root / "folds" / "all_5fold_scanner_v2" / "studies.csv")["StudyInstanceUID"].sort().to_list()
+    studies = (
+        pl.read_csv(cfg.data_root / "folds" / "all_5fold_scanner_v2" / "studies.csv")[
+            "StudyInstanceUID"
+        ]
+        .sort()
+        .to_list()
+    )
     rng = np.random.default_rng(cfg.seed)
     order = [studies[i] for i in rng.permutation(len(studies))]
     if cfg.limit > 0:

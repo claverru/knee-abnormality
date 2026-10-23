@@ -416,7 +416,9 @@ def main() -> None:
     config_path = args.config.expanduser().resolve()
     config = load_config(config_path, overrides=overrides)
     if args.resume is not None and args.initial_weights is not None:
-        raise ValueError("--initial-weights starts a run; a resumed run has its own weights")
+        raise ValueError(
+            "--initial-weights starts a run; a resumed run has its own weights"
+        )
     if args.resume is not None and len(config.validation.folds) != 1:
         raise ValueError("--resume requires exactly one selected fold")
     resume_checkpoint = (

@@ -20,7 +20,10 @@ class Wavelet:
 stub.Wavelet = Wavelet
 sys.modules["pywt"] = stub
 sys.path.insert(0, "/home/claudio/.cache/wtconv-src/WTConv")
-sys.path.insert(0, "/home/claudio/src/knee-abnormality/outputs/autoresearch/backbone-families/experiments/wtconvnext-tiny-20261016T005805Z-b03b5f00/workspace/src")
+sys.path.insert(
+    0,
+    "/home/claudio/src/knee-abnormality/outputs/autoresearch/backbone-families/experiments/wtconvnext-tiny-20261016T005805Z-b03b5f00/workspace/src",
+)
 
 from wtconv.wtconv2d import WTConv2d as Original
 
@@ -49,25 +52,37 @@ for channels, size, levels in ((96, 56, 5), (192, 28, 4), (384, 14, 3), (768, 7,
     x = torch.randn(16, channels, size, size, device="cuda")
     grad = torch.randn(16, channels, size, size, device="cuda")
     results = []
-    for layer, data in ((original, x.clone()), (vendored, x.clone().contiguous(memory_format=torch.channels_last))):
+    for layer, data in (
+        (original, x.clone()),
+        (vendored, x.clone().contiguous(memory_format=torch.channels_last)),
+    ):
         data.requires_grad_(True)
         layer.zero_grad()
         out = layer(data)
         out.backward(grad)
         missing = [name for name, p in layer.named_parameters() if p.grad is None]
         if missing:
-            print(type(layer).__module__, channels, size, levels, "no gradient:", missing)
-        params = {name: (p.grad.clone() if p.grad is not None else torch.zeros_like(p)) for name, p in layer.named_parameters()}
+            print(
+                type(layer).__module__, channels, size, levels, "no gradient:", missing
+            )
+        params = {
+            name: (p.grad.clone() if p.grad is not None else torch.zeros_like(p))
+            for name, p in layer.named_parameters()
+        }
         results.append((out.detach().float(), data.grad.float(), params))
     (o1, g1, p1), (o2, g2, p2) = results
 
     def rel(a, b):
         return ((a - b).norm() / b.norm().clamp_min(1e-12)).item()
 
-    base_pairs = [("base_conv.weight", "base_weight"), ("base_conv.bias", "base_bias"), ("base_scale.weight", "base_scale")]
-    level_pairs = [(f"wavelet_convs.{i}.weight", f"wt_weights.{i}") for i in range(levels)] + [
-        (f"wavelet_scale.{i}.weight", f"wt_scales.{i}") for i in range(levels)
+    base_pairs = [
+        ("base_conv.weight", "base_weight"),
+        ("base_conv.bias", "base_bias"),
+        ("base_scale.weight", "base_scale"),
     ]
+    level_pairs = [
+        (f"wavelet_convs.{i}.weight", f"wt_weights.{i}") for i in range(levels)
+    ] + [(f"wavelet_scale.{i}.weight", f"wt_scales.{i}") for i in range(levels)]
     param_errors = {b: rel(p2[b], p1[a]) for a, b in base_pairs + level_pairs}
     with torch.autocast("cuda", dtype=torch.bfloat16):
         bf_original = original(x)

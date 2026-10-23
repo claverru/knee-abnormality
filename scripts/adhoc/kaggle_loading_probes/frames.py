@@ -10,7 +10,14 @@ CELLS = [1, 4, 16, 64]
 FILES_PER_CELL = 900
 AUDIT_FILES = 300
 
-PREPARATION_ERRORS = (AttributeError, EOFError, OSError, RuntimeError, TypeError, ValueError)
+PREPARATION_ERRORS = (
+    AttributeError,
+    EOFError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,7 +123,10 @@ def read_payload(item):
     path, descriptor = item
     with path.open("rb") as stream:
         info = os.fstat(stream.fileno())
-        if (info.st_size, info.st_mtime_ns) != (descriptor.file_size, descriptor.modified_ns):
+        if (info.st_size, info.st_mtime_ns) != (
+            descriptor.file_size,
+            descriptor.modified_ns,
+        ):
             return None
         stream.seek(descriptor.offset)
         return stream.read(descriptor.length)
@@ -167,7 +177,10 @@ def describe_block(paths: list[Path]) -> list:
 
 def matched_blocks(cells: int, frames_per_cell: int, studies) -> list[list]:
     buckets: list[dict[int, list]] = [{} for _ in range(cells)]
-    while min(sum(len(v) for v in bucket.values()) for bucket in buckets) < frames_per_cell:
+    while (
+        min(sum(len(v) for v in bucket.values()) for bucket in buckets)
+        < frames_per_cell
+    ):
         items = describe_block(sorted(series_paths(next(studies))))
         for item in items:
             length = item[1].length

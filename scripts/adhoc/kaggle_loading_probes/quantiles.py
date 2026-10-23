@@ -21,7 +21,9 @@ def _linear_quantiles(values, lower_quantile, upper_quantile):
     values.partition(np.unique(np.concatenate((lower, upper))))
     lower_values = values[lower]
     upper_values = values[upper]
-    bounds = lower_values + (upper_values - lower_values) * (ranks - lower).astype(np.float32)
+    bounds = lower_values + (upper_values - lower_values) * (ranks - lower).astype(
+        np.float32
+    )
     return float(bounds[0]), float(bounds[1])
 
 
@@ -54,14 +56,20 @@ def _histogram_quantiles(values, lower_quantile, upper_quantile):
     table = {int(rank): selected[position] for position, rank in enumerate(wanted)}
     lower_values = np.asarray([table[int(value)] for value in lower], dtype=np.float32)
     upper_values = np.asarray([table[int(value)] for value in upper], dtype=np.float32)
-    bounds = lower_values + (upper_values - lower_values) * (ranks - lower).astype(np.float32)
+    bounds = lower_values + (upper_values - lower_values) * (ranks - lower).astype(
+        np.float32
+    )
     return float(bounds[0]), float(bounds[1])
 
 
 def _normalize_pixels(pixels, rects, low, high):
     low_value = np.float32(low)
     high_value = np.float32(high)
-    if not np.isfinite(low_value) or not np.isfinite(high_value) or high_value <= low_value:
+    if (
+        not np.isfinite(low_value)
+        or not np.isfinite(high_value)
+        or high_value <= low_value
+    ):
         return np.zeros(pixels.shape, dtype=np.uint8)
     gain = (np.float32(1.0) / (high_value - low_value)) * np.float32(255.0)
     np.clip(pixels, low_value, high_value, out=pixels)
@@ -81,7 +89,11 @@ def _normalize_pixels(pixels, rects, low, high):
 def _fused_normalize(pixels, rects, low, high):
     low_value = np.float32(low)
     high_value = np.float32(high)
-    if not np.isfinite(low_value) or not np.isfinite(high_value) or high_value <= low_value:
+    if (
+        not np.isfinite(low_value)
+        or not np.isfinite(high_value)
+        or high_value <= low_value
+    ):
         return np.zeros(pixels.shape, dtype=np.uint8)
     gain = (np.float32(1.0) / (high_value - low_value)) * np.float32(255.0)
     offset = np.float32(low_value * gain)
@@ -139,7 +151,9 @@ def _axis_filter(source, target, first, count):
     for output_index in range(first, first + count):
         center = (output_index + 0.5) * scale - 0.5
         weights = {}
-        for index in range(math.floor(center - support), math.ceil(center + support) + 1):
+        for index in range(
+            math.floor(center - support), math.ceil(center + support) + 1
+        ):
             weight = max(0.0, 1.0 - abs(center - index) / support)
             if weight == 0 or index < 0 or index >= source:
                 continue
@@ -293,7 +307,9 @@ def audit(acquisitions):
 
 
 def main() -> None:
-    acquisitions = real_acquisitions(ACQUISITIONS) if REAL_PIXELS else build(ACQUISITIONS)
+    acquisitions = (
+        real_acquisitions(ACQUISITIONS) if REAL_PIXELS else build(ACQUISITIONS)
+    )
     bounds = [
         _linear_quantiles(scratch.copy(), LOWER_QUANTILE, UPPER_QUANTILE)
         for _, _, scratch in acquisitions

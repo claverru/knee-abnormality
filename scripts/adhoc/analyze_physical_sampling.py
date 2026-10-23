@@ -40,7 +40,9 @@ from knee_abnormality.provenance import copy_sources, sha256_file
 
 class AnalyzeCLI(CLISettings):
     config: Path = Path("configs/training.yaml")
-    headers: Path = Path("outputs/analysis/g/geometry-metadata-20260912/headers.parquet")
+    headers: Path = Path(
+        "outputs/analysis/g/geometry-metadata-20260912/headers.parquet"
+    )
     inventory: Path = Path("data/metadata/train_series_image_counts.parquet")
     reference: Path = Path(
         "outputs/analysis/p/physical-sampling-20260913/geometry-v3/summary.json"

@@ -21,23 +21,32 @@ class RepeatPair(BaseModel):
 PAIRS = [
     RepeatPair(
         mechanism="label-view-attention-bias",
-        first=EXPERIMENTS / "oblique/experiments/label-view-attention-bias-20260922T120824Z-29aa5863/comparison/comparison.json",
-        second=EXPERIMENTS / "oblique-x4/experiments/label-view-attention-bias-20260922T134812Z-7b4fa495/comparison/comparison.json",
+        first=EXPERIMENTS
+        / "oblique/experiments/label-view-attention-bias-20260922T120824Z-29aa5863/comparison/comparison.json",
+        second=EXPERIMENTS
+        / "oblique-x4/experiments/label-view-attention-bias-20260922T134812Z-7b4fa495/comparison/comparison.json",
     ),
     RepeatPair(
         mechanism="meniscus-shared-residual-head",
-        first=EXPERIMENTS / "knee-geometry/experiments/meniscus-shared-residual-head-20260924T002657Z-24ba1afc/comparison/comparison.json",
-        second=EXPERIMENTS / "near-misses/experiments/meniscus-shared-residual-head-20260924T210640Z-860b1d41/comparison/comparison.json",
+        first=EXPERIMENTS
+        / "knee-geometry/experiments/meniscus-shared-residual-head-20260924T002657Z-24ba1afc/comparison/comparison.json",
+        second=EXPERIMENTS
+        / "near-misses/experiments/meniscus-shared-residual-head-20260924T210640Z-860b1d41/comparison/comparison.json",
     ),
     RepeatPair(
         mechanism="dsu-feature-statistics",
-        first=EXPERIMENTS / "augmentation/experiments/dsu-feature-statistics-20260926T034836Z-6298ea10/comparison/comparison.json",
-        second=Path("outputs/analysis/d/dsu-without-smoothing-vs-report-attributes-control/comparison.json"),
+        first=EXPERIMENTS
+        / "augmentation/experiments/dsu-feature-statistics-20260926T034836Z-6298ea10/comparison/comparison.json",
+        second=Path(
+            "outputs/analysis/d/dsu-without-smoothing-vs-report-attributes-control/comparison.json"
+        ),
     ),
     RepeatPair(
         mechanism="run-level-stratified-jitter",
-        first=EXPERIMENTS / "triplet-sampling/experiments/run-level-stratified-jitter-20260919T183826Z-f211c7ce/comparison/comparison.json",
-        second=EXPERIMENTS / "sampling/experiments/run-level-stratified-jitter-20260921T224831Z-d1fcb8e3/comparison/comparison.json",
+        first=EXPERIMENTS
+        / "triplet-sampling/experiments/run-level-stratified-jitter-20260919T183826Z-f211c7ce/comparison/comparison.json",
+        second=EXPERIMENTS
+        / "sampling/experiments/run-level-stratified-jitter-20260921T224831Z-d1fcb8e3/comparison/comparison.json",
         same_split=False,
     ),
 ]
@@ -49,15 +58,23 @@ class RepeatPairNoiseCLI(CLISettings):
         "and compare it with the paired report-group bootstrap standard error"
     )
 
-    confidence: float = Field(default=0.8, gt=0, lt=1, description="Central interval level of the adoption rule")
+    confidence: float = Field(
+        default=0.8,
+        gt=0,
+        lt=1,
+        description="Central interval level of the adoption rule",
+    )
 
 
 def measurement(path: Path) -> dict[str, float]:
     comparison = json.loads(path.read_text())
     runs = comparison["runs"]
-    low, high = comparison["paired_report_group_bootstrap"]["intervals"]["all"]["delta_percentile_95"]
+    low, high = comparison["paired_report_group_bootstrap"]["intervals"]["all"][
+        "delta_percentile_95"
+    ]
     return {
-        "delta": runs["candidate"]["metrics"]["macro_auc"] - runs["reference"]["metrics"]["macro_auc"],
+        "delta": runs["candidate"]["metrics"]["macro_auc"]
+        - runs["reference"]["metrics"]["macro_auc"],
         "bootstrap_se": (high - low) / 3.92,
     }
 
@@ -87,7 +104,9 @@ def run(args: RepeatPairNoiseCLI) -> dict:
                 "difference": first["delta"] - second["delta"],
             }
         )
-    bootstrap_se = statistics.median(p[k]["bootstrap_se"] for p in pairs for k in ("first", "second"))
+    bootstrap_se = statistics.median(
+        p[k]["bootstrap_se"] for p in pairs for k in ("first", "second")
+    )
     z = norm.ppf(0.5 + args.confidence / 2)
     estimates = {
         "all": summary(pairs, bootstrap_se, z),

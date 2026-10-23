@@ -13,7 +13,14 @@ REPEATS = 3
 SPACING_MM = 0.625
 IMAGE_SIZE = 224
 
-PREPARATION_ERRORS = (AttributeError, EOFError, OSError, RuntimeError, TypeError, ValueError)
+PREPARATION_ERRORS = (
+    AttributeError,
+    EOFError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,7 +109,9 @@ def resample_crop(frame: DecodedFrame) -> ResampledSlice:
         ],
         dtype=np.float32,
     )
-    return ResampledSlice(image, (output_top, output_left, rows, columns), output_to_native)
+    return ResampledSlice(
+        image, (output_top, output_left, rows, columns), output_to_native
+    )
 
 
 def baseline(frames: list) -> list:
@@ -125,8 +134,8 @@ def stacked(frames: list) -> list:
         frame = frames[indexes[0]]
         height, width = frame.pixels.shape
         target_height, target_width = _target_shape(frame)
-        source_top, source_left, output_top, output_left, rows, columns = _crop_geometry(
-            target_height, target_width, IMAGE_SIZE
+        source_top, source_left, output_top, output_left, rows, columns = (
+            _crop_geometry(target_height, target_width, IMAGE_SIZE)
         )
         vertical = _axis_filter(height, target_height, source_top, rows)
         horizontal = _axis_filter(width, target_width, source_left, columns)
@@ -135,7 +144,9 @@ def stacked(frames: list) -> list:
         for position, index in enumerate(indexes):
             stack[:, position * width : (position + 1) * width] = frames[index].pixels
         middle = vertical.dot(stack).reshape(rows, count, width)
-        middle = np.ascontiguousarray(middle.transpose(2, 1, 0).reshape(width, count * rows))
+        middle = np.ascontiguousarray(
+            middle.transpose(2, 1, 0).reshape(width, count * rows)
+        )
         region = horizontal.dot(middle).reshape(columns, count, rows)
         scale_x = width / target_width
         scale_y = height / target_height
@@ -152,7 +163,9 @@ def stacked(frames: list) -> list:
             if frame.slope != 1.0 or frame.intercept != 0.0:
                 piece = piece * np.float32(frame.slope) + np.float32(frame.intercept)
             image = np.zeros((IMAGE_SIZE, IMAGE_SIZE), dtype=np.float32)
-            image[output_top : output_top + rows, output_left : output_left + columns] = piece
+            image[
+                output_top : output_top + rows, output_left : output_left + columns
+            ] = piece
             output[index] = ResampledSlice(
                 image, (output_top, output_left, rows, columns), matrix
             )
@@ -175,8 +188,8 @@ def batched(frames: list) -> list:
         frame = frames[indexes[0]]
         height, width = frame.pixels.shape
         target_height, target_width = _target_shape(frame)
-        source_top, source_left, output_top, output_left, rows, columns = _crop_geometry(
-            target_height, target_width, IMAGE_SIZE
+        source_top, source_left, output_top, output_left, rows, columns = (
+            _crop_geometry(target_height, target_width, IMAGE_SIZE)
         )
         vertical = _axis_filter(height, target_height, source_top, rows)
         horizontal = _axis_filter(width, target_width, source_left, columns).toarray().T
@@ -201,7 +214,9 @@ def batched(frames: list) -> list:
             if frame.slope != 1.0 or frame.intercept != 0.0:
                 piece = piece * np.float32(frame.slope) + np.float32(frame.intercept)
             image = np.zeros((IMAGE_SIZE, IMAGE_SIZE), dtype=np.float32)
-            image[output_top : output_top + rows, output_left : output_left + columns] = piece
+            image[
+                output_top : output_top + rows, output_left : output_left + columns
+            ] = piece
             output[index] = ResampledSlice(
                 image, (output_top, output_left, rows, columns), matrix
             )

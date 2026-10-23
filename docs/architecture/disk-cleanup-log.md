@@ -214,3 +214,6 @@ outside the final solution. Kept: every run named in the final solution, the six
 their `last.ckpt`, the code-only bundles (S188's among them), `outputs/logs` (it holds the local half
 of the final chain's scripts), `outputs/labels-v3-reading`, the rented-machine archive and the raw
 competition data. Deleted paths: `outputs/archive/maintenance/manual-cleanup-20261023/`.
+The deletion of `outputs/analysis` took the scanner table the split preparation reads
+(`outputs/analysis/s/sharing-disagreement-20260914/study_headers.parquet`); it was regenerated the
+same day with identical fold assignments ([splits](../validation/validation-splits.md#all_5fold_scanner_v2)).

@@ -22,13 +22,42 @@ LABEL_TABLES = {
 }
 HEADERS = "outputs/analysis/s/sharing-disagreement-20260914/study_headers.parquet"
 COHORTS = {
-    "v3_x2": (5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 20, 23, 24, 25, 26, 27),
+    "v3_x2": (
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        17,
+        18,
+        19,
+        20,
+        23,
+        24,
+        25,
+        26,
+        27,
+    ),
     "v3_x1_tau075": (32, 33, 34, 38, 39),
     "scanner_x1": (40, 41, 42, 43, 44, 45, 46, 48),
 }
 EXTRA = {48: ("outputs/training/k05-clean/fold_0", 8, 0.942)}
 REFERENCE = "hard05"
-STRATA = ("scanner_group", "vendor", "field", "machine", "thickness", "pixel_spacing", "sex")
+STRATA = (
+    "scanner_group",
+    "vendor",
+    "field",
+    "machine",
+    "thickness",
+    "pixel_spacing",
+    "sex",
+)
 HEDGES = r"possibl|cannot be excluded|may represent|likely|questionabl|suspect|probabl|equivocal|subtle|suggest"
 
 
@@ -50,8 +79,8 @@ def submissions(settings: VariantsCLI) -> dict[int, tuple[Path, int, float]]:
         manifest = Path(row["bundle"]) / "manifest.json"
         if row["public_score"] is None or not manifest.exists():
             continue
-        source = json.loads(manifest.read_text()).get("checkpoint", {}).get(
-            "source_path"
+        source = (
+            json.loads(manifest.read_text()).get("checkpoint", {}).get("source_path")
         )
         if source is None:
             continue
@@ -69,7 +98,11 @@ def submissions(settings: VariantsCLI) -> dict[int, tuple[Path, int, float]]:
         )
         match = re.search(r"epoch=(\d+)", source.name)
         if run is not None and match:
-            result[row["sequence"]] = (run, int(match.group(1)), float(row["public_score"]))
+            result[row["sequence"]] = (
+                run,
+                int(match.group(1)),
+                float(row["public_score"]),
+            )
     for sequence, (run, epoch, public) in EXTRA.items():
         result[sequence] = (Path(run), epoch, public)
     return result
@@ -111,34 +144,54 @@ def acquisition_strata() -> pl.DataFrame:
     headers = pl.read_parquet(HEADERS)
     field = pl.col("MagneticFieldStrength").cast(pl.Float64, strict=False)
     spacing = (
-        pl.col("PixelSpacing").str.strip_chars("[]").str.split(",").list.first()
-        .str.strip_chars().cast(pl.Float64, strict=False)
+        pl.col("PixelSpacing")
+        .str.strip_chars("[]")
+        .str.split(",")
+        .list.first()
+        .str.strip_chars()
+        .cast(pl.Float64, strict=False)
     )
     thickness = pl.col("SliceThickness").cast(pl.Float64, strict=False)
     return headers.select(
         STUDY,
         pl.col("vendor"),
-        pl.when(field.is_null()).then(pl.lit("unknown"))
-        .when(field >= 2).then(pl.lit("3T"))
-        .when(field >= 1.4).then(pl.lit("1.5T"))
-        .otherwise(pl.lit("low")).alias("field"),
+        pl.when(field.is_null())
+        .then(pl.lit("unknown"))
+        .when(field >= 2)
+        .then(pl.lit("3T"))
+        .when(field >= 1.4)
+        .then(pl.lit("1.5T"))
+        .otherwise(pl.lit("low"))
+        .alias("field"),
         pl.col("ManufacturerModelName").alias("machine"),
-        pl.when(thickness < 3).then(pl.lit("thin")).when(thickness <= 3.5)
-        .then(pl.lit("mid")).otherwise(pl.lit("thick")).alias("thickness"),
-        pl.when(spacing < 0.3).then(pl.lit("fine")).when(spacing < 0.45)
-        .then(pl.lit("mid")).otherwise(pl.lit("coarse")).alias("pixel_spacing"),
+        pl.when(thickness < 3)
+        .then(pl.lit("thin"))
+        .when(thickness <= 3.5)
+        .then(pl.lit("mid"))
+        .otherwise(pl.lit("thick"))
+        .alias("thickness"),
+        pl.when(spacing < 0.3)
+        .then(pl.lit("fine"))
+        .when(spacing < 0.45)
+        .then(pl.lit("mid"))
+        .otherwise(pl.lit("coarse"))
+        .alias("pixel_spacing"),
         pl.col("PatientSex").alias("sex"),
     ).join(scanner_groups(headers), on=STUDY)
 
 
 def study_properties(settings: VariantsCLI, membership: pl.DataFrame) -> pl.DataFrame:
-    reports = pl.read_csv(settings.raw_dir / "train.csv", infer_schema_length=None).select(
+    reports = pl.read_csv(
+        settings.raw_dir / "train.csv", infer_schema_length=None
+    ).select(
         STUDY,
         pl.col("Report").str.len_chars().log().alias("log_report_length"),
         pl.col("Report").str.to_lowercase().str.count_matches(HEDGES).alias("hedges"),
     )
-    series = pl.read_csv(settings.raw_dir / "train_series.csv").group_by(STUDY).agg(
-        pl.len().alias("series")
+    series = (
+        pl.read_csv(settings.raw_dir / "train_series.csv")
+        .group_by(STUDY)
+        .agg(pl.len().alias("series"))
     )
     properties = (
         membership.select(STUDY, "is_gold", "report_group")
@@ -183,7 +236,11 @@ def stratified(base: dict, strata: dict) -> dict:
 
 
 def pair_weights(
-    target: np.ndarray, gold: np.ndarray, study: dict, strata: dict, agreement: np.ndarray
+    target: np.ndarray,
+    gold: np.ndarray,
+    study: dict,
+    strata: dict,
+    agreement: np.ndarray,
 ) -> dict:
     positive = target >= 0.5
     cross = np.outer(positive, ~positive)
@@ -228,7 +285,9 @@ def labels_for(settings: VariantsCLI, split_name: str) -> dict:
     split = load_split(settings.raw_dir, settings.folds_dir / split_name)
     targets = split.protocol["targets"]
     evaluation = (
-        split.evaluation.join(split.membership.select(STUDY, "is_gold", "fold"), on=STUDY)
+        split.evaluation.join(
+            split.membership.select(STUDY, "is_gold", "fold"), on=STUDY
+        )
         .filter(pl.col("fold") == 0)
         .join(acquisition_strata(), on=STUDY, how="left")
         .sort(STUDY)
@@ -261,8 +320,15 @@ def labels_for(settings: VariantsCLI, split_name: str) -> dict:
     intercept, slope = gold_calibration(settings, split, targets)
     calibrated = 1 / (1 + np.exp(-(intercept + slope * logit(frozen))))
     calibrated[gold] = frozen[gold]
-    print(f"{split_name} gold calibration a={intercept:.3f} b={slope:.3f}", file=sys.stderr)
-    tables = {"": frozen, "consensus10_": consensus(names), "independent9_": consensus(names[1:])}
+    print(
+        f"{split_name} gold calibration a={intercept:.3f} b={slope:.3f}",
+        file=sys.stderr,
+    )
+    tables = {
+        "": frozen,
+        "consensus10_": consensus(names),
+        "independent9_": consensus(names[1:]),
+    }
     properties = evaluation.select(STUDY).join(
         study_properties(settings, split.membership), on=STUDY, how="left"
     )
@@ -275,12 +341,16 @@ def labels_for(settings: VariantsCLI, split_name: str) -> dict:
         axis: evaluation[axis].fill_null("missing").cast(pl.String).to_numpy()
         for axis in STRATA
     }
-    strata["series_count"] = np.digitize(properties["series"].to_numpy(), [4.5, 5.5, 6.5]).astype(str)
+    strata["series_count"] = np.digitize(
+        properties["series"].to_numpy(), [4.5, 5.5, 6.5]
+    ).astype(str)
     spread = np.stack(
         [
             stacked.select(
                 pl.concat_list([f"{n}|{t}" for n in names]).list.drop_nulls().list.std()
-            ).to_series().to_numpy()
+            )
+            .to_series()
+            .to_numpy()
             for t in targets
         ],
         axis=1,
@@ -322,7 +392,9 @@ def per_label(
         above += 0.5 * (column[:, None] == column[None, :])
         for name, (weight, norm) in weights.items():
             if names is None or name in names:
-                value = float(np.einsum("ij,ij->", weight, above, dtype=np.float64)) / norm
+                value = (
+                    float(np.einsum("ij,ij->", weight, above, dtype=np.float64)) / norm
+                )
                 result.setdefault(name, []).append(value)
     return result
 
@@ -339,7 +411,12 @@ def variants(score: np.ndarray, labels: dict) -> dict[str, float]:
         )
     )
     values["partial_fpr20"] = float(
-        np.mean([roc_auc_score(frozen[:, k] >= 0.5, score[:, k], max_fpr=0.2) for k in range(12)])
+        np.mean(
+            [
+                roc_auc_score(frozen[:, k] >= 0.5, score[:, k], max_fpr=0.2)
+                for k in range(12)
+            ]
+        )
     )
     values["spearman_target"] = float(
         np.mean(
@@ -385,7 +462,9 @@ def score(settings: VariantsCLI) -> None:
             if split not in labels:
                 labels[split] = labels_for(settings, split)
             epochs = run / "epochs"
-            selected = predictions(epochs / f"validation_epoch_{epoch:03d}.csv", labels[split])
+            selected = predictions(
+                epochs / f"validation_epoch_{epoch:03d}.csv", labels[split]
+            )
             values = variants(selected, labels[split])
             last = [
                 predictions(path, labels[split])
@@ -400,12 +479,22 @@ def score(settings: VariantsCLI) -> None:
                 )
                 values[f"{name}_last3_ensemble"] = float(np.mean(ensemble[name]))
             rows.append(
-                {"cohort": cohort, "sequence": sequence, "run": str(run), "epoch": epoch,
-                 "public": public, **values}
+                {
+                    "cohort": cohort,
+                    "sequence": sequence,
+                    "run": str(run),
+                    "epoch": epoch,
+                    "public": public,
+                    **values,
+                }
             )
             print(f"scored S{sequence}", file=sys.stderr)
     frame = pl.DataFrame(rows)
-    metrics = [c for c in frame.columns if c not in ("cohort", "sequence", "run", "epoch", "public")]
+    metrics = [
+        c
+        for c in frame.columns
+        if c not in ("cohort", "sequence", "run", "epoch", "public")
+    ]
     parts = [frame.filter(pl.col("cohort") == c) for c in COHORTS]
     local = {m: [p[m].to_numpy() for p in parts] for m in metrics}
     public = [p["public"].to_numpy() for p in parts]
@@ -432,7 +521,8 @@ def score(settings: VariantsCLI) -> None:
             "ranked": sum(concordance(x, y)[1] for x, y in zip(local[metric], public)),
             "gain_vs_reference": observed[metric],
             "p_gain": (exceed[metric] + 1) / (settings.permutations + 1),
-            "p_gain_max_corrected": (exceed_max[metric] + 1) / (settings.permutations + 1),
+            "p_gain_max_corrected": (exceed_max[metric] + 1)
+            / (settings.permutations + 1),
             "cohorts": {},
         }
         for cohort, x, y in zip(COHORTS, local[metric], public):
@@ -445,7 +535,9 @@ def score(settings: VariantsCLI) -> None:
             }
     settings.output_dir.mkdir(parents=True)
     frame.write_csv(settings.output_dir / "submissions.csv")
-    (settings.output_dir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+    (settings.output_dir / "summary.json").write_text(
+        json.dumps(summary, indent=2) + "\n"
+    )
     for metric in sorted(metrics, key=lambda m: -summary[metric]["concordant"]):
         s = summary[metric]
         cells = " | ".join(

@@ -42,7 +42,9 @@ planes = [kind.plane for kind in wide.series_types]
 fluid = [kind.fluid_sensitive for kind in wide.series_types]
 gpu = torch.device("cuda")
 selected = json.loads((RUN / "fold_1" / "selected_checkpoint.json").read_text())
-model = checkpoint_model(read_checkpoint(Path(selected["path"])), config, targets, gpu).eval()
+model = checkpoint_model(
+    read_checkpoint(Path(selected["path"])), config, targets, gpu
+).eval()
 model.view_frame_rotation_fraction = 0.0
 captured = {}
 original = model.encode_batch
@@ -60,7 +62,10 @@ model.encode_batch = encode
 def loader(data):
     return DataLoader(
         KneeStudyDataset(studies, index, data, targets, None, 1),
-        batch_size=1, shuffle=False, num_workers=8, collate_fn=collate_studies,
+        batch_size=1,
+        shuffle=False,
+        num_workers=8,
+        collate_fn=collate_studies,
     )
 
 
@@ -85,8 +90,21 @@ for model_batch, wide_batch in zip(loader(config.data), loader(wide)):
     sign = float(1 - 2 * encoded["study_left_probability"][0].float().cpu())
     w = with_images(move_batch(wide_batch, torch.device("cpu")))
     mask = w["slice_mask"]
-    centre = np.array([float(w[key][torch.isfinite(w[key])].mean()) if torch.isfinite(w[key]).any() else np.nan for key in ("knee_center_x_mm", "knee_center_y_mm", "knee_center_z_mm")])
-    record = {"study": model_batch["study_uid"][0], "nod": angles[0], "roll": angles[1], "turn": angles[2], "shift_up": shift[2]}
+    centre = np.array(
+        [
+            float(w[key][torch.isfinite(w[key])].mean())
+            if torch.isfinite(w[key]).any()
+            else np.nan
+            for key in ("knee_center_x_mm", "knee_center_y_mm", "knee_center_z_mm")
+        ]
+    )
+    record = {
+        "study": model_batch["study_uid"][0],
+        "nod": angles[0],
+        "roll": angles[1],
+        "turn": angles[2],
+        "shift_up": shift[2],
+    }
     if not np.isfinite(centre).all():
         rows.append(record)
         continue
@@ -112,12 +130,22 @@ for model_batch, wide_batch in zip(loader(config.data), loader(wide)):
                 tissue = binary_erosion(image > 30, iterations=22)
                 if tissue.sum() < 500:
                     continue
-                inside = tissue & (image > np.percentile(image[tissue], 65)) & ((np.abs(medial) < 30) if plane == "Sagittal" else (np.abs(front) < 25))
+                inside = (
+                    tissue
+                    & (image > np.percentile(image[tissue], 65))
+                    & (
+                        (np.abs(medial) < 30)
+                        if plane == "Sagittal"
+                        else (np.abs(front) < 25)
+                    )
+                )
                 value = front if plane == "Sagittal" else medial
                 which = np.digitize(height[inside], BINS) - 1
                 good = (which >= 0) & (which < len(total))
                 total += np.bincount(which[good], minlength=len(total))
-                moment += np.bincount(which[good], weights=value[inside][good], minlength=len(total))
+                moment += np.bincount(
+                    which[good], weights=value[inside][good], minlength=len(total)
+                )
         middle = (BINS[:-1] + BINS[1:]) / 2
         profile = np.where(total > 100, moment / np.maximum(total, 1), np.nan)
         profiles[plane].append(profile)
@@ -131,16 +159,53 @@ table = table.with_columns(
     (pl.col("cor_upper") - pl.col("cor_lower")).alias("cor_bend"),
 )
 table.write_csv(OUT / "bend-marrow.csv")
-np.savez(OUT / "profiles-marrow.npz", bins=BINS, sagittal=np.array(profiles["Sagittal"]), coronal=np.array(profiles["Coronal"]))
+np.savez(
+    OUT / "profiles-marrow.npz",
+    bins=BINS,
+    sagittal=np.array(profiles["Sagittal"]),
+    coronal=np.array(profiles["Coronal"]),
+)
 print("knees", len(table))
-for name in ("sag_upper", "sag_lower", "sag_bend", "cor_upper", "cor_lower", "cor_bend", "nod", "roll"):
+for name in (
+    "sag_upper",
+    "sag_lower",
+    "sag_bend",
+    "cor_upper",
+    "cor_lower",
+    "cor_bend",
+    "nod",
+    "roll",
+):
     values = table[name].drop_nulls().drop_nans().to_numpy()
-    print(f"{name:10} n {len(values):4d} mean {values.mean():+6.1f} sd {values.std():5.1f} p5 {np.percentile(values, 5):+6.1f} median {np.median(values):+6.1f} p95 {np.percentile(values, 95):+6.1f}")
-clean = table.drop_nulls().filter(pl.all_horizontal(pl.col(pl.Float64, pl.Float32).is_finite()))
+    print(
+        f"{name:10} n {len(values):4d} mean {values.mean():+6.1f} sd {values.std():5.1f} p5 {np.percentile(values, 5):+6.1f} median {np.median(values):+6.1f} p95 {np.percentile(values, 95):+6.1f}"
+    )
+clean = table.drop_nulls().filter(
+    pl.all_horizontal(pl.col(pl.Float64, pl.Float32).is_finite())
+)
 print("complete knees", len(clean))
-for a, b in (("nod", "sag_upper"), ("nod", "sag_lower"), ("nod", "sag_bend"), ("roll", "cor_upper"), ("roll", "cor_lower"), ("roll", "cor_bend"), ("sag_upper", "sag_lower"), ("cor_upper", "cor_lower")):
-    print(f"correlation {a} ~ {b}: {np.corrcoef(clean[a].to_numpy(), clean[b].to_numpy())[0, 1]:+.2f}")
+for a, b in (
+    ("nod", "sag_upper"),
+    ("nod", "sag_lower"),
+    ("nod", "sag_bend"),
+    ("roll", "cor_upper"),
+    ("roll", "cor_lower"),
+    ("roll", "cor_bend"),
+    ("sag_upper", "sag_lower"),
+    ("cor_upper", "cor_lower"),
+):
+    print(
+        f"correlation {a} ~ {b}: {np.corrcoef(clean[a].to_numpy(), clean[b].to_numpy())[0, 1]:+.2f}"
+    )
 middle = (BINS[:-1] + BINS[1:]) / 2
 for plane in ("Sagittal", "Coronal"):
     stack = np.array(profiles[plane])
-    print(plane, "mean limb centre by height (mm):", {int(h): round(float(v), 1) for h, v in zip(middle, np.nanmean(stack, 0)) if np.isfinite(v)})
+    print(
+        plane,
+        "mean limb centre by height (mm):",
+        {
+            int(h): round(float(v), 1)
+            for h, v in zip(middle, np.nanmean(stack, 0))
+            if np.isfinite(v)
+        },
+    )

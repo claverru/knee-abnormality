@@ -71,7 +71,9 @@ def series_paths(study_dir: Path) -> list[Path]:
     ]
 
 
-def file_blocks(cells: int, files_per_cell: int, split: str = "train") -> list[list[Path]]:
+def file_blocks(
+    cells: int, files_per_cell: int, split: str = "train"
+) -> list[list[Path]]:
     blocks: list[list[Path]] = []
     current: list[Path] = []
     studies = iter(series_directories(split))

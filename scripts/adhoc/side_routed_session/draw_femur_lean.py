@@ -12,8 +12,14 @@ CORE, RING, OUTER = 15.4, 28.7, 45.0
 BOTTOM, TOP, LOW, HIGH = -11.2, 10.7, -42.0, 46.0
 LEAN, NOD = np.radians(-25.0), np.radians(7.0)
 SECTORS = {
-    "anteromedial": 22.5, "anterior": 67.5, "anterolateral": 112.5, "lateral": 157.5,
-    "posterolateral": 202.5, "posterior": 247.5, "posteromedial": 292.5, "medial": 337.5,
+    "anteromedial": 22.5,
+    "anterior": 67.5,
+    "anterolateral": 112.5,
+    "lateral": 157.5,
+    "posterolateral": 202.5,
+    "posterior": 247.5,
+    "posteromedial": 292.5,
+    "medial": 337.5,
 }
 MEDIAL = ("anteromedial", "medial", "posteromedial")
 LATERAL = ("anterolateral", "lateral", "posterolateral")
@@ -33,15 +39,23 @@ def wedge(inner, outer, start, stop, low, high, steps=6):
         if value == 0:
             continue
         for a, b in zip(angles[:-1], angles[1:]):
-            faces.append([
-                (value * np.cos(a), value * np.sin(a), low), (value * np.cos(b), value * np.sin(b), low),
-                (value * np.cos(b), value * np.sin(b), high), (value * np.cos(a), value * np.sin(a), high),
-            ])
+            faces.append(
+                [
+                    (value * np.cos(a), value * np.sin(a), low),
+                    (value * np.cos(b), value * np.sin(b), low),
+                    (value * np.cos(b), value * np.sin(b), high),
+                    (value * np.cos(a), value * np.sin(a), high),
+                ]
+            )
     for a in (angles[0], angles[-1]):
-        faces.append([
-            (inner * np.cos(a), inner * np.sin(a), low), (outer * np.cos(a), outer * np.sin(a), low),
-            (outer * np.cos(a), outer * np.sin(a), high), (inner * np.cos(a), inner * np.sin(a), high),
-        ])
+        faces.append(
+            [
+                (inner * np.cos(a), inner * np.sin(a), low),
+                (outer * np.cos(a), outer * np.sin(a), low),
+                (outer * np.cos(a), outer * np.sin(a), high),
+                (inner * np.cos(a), inner * np.sin(a), high),
+            ]
+        )
     return faces
 
 
@@ -51,7 +65,13 @@ def place(faces):
         points = []
         for x, y, z in face:
             y = y + max(z - TOP, 0.0) * np.tan(LEAN)
-            points.append((x, y * np.cos(NOD) + z * np.sin(NOD), z * np.cos(NOD) - y * np.sin(NOD)))
+            points.append(
+                (
+                    x,
+                    y * np.cos(NOD) + z * np.sin(NOD),
+                    z * np.cos(NOD) - y * np.sin(NOD),
+                )
+            )
         out.append(points)
     return out
 
@@ -60,10 +80,19 @@ CELLS = {}
 for band, (low, high) in BANDS.items():
     pad = 0.6
     for side, (start, stop) in (("medial", (-90.0, 90.0)), ("lateral", (90.0, 270.0))):
-        CELLS[("core", side, band)] = wedge(0.0, CORE - pad, start + 1, stop - 1, low + pad, high - pad, steps=12)
+        CELLS[("core", side, band)] = wedge(
+            0.0, CORE - pad, start + 1, stop - 1, low + pad, high - pad, steps=12
+        )
     for ring, (inner, outer) in (("inner", (CORE, RING)), ("outer", (RING, OUTER))):
         for sector, start in SECTORS.items():
-            CELLS[(ring, sector, band)] = wedge(inner + pad, outer - pad, start + 1.5, start + 43.5, low + pad, high - pad)
+            CELLS[(ring, sector, band)] = wedge(
+                inner + pad,
+                outer - pad,
+                start + 1.5,
+                start + 43.5,
+                low + pad,
+                high - pad,
+            )
 
 
 def compartment(names):
@@ -71,6 +100,7 @@ def compartment(names):
         if band == "upper":
             return False
         return part == names[1] if ring == "core" else part in names[0]
+
     return read
 
 
@@ -81,20 +111,62 @@ def kneecap(ring, part, band):
 def ligament(ring, part, band):
     if band == "tibia":
         return False
-    return ring == "core" or (ring == "inner" and part in ("anterior", "posterior", *LATERAL))
+    return ring == "core" or (
+        ring == "inner" and part in ("anterior", "posterior", *LATERAL)
+    )
 
 
 LABELS = {
-    "ACL": ("#5aa469", ligament, "core, and the inner ring's front, back and lateral sectors; joint and upper bands"),
-    "MCL": ("#8e5ea2", lambda r, p, b: r != "core" and p in ("anteromedial", "medial"), "medial and anteromedial sectors outside the core; all heights"),
-    "Medial Meniscus": ("#d1495b", compartment((MEDIAL, "medial")), "three medial sectors and the core's medial half; tibia and joint bands"),
-    "Lateral Meniscus": ("#3a7ca5", compartment((LATERAL, "lateral")), "three lateral sectors and the core's lateral half; tibia and joint bands"),
-    "Medial OA": ("#e07a5f", compartment((MEDIAL, "medial")), "three medial sectors and the core's medial half; tibia and joint bands"),
-    "Lateral OA": ("#5b8fb9", compartment((LATERAL, "lateral")), "three lateral sectors and the core's lateral half; tibia and joint bands"),
-    "PF OA": ("#f2c14e", kneecap, "three front sectors outside the core; joint and upper bands"),
-    "Effusion": ("#e9a03b", kneecap, "three front sectors outside the core; joint and upper bands"),
-    "Synovitis": ("#c77dba", lambda r, p, b: b != "tibia" and (r == "core" or p in FRONT), "three front sectors and the core; joint and upper bands"),
-    "Baker's": ("#2a9d8f", lambda r, p, b: r != "core" and p in ("posterior", "posteromedial", "medial"), "back, posteromedial and medial sectors outside the core; all heights"),
+    "ACL": (
+        "#5aa469",
+        ligament,
+        "core, and the inner ring's front, back and lateral sectors; joint and upper bands",
+    ),
+    "MCL": (
+        "#8e5ea2",
+        lambda r, p, b: r != "core" and p in ("anteromedial", "medial"),
+        "medial and anteromedial sectors outside the core; all heights",
+    ),
+    "Medial Meniscus": (
+        "#d1495b",
+        compartment((MEDIAL, "medial")),
+        "three medial sectors and the core's medial half; tibia and joint bands",
+    ),
+    "Lateral Meniscus": (
+        "#3a7ca5",
+        compartment((LATERAL, "lateral")),
+        "three lateral sectors and the core's lateral half; tibia and joint bands",
+    ),
+    "Medial OA": (
+        "#e07a5f",
+        compartment((MEDIAL, "medial")),
+        "three medial sectors and the core's medial half; tibia and joint bands",
+    ),
+    "Lateral OA": (
+        "#5b8fb9",
+        compartment((LATERAL, "lateral")),
+        "three lateral sectors and the core's lateral half; tibia and joint bands",
+    ),
+    "PF OA": (
+        "#f2c14e",
+        kneecap,
+        "three front sectors outside the core; joint and upper bands",
+    ),
+    "Effusion": (
+        "#e9a03b",
+        kneecap,
+        "three front sectors outside the core; joint and upper bands",
+    ),
+    "Synovitis": (
+        "#c77dba",
+        lambda r, p, b: b != "tibia" and (r == "core" or p in FRONT),
+        "three front sectors and the core; joint and upper bands",
+    ),
+    "Baker's": (
+        "#2a9d8f",
+        lambda r, p, b: r != "core" and p in ("posterior", "posteromedial", "medial"),
+        "back, posteromedial and medial sectors outside the core; all heights",
+    ),
     "Contusion": ("#7a8b99", lambda r, p, b: True, "everything (not routed)"),
     "Fracture": ("#7a8b99", lambda r, p, b: True, "everything (not routed)"),
 }
@@ -117,7 +189,14 @@ for number, (label, (colour, read, text)) in enumerate(LABELS.items(), 1):
     tip = np.array([0.0, (HIGH - TOP) * np.tan(LEAN), HIGH])
     for a, b, style in ((np.array([0.0, 0.0, LOW]), hinge, "-"), (hinge, tip, "-")):
         points = np.array(place([[tuple(a), tuple(b)]])[0])
-        axis.plot(points[:, 0], points[:, 1], points[:, 2], color="black", linewidth=1.6, linestyle=style)
+        axis.plot(
+            points[:, 0],
+            points[:, 1],
+            points[:, 2],
+            color="black",
+            linewidth=1.6,
+            linestyle=style,
+        )
     limit = 50
     axis.set_xlim(-limit, limit)
     axis.set_ylim(-limit, limit)

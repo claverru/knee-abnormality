@@ -13,7 +13,9 @@ frame = (
     .sort("StudyInstanceUID")
 )
 runs = [
-    Path("outputs/autoresearch/fixes-and-removals/experiments/slab-rule-and-positive-std-requeue-20261005T155303Z-59280bbc/training")
+    Path(
+        "outputs/autoresearch/fixes-and-removals/experiments/slab-rule-and-positive-std-requeue-20261005T155303Z-59280bbc/training"
+    )
 ] + sorted(
     path
     for path in Path("outputs/training").glob("2026100[56]-*side-routed*")
@@ -31,4 +33,8 @@ for run in runs:
         for name in targets
     }
     label = "old recipe" if "autoresearch" in str(run) else run.name[16:]
-    print(f"{label:52}" + "".join(f"{scores[name]:12.4f}" for name in names) + f"{sum(scores.values()) / len(scores):10.4f}")
+    print(
+        f"{label:52}"
+        + "".join(f"{scores[name]:12.4f}" for name in names)
+        + f"{sum(scores.values()) / len(scores):10.4f}"
+    )

@@ -46,7 +46,11 @@ def summarise(a, b, ests, kind, meta):
         row[f"{name}_si"] = float(vec[2])
         row[f"{name}_mag"] = float(np.hypot(mx, my))
         row[f"{name}_spread"] = float(
-            max(np.hypot(sy[i] - sy[j], sx[i] - sx[j]) for i in range(len(ests)) for j in range(len(ests)))
+            max(
+                np.hypot(sy[i] - sy[j], sx[i] - sx[j])
+                for i in range(len(ests))
+                for j in range(len(ests))
+            )
         )
         row[f"{name}_z"] = float(np.median([e[name]["z"] for e in ests]))
         row[f"{name}_peak"] = float(np.median([e[name]["peak"] for e in ests]))
@@ -64,7 +68,9 @@ def summarise(a, b, ests, kind, meta):
             row[f"{name}_c_peak"] = float(c["peak"])
             row[f"{name}_c_second"] = float(c["second"])
             row[f"{name}_c_edge"] = bool(c["edge"])
-            row[f"{name}_c_dev"] = float(np.median(np.hypot(sy - c["sy"], sx - c["sx"])))
+            row[f"{name}_c_dev"] = float(
+                np.median(np.hypot(sy - c["sy"], sx - c["sx"]))
+            )
     return row
 
 
@@ -131,8 +137,12 @@ def work(args):
                 "gap_b": b.gap,
                 "ps_a": a.ps[0],
                 "ps_b": b.ps[0],
-                "normal_angle_deg": float(np.degrees(np.arccos(np.clip(abs(a.n @ b.n), 0, 1)))),
-                "inplane_angle_deg": float(np.degrees(np.arccos(np.clip(abs(a.u @ b.u), 0, 1)))),
+                "normal_angle_deg": float(
+                    np.degrees(np.arccos(np.clip(abs(a.n @ b.n), 0, 1)))
+                ),
+                "inplane_angle_deg": float(
+                    np.degrees(np.arccos(np.clip(abs(a.u @ b.u), 0, 1)))
+                ),
                 "ua": a.u.tolist(),
                 "va": a.v.tolist(),
             }
@@ -145,7 +155,14 @@ def work(args):
                     rows.append(row)
         if extras:
             for s, r in items:
-                meta = {"study": study, "plane": plane, "series_a": s.uid, "series_b": s.uid, "gap_a": s.gap, "gap_b": s.gap}
+                meta = {
+                    "study": study,
+                    "plane": plane,
+                    "series_a": s.uid,
+                    "series_b": s.uid,
+                    "gap_a": s.gap,
+                    "gap_b": s.gap,
+                }
                 row = run_pair(s, s, "null_adjacent", meta, null=True)
                 if row is not None:
                     rows.append(row)
@@ -158,7 +175,13 @@ def work(args):
 def main():
     cfg = Settings()
     series = pl.read_csv(cfg.data_root / "raw" / "train_series.csv")
-    studies = pl.read_csv(cfg.data_root / "folds" / "all_5fold_scanner_v2" / "studies.csv")["StudyInstanceUID"].sort().to_list()
+    studies = (
+        pl.read_csv(cfg.data_root / "folds" / "all_5fold_scanner_v2" / "studies.csv")[
+            "StudyInstanceUID"
+        ]
+        .sort()
+        .to_list()
+    )
     rng = np.random.default_rng(cfg.seed)
     order = [studies[i] for i in rng.permutation(len(studies))]
     if cfg.limit > 0:

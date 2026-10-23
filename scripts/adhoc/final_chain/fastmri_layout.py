@@ -31,7 +31,9 @@ STEADY_NAME = re.compile(r"de3d|tfi", re.IGNORECASE)
 STEADY_DESCRIPTION = re.compile(r"dess|de3d|trufi", re.IGNORECASE)
 NOT_FS = re.compile(r"non\s*fat|no\s*fat|non\s*fs", re.I)
 PDFSE = re.compile(r"pdfse", re.I)
-STRONG = re.compile(r"fat|ftst|\bfs\b|fs$|_fs|fs_|f/s|fsat|stir|spair|water|fsefw", re.I)
+STRONG = re.compile(
+    r"fat|ftst|\bfs\b|fs$|_fs|fs_|f/s|fsat|stir|spair|water|fsefw", re.I
+)
 PLANES = ("Sagittal", "Coronal", "Axial")
 MINIMUM_IMAGES = 2
 
@@ -205,7 +207,9 @@ def main() -> None:
         .sort("directory")
     )
     if len(sys.argv) > 2 and Path("/root/fastmri_rejected.csv").is_file():
-        rejected = pl.read_csv("/root/fastmri_rejected.csv")["StudyInstanceUID"].to_list()
+        rejected = pl.read_csv("/root/fastmri_rejected.csv")[
+            "StudyInstanceUID"
+        ].to_list()
         frame = frame.with_columns(
             reason=pl.when(
                 pl.col("reason").is_null() & pl.col("StudyInstanceUID").is_in(rejected)
@@ -243,24 +247,68 @@ def main() -> None:
         pl.col("part").first(), pl.col("patient").first(), pl.len().alias("n_series")
     ).sort("StudyInstanceUID").write_csv(output / "studies.csv")
     key = pl.col("plane").str.slice(0, 3) + pl.col("fat_suppressed").cast(pl.String)
-    for part, group in [("all", kept), *sorted(kept.partition_by("part", as_dict=True).items())]:
+    for part, group in [
+        ("all", kept),
+        *sorted(kept.partition_by("part", as_dict=True).items()),
+    ]:
         name = part if isinstance(part, str) else part[0]
-        sets = group.with_columns(k=key).group_by("StudyInstanceUID").agg(
-            pl.col("k").unique().sort()
-        ).with_columns(pl.col("k").list.join(" "))
+        sets = (
+            group.with_columns(k=key)
+            .group_by("StudyInstanceUID")
+            .agg(pl.col("k").unique().sort())
+            .with_columns(pl.col("k").list.join(" "))
+        )
         print(
             f"[{name}] series {group.height} studies {group['StudyInstanceUID'].n_unique()} "
             f"patients {group['patient'].n_unique()} images {int(group['n_images'].sum())}"
         )
-        print("  types", group.group_by("plane", "fat_suppressed").len().sort("plane", "fat_suppressed").rows())
+        print(
+            "  types",
+            group.group_by("plane", "fat_suppressed")
+            .len()
+            .sort("plane", "fat_suppressed")
+            .rows(),
+        )
         print("  sets", sets["k"].value_counts(sort=True).head(6).rows())
-        print("  field", group.group_by("StudyInstanceUID").agg(pl.col("field_strength").first())["field_strength"].value_counts(sort=True).head(4).rows())
-    print("all series", frame.height, "all studies", frame["StudyInstanceUID"].n_unique())
-    print("excluded", frame.filter(pl.col("reason").is_not_null()).group_by("part", "reason").len().rows())
+        print(
+            "  field",
+            group.group_by("StudyInstanceUID")
+            .agg(pl.col("field_strength").first())["field_strength"]
+            .value_counts(sort=True)
+            .head(4)
+            .rows(),
+        )
+    print(
+        "all series", frame.height, "all studies", frame["StudyInstanceUID"].n_unique()
+    )
+    print(
+        "excluded",
+        frame.filter(pl.col("reason").is_not_null())
+        .group_by("part", "reason")
+        .len()
+        .rows(),
+    )
     print("contrast source", kept["contrast_source"].value_counts(sort=True).rows())
-    print("corrected names", kept.filter(pl.col("contrast_source") != "pipeline").group_by("contrast_source", "description").len().sort("len", descending=True).head(14).rows())
-    print("short series", frame.filter(pl.col("n_images") < 12)["n_images"].value_counts().sort("n_images").rows())
-    print("patients in both parts", kept.group_by("patient").agg(pl.col("part").n_unique())["part"].gt(1).sum())
+    print(
+        "corrected names",
+        kept.filter(pl.col("contrast_source") != "pipeline")
+        .group_by("contrast_source", "description")
+        .len()
+        .sort("len", descending=True)
+        .head(14)
+        .rows(),
+    )
+    print(
+        "short series",
+        frame.filter(pl.col("n_images") < 12)["n_images"]
+        .value_counts()
+        .sort("n_images")
+        .rows(),
+    )
+    print(
+        "patients in both parts",
+        kept.group_by("patient").agg(pl.col("part").n_unique())["part"].gt(1).sum(),
+    )
 
 
 if __name__ == "__main__":

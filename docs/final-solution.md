@@ -103,6 +103,18 @@ studies in both. v3 raised the gen-1 teachers' gold AUC by +0.0067 but tied v2 o
 | Backbone mode | eager (no CUDA graph; from the bundle name `v2v3-gen2gen3-x60-eager-x4-tau04eff-tta`), precision by the manifest's automatic policy (FP16 on the T4) |
 | Bundle | `outputs/submission/exports/v2v3-gen2gen3-x60-eager-x4-tau04eff-tta` (manifest only locally), built 2026-10-20 from code at `6f78b4f` with local modifications |
 
+The bundle was assembled from earlier bundles' members. The same 60 members export directly from
+their selected checkpoints, one per run, at an effective τ of 0.4 for every member (the export's
+default multiplier is 2, so `--image-multiplier 4` is required):
+
+```bash
+uv run --locked just export \
+  --checkpoint outputs/training/{convnext,resnet50,nextvit}-{gen2,gen3,v3-gen2,v3-gen3}-fold-[0-4]/fold_*/best-*.ckpt \
+  --output outputs/submission/exports/s188-rebuild \
+  --image-multiplier 4 --attention-temperature 0.4 --reflection-tta --backbone eager \
+  --inference-batch-size 2 --inference-num-workers 8
+```
+
 τ divides the main attention scorer, view label bias and position prior and multiplies the shared
 routing temperature. Local validation always preferred τ 0.85; the board preferred 0.4–0.5 for
 every large ensemble, because sharpening moves predictions toward image findings exactly where

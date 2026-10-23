@@ -79,7 +79,9 @@ def run(settings: AxialOnlyCLI) -> dict:
         dataset, config.trainer, INFERENCE_BATCH_SIZE, num_workers=settings.workers
     )
     device = resolve_device("auto")
-    model = load_checkpoint_model(config, targets, checkpoint, device, expected_fold=fold)
+    model = load_checkpoint_model(
+        config, targets, checkpoint, device, expected_fold=fold
+    )
     started = time.perf_counter()
     study_ids, predictions, _ = predict_loader([model], loader, device)
     seconds = time.perf_counter() - started

@@ -39,10 +39,18 @@ def composite(a, b):
 def main():
     cfg = Settings()
     d = pl.read_parquet(cfg.pairs).filter(
-        (pl.col("kind") == "pair") & (pl.col("normal_angle_deg") <= 3) & pl.col("ngf_c_mag").is_not_null()
+        (pl.col("kind") == "pair")
+        & (pl.col("normal_angle_deg") <= 3)
+        & pl.col("ngf_c_mag").is_not_null()
     )
-    d = d.filter((pl.col("ngf_c_mag") >= cfg.min_mag) & (pl.col("ngf_c_mag") <= cfg.max_mag))
-    d = d.sort("ngf_c_mag", descending=True).unique("study", keep="first", maintain_order=True).head(cfg.top)
+    d = d.filter(
+        (pl.col("ngf_c_mag") >= cfg.min_mag) & (pl.col("ngf_c_mag") <= cfg.max_mag)
+    )
+    d = (
+        d.sort("ngf_c_mag", descending=True)
+        .unique("study", keep="first", maintain_order=True)
+        .head(cfg.top)
+    )
     cfg.out_dir.mkdir(parents=True, exist_ok=True)
     root = cfg.data_root / "raw" / "train_series"
     for rank, r in enumerate(d.iter_rows(named=True)):
@@ -55,13 +63,23 @@ def main():
             shape = ml.grid_shape(a)
             img_a, _ = ml.sample_on_grid(a, ia, a, ia, shape)
             img_b, _ = ml.sample_on_grid(a, ia, b, ib, shape)
-            img_c, _ = ml.sample_on_grid(a, ia, b, ib, shape, (r["ngf_c_sy"], r["ngf_c_sx"]))
+            img_c, _ = ml.sample_on_grid(
+                a, ia, b, ib, shape, (r["ngf_c_sy"], r["ngf_c_sx"])
+            )
             ea, eb, ec = edges(img_a), edges(img_b), edges(img_c)
             panels = [
                 (img_a, f"A #{r['number_a']} {r['desc_a']} slice {ia}", "gray"),
-                (img_b, f"B #{r['number_b']} {r['desc_b']} slice {ib} (offset {dist:.1f} mm)", "gray"),
+                (
+                    img_b,
+                    f"B #{r['number_b']} {r['desc_b']} slice {ib} (offset {dist:.1f} mm)",
+                    "gray",
+                ),
                 (composite(ea, eb), "edges by header: A magenta, B green", None),
-                (composite(ea, ec), f"edges after shift sx={r['ngf_c_sx']:.1f} sy={r['ngf_c_sy']:.1f} mm", None),
+                (
+                    composite(ea, ec),
+                    f"edges after shift sx={r['ngf_c_sx']:.1f} sy={r['ngf_c_sy']:.1f} mm",
+                    None,
+                ),
             ]
             for ax, (im, title, cmap) in zip(axes[k], panels):
                 ax.imshow(im, cmap=cmap, vmin=0, vmax=1)

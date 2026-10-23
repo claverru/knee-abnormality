@@ -49,10 +49,15 @@ with torch.inference_mode():
             model.frame_rotation_logit.copy_(
                 torch.atanh((angles / (math.pi / 2)).clamp(-0.999, 0.999))
             )
-            logits[("cuts", setting)].append(model.pool_encoded(encoded).float().cpu()[0])
+            logits[("cuts", setting)].append(
+                model.pool_encoded(encoded).float().cpu()[0]
+            )
             with torch.autocast(device_type="cuda", enabled=False):
                 position = model.frame(
-                    encoded["knee_x"], encoded["anterior_axis"], encoded["superior_axis"], sign
+                    encoded["knee_x"],
+                    encoded["anterior_axis"],
+                    encoded["superior_axis"],
+                    sign,
                 )
             logits[("all", setting)].append(
                 model.pool_encoded({**encoded, "position": position}).float().cpu()[0]
@@ -89,4 +94,8 @@ out = Path("outputs/analysis/s/side-routing-rotation-sweep-20261006")
 out.mkdir(parents=True, exist_ok=True)
 table.write_csv(out / "sweep.csv")
 with pl.Config(tbl_rows=60, tbl_cols=-1, tbl_width_chars=230):
-    print(table.select("mode", "axis", "delta_deg", "macro", "routed_sum", "own_sum", *ROUTED))
+    print(
+        table.select(
+            "mode", "axis", "delta_deg", "macro", "routed_sum", "own_sum", *ROUTED
+        )
+    )

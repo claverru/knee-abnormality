@@ -75,6 +75,8 @@ Rerun on 2026-09-28 into scratch directories, the tool and the split builder rep
 adopted files byte for byte: `rebuild-state-v2/labels.csv` (`5877acaf…`) and
 `rebuild-mean-v2/labels.csv` (`a550cd46…`) in 42 s, and all four files of
 `all_5fold_scanner_v2` from `scripts.tools.validation prepare --config configs/resnet50.yaml`.
+Since commit `c8b3361` (2026-10-23) the tool writes `rebuild_state_v3` instead; reproduce v2 from
+a checkout of `7035d6f`, the last commit whose tool writes v2.
 
 ```bash
 uv run --locked python -m scripts.tools.prepare_rebuilt_labels --output-dir <scratch>/prepared --manifest-dir <scratch>/manifests --analysis-dir <scratch>/analysis

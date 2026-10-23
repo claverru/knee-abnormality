@@ -61,7 +61,9 @@ def audit(studies: list[Path]) -> dict:
     mismatches = 0
     for study in studies:
         expected = sorted(
-            path.name for directory in series_dirs(study) for path in directory.glob("*.dcm")
+            path.name
+            for directory in series_dirs(study)
+            for path in directory.glob("*.dcm")
         )
         actual = sorted(
             entry.name

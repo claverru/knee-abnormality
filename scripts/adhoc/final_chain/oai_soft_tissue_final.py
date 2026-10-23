@@ -12,7 +12,8 @@ cases = json.loads(CASES.read_text())
 mismatched = sorted(
     case["study"]
     for case in cases
-    if "size" in case and not (case["frame_matches"] and all(case["frame_matches"].values()))
+    if "size" in case
+    and not (case["frame_matches"] and all(case["frame_matches"].values()))
 )
 removed = []
 for study in mismatched:
@@ -20,11 +21,24 @@ for study in mismatched:
     if path.exists():
         path.unlink()
         removed.append(study)
-knees = [knee for knee in json.loads((OAI / "knees.json").read_text()) if knee["study"] not in set(mismatched)]
+knees = [
+    knee
+    for knee in json.loads((OAI / "knees.json").read_text())
+    if knee["study"] not in set(mismatched)
+]
 (OAI / "knees.json").write_text(json.dumps(knees, indent=1) + "\n")
 (OAI / "excluded_frames.json").write_text(json.dumps(mismatched, indent=1) + "\n")
 oai_volumes = sorted(path.stem for path in (OAI / "volumes").glob("*.npz"))
-print("mismatched", len(mismatched), "removed volumes", len(removed), "oai volumes", len(oai_volumes), "oai knees", len(knees))
+print(
+    "mismatched",
+    len(mismatched),
+    "removed volumes",
+    len(removed),
+    "oai volumes",
+    len(oai_volumes),
+    "oai knees",
+    len(knees),
+)
 
 kaggle_classes = json.loads((KAGGLE / "classes.json").read_text())["classes"]
 oai_classes = json.loads((OAI / "classes.json").read_text())["classes"]
@@ -41,4 +55,6 @@ combined_knees = json.loads((KAGGLE / "knees.json").read_text()) + knees
 (COMBINED / "classes.json").write_text((KAGGLE / "classes.json").read_text())
 links = list((COMBINED / "volumes").glob("*.npz"))
 broken = [link for link in links if not link.resolve().exists()]
-print("combined volumes", len(links), "broken", len(broken), "knees", len(combined_knees))
+print(
+    "combined volumes", len(links), "broken", len(broken), "knees", len(combined_knees)
+)

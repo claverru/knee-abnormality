@@ -150,7 +150,8 @@ published output is readable per version, including versions older than the curr
 from kaggle.api.kaggle_api_extended import KaggleApi
 from kagglesdk.kernels.types.kernels_api_service import ApiDownloadKernelOutputRequest
 
-api = KaggleApi(); api.authenticate()
+api = KaggleApi()
+api.authenticate()
 with api.build_kaggle_client() as client:
     request = ApiDownloadKernelOutputRequest()
     request.owner_slug = "ryanholbrook"

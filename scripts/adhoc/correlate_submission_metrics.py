@@ -27,13 +27,26 @@ class SubmissionMetricsCLI(CLISettings):
         "comparable cohorts"
     )
 
-    ledger: Path = Field(default=Path("outputs/submission/kaggle-ledger.json"), description="Machine submission ledger")
-    raw_dir: Path = Field(default=Path("data/raw"), description="Official competition files")
-    folds_dir: Path = Field(default=Path("data/folds"), description="Frozen split directories")
+    ledger: Path = Field(
+        default=Path("outputs/submission/kaggle-ledger.json"),
+        description="Machine submission ledger",
+    )
+    raw_dir: Path = Field(
+        default=Path("data/raw"), description="Official competition files"
+    )
+    folds_dir: Path = Field(
+        default=Path("data/folds"), description="Frozen split directories"
+    )
     output_dir: Path = Field(description="Fresh output directory")
-    permutations: int = Field(default=20000, ge=1000, description="Within-cohort permutations")
+    permutations: int = Field(
+        default=20000, ge=1000, description="Within-cohort permutations"
+    )
     seed: int = Field(default=20260928, description="Permutation seed")
-    decisive: float = Field(default=0.003, gt=0, description="Public difference counted as beyond seed noise")
+    decisive: float = Field(
+        default=0.003,
+        gt=0,
+        description="Public difference counted as beyond seed noise",
+    )
 
 
 def submitted_checkpoint(entry: dict) -> dict | None:
@@ -43,14 +56,20 @@ def submitted_checkpoint(entry: dict) -> dict | None:
         return None
     record = json.loads(manifest.read_text())
     checkpoint = record.get("checkpoint")
-    match = CHECKPOINT.match(checkpoint["source_path"]) if isinstance(checkpoint, dict) else None
+    match = (
+        CHECKPOINT.match(checkpoint["source_path"])
+        if isinstance(checkpoint, dict)
+        else None
+    )
     if match is None or not Path(match["run"]).exists():
         return None
     run, fold, name = Path(match["run"]), int(match["fold"]), match["name"]
     runtime = record["runtime"]
     config = json.loads((run / "effective_config.json").read_text())
     epochs = sorted((run / f"fold_{fold}/epochs").glob("metrics_epoch_*.json"))
-    epoch = int(re.search(r"epoch=(\d+)", name)[1]) if "epoch=" in name else len(epochs) - 1
+    epoch = (
+        int(re.search(r"epoch=(\d+)", name)[1]) if "epoch=" in name else len(epochs) - 1
+    )
     selected = json.loads((run / f"fold_{fold}/selected_checkpoint.json").read_text())
     return {
         "submission": entry["sequence"],
@@ -64,12 +83,18 @@ def submitted_checkpoint(entry: dict) -> dict | None:
         "inference": f"x{runtime.get('image_multiplier', 2)} tau{runtime.get('attention_temperature', 1.0)}"
         + (" tta" if runtime.get("reflection_tta") else ""),
         "is_selected": Path(selected["path"]).name == name,
-        "prediction_multiplier": selected.get("prediction_image_multiplier", config["data"].get("validation_image_multiplier")),
+        "prediction_multiplier": selected.get(
+            "prediction_image_multiplier",
+            config["data"].get("validation_image_multiplier"),
+        ),
     }
 
 
 def recorded_metrics(row: dict) -> dict:
-    path = Path(row["run"]) / f"fold_{row['fold']}/epochs/metrics_epoch_{row['epoch']:03d}.json"
+    path = (
+        Path(row["run"])
+        / f"fold_{row['fold']}/epochs/metrics_epoch_{row['epoch']:03d}.json"
+    )
     stored = json.loads(path.read_text())
     return {
         "own_x1_macro_auc": stored["macro_auc"],
@@ -80,18 +105,30 @@ def recorded_metrics(row: dict) -> dict:
     }
 
 
-def label_sets(settings: SubmissionMetricsCLI) -> tuple[dict[str, pl.DataFrame], list[str], pl.DataFrame]:
+def label_sets(
+    settings: SubmissionMetricsCLI,
+) -> tuple[dict[str, pl.DataFrame], list[str], pl.DataFrame]:
     frames, targets = {}, None
     for labels, split_name in LABEL_SPLITS.items():
         split = load_split(settings.raw_dir, settings.folds_dir / split_name)
         targets = split.protocol["targets"]
         frames[labels] = split.evaluation
-    membership = load_split(settings.raw_dir, settings.folds_dir / LABEL_SPLITS["rebuild_state_v2"]).membership
+    membership = load_split(
+        settings.raw_dir, settings.folds_dir / LABEL_SPLITS["rebuild_state_v2"]
+    ).membership
     return frames, targets, membership.select(STUDY, "is_gold")
 
 
-def score(predictions: pl.DataFrame, truth: pl.DataFrame, gold: pl.DataFrame, targets: list[str], prefix: str) -> dict:
-    frame = predictions.join(truth.rename({t: f"y_{t}" for t in targets}), on=STUDY).join(gold, on=STUDY)
+def score(
+    predictions: pl.DataFrame,
+    truth: pl.DataFrame,
+    gold: pl.DataFrame,
+    targets: list[str],
+    prefix: str,
+) -> dict:
+    frame = predictions.join(
+        truth.rename({t: f"y_{t}" for t in targets}), on=STUDY
+    ).join(gold, on=STUDY)
     probability = frame.select(targets).to_numpy().astype(np.float64)
     soft = frame.select([f"y_{t}" for t in targets]).to_numpy().astype(np.float64)
     hard = (soft >= TARGET_THRESHOLD).astype(np.int8)
@@ -100,27 +137,49 @@ def score(predictions: pl.DataFrame, truth: pl.DataFrame, gold: pl.DataFrame, ta
     bce = -(soft * np.log(clipped) + (1 - soft) * np.log1p(-clipped)).mean()
     return {
         f"{prefix}_macro_auc": aucs(hard, probability, targets)["macro_auc"],
-        f"{prefix}_soft_macro_auc": soft_aucs(soft, probability, targets)["soft_macro_auc"],
+        f"{prefix}_soft_macro_auc": soft_aucs(soft, probability, targets)[
+            "soft_macro_auc"
+        ],
         f"{prefix}_soft_bce": -float(bce),
-        f"{prefix}_report_auc": aucs(hard[~is_gold], probability[~is_gold], targets)["macro_auc"],
+        f"{prefix}_report_auc": aucs(hard[~is_gold], probability[~is_gold], targets)[
+            "macro_auc"
+        ],
     }
 
 
-def consensus_auc(predictions: pl.DataFrame, frames: dict[str, pl.DataFrame], targets: list[str], prefix: str) -> dict:
+def consensus_auc(
+    predictions: pl.DataFrame,
+    frames: dict[str, pl.DataFrame],
+    targets: list[str],
+    prefix: str,
+) -> dict:
     joined = predictions
     for labels, frame in frames.items():
-        joined = joined.join(frame.rename({t: f"{labels}_{t}" for t in targets}), on=STUDY)
+        joined = joined.join(
+            frame.rename({t: f"{labels}_{t}" for t in targets}), on=STUDY
+        )
     per_target = []
     for target in targets:
-        hard = np.stack([(joined[f"{labels}_{target}"].to_numpy() >= TARGET_THRESHOLD) for labels in frames])
+        hard = np.stack(
+            [
+                (joined[f"{labels}_{target}"].to_numpy() >= TARGET_THRESHOLD)
+                for labels in frames
+            ]
+        )
         agree = (hard == hard[0]).all(axis=0)
         per_target.append(
-            aucs(hard[0][agree, None].astype(np.int8), joined[target].to_numpy()[agree, None], [target])["macro_auc"]
+            aucs(
+                hard[0][agree, None].astype(np.int8),
+                joined[target].to_numpy()[agree, None],
+                [target],
+            )["macro_auc"]
         )
     return {f"{prefix}_consensus_auc": float(np.mean(per_target))}
 
 
-def gold_auc(predictions: pl.DataFrame, official: pl.DataFrame, targets: list[str], prefix: str) -> dict:
+def gold_auc(
+    predictions: pl.DataFrame, official: pl.DataFrame, targets: list[str], prefix: str
+) -> dict:
     frame = predictions.join(official.rename({t: f"y_{t}" for t in targets}), on=STUDY)
     result = aucs(
         frame.select([f"y_{t}" for t in targets]).to_numpy().astype(np.int8),
@@ -131,9 +190,18 @@ def gold_auc(predictions: pl.DataFrame, official: pl.DataFrame, targets: list[st
     return {f"{prefix}_gold_auc": result["macro_auc"]}
 
 
-def prediction_metrics(row: dict, frames: dict, targets: list[str], gold: pl.DataFrame, official: pl.DataFrame) -> dict:
+def prediction_metrics(
+    row: dict,
+    frames: dict,
+    targets: list[str],
+    gold: pl.DataFrame,
+    official: pl.DataFrame,
+) -> dict:
     run, fold = Path(row["run"]), row["fold"]
-    sources = {f"val_x{row['validation_multiplier']}": run / f"fold_{fold}/epochs/validation_epoch_{row['epoch']:03d}.csv"}
+    sources = {
+        f"val_x{row['validation_multiplier']}": run
+        / f"fold_{fold}/epochs/validation_epoch_{row['epoch']:03d}.csv"
+    }
     if row["is_selected"]:
         sources[f"pred_x{row['prediction_multiplier']}"] = run / "oof_predictions.csv"
     result = {}
@@ -148,7 +216,9 @@ def prediction_metrics(row: dict, frames: dict, targets: list[str], gold: pl.Dat
     return result
 
 
-def official_gold(settings: SubmissionMetricsCLI, targets: list[str], gold: pl.DataFrame) -> pl.DataFrame:
+def official_gold(
+    settings: SubmissionMetricsCLI, targets: list[str], gold: pl.DataFrame
+) -> pl.DataFrame:
     frame = pl.read_csv(settings.raw_dir / "train.csv", infer_schema_length=None)
     return frame.join(gold.filter(pl.col("is_gold")), on=STUDY).select(STUDY, *targets)
 
@@ -162,8 +232,14 @@ def cohort_key(row: dict, metric: str) -> tuple:
     return key
 
 
-def evaluate_metric(table: pl.DataFrame, metric: str, settings: SubmissionMetricsCLI) -> dict | None:
-    rows = [row for row in table.iter_rows(named=True) if row.get(metric) is not None and np.isfinite(row[metric])]
+def evaluate_metric(
+    table: pl.DataFrame, metric: str, settings: SubmissionMetricsCLI
+) -> dict | None:
+    rows = [
+        row
+        for row in table.iter_rows(named=True)
+        if row.get(metric) is not None and np.isfinite(row[metric])
+    ]
     cohorts: dict[tuple, list[dict]] = {}
     for row in rows:
         cohorts.setdefault(cohort_key(row, metric), []).append(row)
@@ -187,7 +263,11 @@ def evaluate_metric(table: pl.DataFrame, metric: str, settings: SubmissionMetric
             if abs(public[a] - public[b]) >= settings.decisive - 1e-9:
                 decisive_ranked += 1
                 decisive_concordant += agrees
-    x, y, groups = np.array(centered_metric), np.array(centered_public), np.array(groups)
+    x, y, groups = (
+        np.array(centered_metric),
+        np.array(centered_public),
+        np.array(groups),
+    )
     observed = float(np.corrcoef(x, y)[0, 1])
     generator = np.random.default_rng(settings.seed)
     exceed = 0
@@ -206,10 +286,14 @@ def evaluate_metric(table: pl.DataFrame, metric: str, settings: SubmissionMetric
         "concordant_pairs": concordant,
         "ranked_pairs": ranked,
         "concordance": concordant / ranked if ranked else None,
-        "concordance_binomial_p": binomtest(concordant, ranked, 0.5).pvalue if ranked else None,
+        "concordance_binomial_p": binomtest(concordant, ranked, 0.5).pvalue
+        if ranked
+        else None,
         "decisive_concordant": decisive_concordant,
         "decisive_pairs": decisive_ranked,
-        "decisive_concordance": decisive_concordant / decisive_ranked if decisive_ranked else None,
+        "decisive_concordance": decisive_concordant / decisive_ranked
+        if decisive_ranked
+        else None,
     }
 
 
@@ -223,19 +307,41 @@ def run(settings: SubmissionMetricsCLI) -> None:
         row = submitted_checkpoint(entry)
         if row is None:
             continue
-        rows.append(row | recorded_metrics(row) | prediction_metrics(row, frames, targets, gold, official))
+        rows.append(
+            row
+            | recorded_metrics(row)
+            | prediction_metrics(row, frames, targets, gold, official)
+        )
     table = pl.DataFrame(rows, infer_schema_length=None)
     metrics = [c for c in table.columns if c.endswith(("_auc", "_bce"))]
     results = [r for r in (evaluate_metric(table, m, settings) for m in metrics) if r]
-    summary = pl.DataFrame(results).sort("concordance", descending=True, nulls_last=True)
+    summary = pl.DataFrame(results).sort(
+        "concordance", descending=True, nulls_last=True
+    )
     settings.output_dir.mkdir(parents=True)
     table.write_csv(settings.output_dir / "submissions.csv")
     summary.write_csv(settings.output_dir / "metrics.csv")
     with pl.Config(tbl_rows=-1, tbl_width_chars=200, fmt_str_lengths=40):
-        print(summary.select("metric", "submissions", "cohorts", "within_cohort_pearson", "pearson_permutation_p", "concordance", "ranked_pairs", "decisive_concordance", "decisive_pairs"))
+        print(
+            summary.select(
+                "metric",
+                "submissions",
+                "cohorts",
+                "within_cohort_pearson",
+                "pearson_permutation_p",
+                "concordance",
+                "ranked_pairs",
+                "decisive_concordance",
+                "decisive_pairs",
+            )
+        )
         print(
             table.group_by("split", "fold", "inference")
-            .agg(n=pl.len(), submissions=pl.col("submission"), public_sd=pl.col("public").std())
+            .agg(
+                n=pl.len(),
+                submissions=pl.col("submission"),
+                public_sd=pl.col("public").std(),
+            )
             .sort("split", "fold")
         )
 

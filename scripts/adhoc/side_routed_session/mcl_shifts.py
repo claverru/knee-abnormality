@@ -32,13 +32,17 @@ names = studies[STUDY].to_list()
 
 
 def scores(run):
-    table = pl.read_csv(run / "training" / "fold_1" / "validation_predictions.csv").sort(STUDY)
+    table = pl.read_csv(
+        run / "training" / "fold_1" / "validation_predictions.csv"
+    ).sort(STUDY)
     assert table[STUDY].to_list() == names
     return table["MCL"].to_numpy()
 
 
 labels = pl.read_csv(Path("data/folds/all_5fold_scanner_v2") / "targets.csv")
-truth = studies.select(STUDY).join(labels, on=STUDY, how="left")["MCL"].to_numpy() >= 0.5
+truth = (
+    studies.select(STUDY).join(labels, on=STUDY, how="left")["MCL"].to_numpy() >= 0.5
+)
 old, new = scores(BASE), scores(RUN)
 
 
@@ -53,9 +57,13 @@ negatives = rng.choice(np.flatnonzero(~truth), 150, replace=False)
 rows = np.concatenate((positives, negatives))
 index = build_series_index(config.paths.data_root, config.data, split, names)
 dataset = KneeStudyDataset(studies, index, config.data, targets, None, 1)
-selected = json.loads((RUN / "training" / "fold_1" / "selected_checkpoint.json").read_text())
+selected = json.loads(
+    (RUN / "training" / "fold_1" / "selected_checkpoint.json").read_text()
+)
 gpu = torch.device("cuda")
-model = load_checkpoint_model(config, targets, Path(selected["path"]), gpu, expected_fold=1).eval()
+model = load_checkpoint_model(
+    config, targets, Path(selected["path"]), gpu, expected_fold=1
+).eval()
 planes = [kind.plane for kind in config.data.series_types]
 fluid = [kind.fluid_sensitive for kind in config.data.series_types]
 fields = [view.field_mm for _, view in config.data.views]
@@ -69,7 +77,9 @@ for row in rows:
         before = model.view_windows(batch, torch.zeros_like(delta))
     sign = -1.0 if bool(batch["knee_side_left"][0]) else 1.0
     d = delta[0].float().cpu().numpy()
-    records.append((int(row), bool(truth[row]), int(change[row]), sign * d[0], d[1], d[2]))
+    records.append(
+        (int(row), bool(truth[row]), int(change[row]), sign * d[0], d[1], d[2])
+    )
     if row in movers:
         kinds = batch["series_type_index"].cpu().numpy()
         views = batch["view_index"].cpu().numpy()
@@ -77,7 +87,9 @@ for row in rows:
         applied = after["applied_view_shift_mm"].float().cpu().numpy()
         panels = []
         for plane in ("Coronal", "Axial"):
-            members = [i for i, k in enumerate(kinds) if planes[k] == plane and mask[i].any()]
+            members = [
+                i for i, k in enumerate(kinds) if planes[k] == plane and mask[i].any()
+            ]
             members.sort(key=lambda i: (not fluid[kinds[i]], -fields[views[i]]))
             if not members:
                 continue
@@ -93,13 +105,22 @@ for row in rows:
                 )
             )
         drawings[int(row)] = (sign, d, panels)
-table = pl.DataFrame(records, schema=["row", "positive", "gain", "medial", "front", "up"], orient="row")
+table = pl.DataFrame(
+    records, schema=["row", "positive", "gain", "medial", "front", "up"], orient="row"
+)
 table.write_csv(OUT / "shifts.csv")
-for name, part in (("MCL positives", table.filter(pl.col("positive"))), ("negatives (150)", table.filter(~pl.col("positive")))):
-    print(f"{name:18} n {len(part):4d} | medial mean {part['medial'].mean():+.2f} sd {part['medial'].std():.2f} | front mean {part['front'].mean():+.2f} sd {part['front'].std():.2f} | up mean {part['up'].mean():+.2f} sd {part['up'].std():.2f}")
+for name, part in (
+    ("MCL positives", table.filter(pl.col("positive"))),
+    ("negatives (150)", table.filter(~pl.col("positive"))),
+):
+    print(
+        f"{name:18} n {len(part):4d} | medial mean {part['medial'].mean():+.2f} sd {part['medial'].std():.2f} | front mean {part['front'].mean():+.2f} sd {part['front'].std():.2f} | up mean {part['up'].mean():+.2f} sd {part['up'].std():.2f}"
+    )
 pos = table.filter(pl.col("positive"))
 for key in ("medial", "front", "up"):
-    print(f"positives: correlation of gain with {key} shift {np.corrcoef(pos['gain'].to_numpy(), pos[key].to_numpy())[0, 1]:+.2f}; with its size {np.corrcoef(pos['gain'].to_numpy(), np.abs(pos[key].to_numpy()))[0, 1]:+.2f}")
+    print(
+        f"positives: correlation of gain with {key} shift {np.corrcoef(pos['gain'].to_numpy(), pos[key].to_numpy())[0, 1]:+.2f}; with its size {np.corrcoef(pos['gain'].to_numpy(), np.abs(pos[key].to_numpy()))[0, 1]:+.2f}"
+    )
 print(pos.sort("gain", descending=True).head(8))
 print(pos.sort("gain").head(5))
 figure, axes = plt.subplots(len(movers), 4, figsize=(14, 3.6 * len(movers)))
@@ -108,19 +129,34 @@ for line, row in enumerate(movers):
     for column in range(4):
         axes[line][column].axis("off")
     for p, (plane, field, first, second, applied) in enumerate(panels):
-        for q, (image, name) in enumerate(((first, "centred as before"), (second, "moved by the locator"))):
+        for q, (image, name) in enumerate(
+            ((first, "centred as before"), (second, "moved by the locator"))
+        ):
             panel = axes[line][2 * p + q]
             panel.imshow(image, cmap="gray", vmin=0, vmax=255)
             panel.axhline(111.5, color="cyan", linewidth=0.6)
             panel.axvline(111.5, color="cyan", linewidth=0.6)
-            extra = f"\nmoved {applied[1]:+.1f} mm across, {applied[0]:+.1f} mm down" if q else ""
-            panel.set_title(f"{plane.lower()}, {field:.0f} mm, {name}{extra}", fontsize=8.5)
+            extra = (
+                f"\nmoved {applied[1]:+.1f} mm across, {applied[0]:+.1f} mm down"
+                if q
+                else ""
+            )
+            panel.set_title(
+                f"{plane.lower()}, {field:.0f} mm, {name}{extra}", fontsize=8.5
+            )
     axes[line][0].text(
-        -0.02, 0.5,
+        -0.02,
+        0.5,
         f"row {row}\nMCL rank +{int(change[row])}\nmedial {sign * d[0]:+.1f}\nfront {d[1]:+.1f}\nup {d[2]:+.1f} mm",
-        transform=axes[line][0].transAxes, ha="right", va="center", fontsize=9,
+        transform=axes[line][0].transAxes,
+        ha="right",
+        va="center",
+        fontsize=9,
     )
-figure.suptitle("The five MCL knees that gained most: the same slice cut at the old centre and at the locator's point", fontsize=12)
+figure.suptitle(
+    "The five MCL knees that gained most: the same slice cut at the old centre and at the locator's point",
+    fontsize=12,
+)
 figure.tight_layout(rect=(0.06, 0, 1, 0.97))
 figure.savefig(OUT / "top-movers-crops.png", dpi=80)
 print("saved", OUT / "top-movers-crops.png")

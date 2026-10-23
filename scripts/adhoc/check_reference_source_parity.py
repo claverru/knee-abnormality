@@ -31,7 +31,9 @@ class SourceParityCLI(CLISettings):
     )
 
     run: Path = Field(description="Completed training run directory")
-    studies: int = Field(default=16, gt=0, description="Validation studies, in study-ID order")
+    studies: int = Field(
+        default=16, gt=0, description="Validation studies, in study-ID order"
+    )
     output: Path = Field(description="Fresh .npy output path")
 
 
@@ -41,22 +43,38 @@ def run(settings: SourceParityCLI) -> None:
     checkpoint_module.validate_preprocessing_identity = lambda *args, **kwargs: None
     config = load_config(settings.run / "effective_config.json")
     (fold,) = config.validation.folds
-    selected = json.loads((settings.run / f"fold_{fold}/selected_checkpoint.json").read_text())
+    selected = json.loads(
+        (settings.run / f"fold_{fold}/selected_checkpoint.json").read_text()
+    )
     checkpoint = settings.run / f"fold_{fold}" / Path(selected["path"]).name
     targets, studies, split = prediction_studies(config, "validation", fold)
     studies = studies.sort(STUDY).head(settings.studies)
-    index = build_series_index(config.paths.data_root, config.data, split, studies[STUDY].to_list())
-    dataset = KneeStudyDataset(studies, index, config.data, targets, None, 1, INFERENCE_IO_THREADS)
-    loader = build_data_loader(dataset, config.trainer, INFERENCE_BATCH_SIZE, num_workers=2)
+    index = build_series_index(
+        config.paths.data_root, config.data, split, studies[STUDY].to_list()
+    )
+    dataset = KneeStudyDataset(
+        studies, index, config.data, targets, None, 1, INFERENCE_IO_THREADS
+    )
+    loader = build_data_loader(
+        dataset, config.trainer, INFERENCE_BATCH_SIZE, num_workers=2
+    )
     device = torch.device("cpu")
-    model = checkpoint_module.load_checkpoint_model(config, targets, checkpoint, device, expected_fold=fold)
+    model = checkpoint_module.load_checkpoint_model(
+        config, targets, checkpoint, device, expected_fold=fold
+    )
     _, predictions, _ = predict_loader([model], loader, device)
     np.save(settings.output, np.asarray(predictions, dtype=np.float64))
-    print(json.dumps({
-        "source": checkpoint_module.__file__,
-        "sources_sha256": preprocessing_identity(config.model.backbone)["sources_sha256"],
-        "shape": list(np.asarray(predictions).shape),
-    }))
+    print(
+        json.dumps(
+            {
+                "source": checkpoint_module.__file__,
+                "sources_sha256": preprocessing_identity(config.model.backbone)[
+                    "sources_sha256"
+                ],
+                "shape": list(np.asarray(predictions).shape),
+            }
+        )
+    )
 
 
 if __name__ == "__main__":
