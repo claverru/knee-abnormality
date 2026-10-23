@@ -402,6 +402,19 @@ the worktrees: with the submission ledger stale since 2026-10-03 its export rule
 removed the wheels of bundles another session was still using. Predictions, metrics, configs,
 sources and the campaign state are kept; the weights of S150 and S151 are on Kaggle.
 
+**2026-10-20, before closing the rented machine (user order, by hand).** WSL use fell from 770 to
+694 GB: 64 export bundles in `outputs/submission/exports` (old ensemble probes A–D and the 5- and
+6-family resplits, the efficiency probes cleared by the inference-speed session, the v3 gen-2
+bundles at τ 0.15/0.3/0.5), the checkpoints of the v2 gen-1 runs of all six families,
+`nextvit-silver-fold-*` and `overnight-*` (23 files), 55 parity checkpoints in
+`outputs/rented-machine-archive-20261020/parity`, 13 TensorRT engine builds in
+`outputs/profiling`, and `uv cache clean` (26.8 GiB). The dry run of `free_disk` was not executed:
+its rules would have removed the pretraining `last.ckpt` files the students start from and the
+wheels of the four candidate bundles, both recorded only in the fastmri-pretraining worktree's
+ongoing notes. Kept: the four candidate bundles, the v2/v3 gen-2 and gen-3, v3 gen-1 and six
+pretraining checkpoints, `outputs/autoresearch` records, the torch hub cache (RadImageNet weights).
+Deleted paths: `outputs/archive/maintenance/manual-cleanup-20261020/`.
+
 ## Current scope and next execution
 
 The config, fold-aware labels, on-the-fly image preparation, study dataset,
