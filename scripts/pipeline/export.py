@@ -29,6 +29,7 @@ from knee_abnormality.config import (
 from knee_abnormality.identity import validate_preprocessing_identity
 from knee_abnormality.inference.bundle import BUNDLE_SCHEMA_VERSION, bundle_hashes
 from knee_abnormality.inference.checkpoint import (
+    MEMBER_DATA_FIELDS,
     bake_attention_temperature,
     checkpoint_model,
     ensemble_member_path,
@@ -153,6 +154,7 @@ def _portable_config(config: ExperimentConfig, fold: int) -> dict:
         "meniscus_targets": "meniscus-targets-not-required-for-test",
     }
     values["validation"]["folds"] = [fold]
+    values["extra_training"] = None
     ExperimentConfig.model_validate(values, context={"config_dir": Path.cwd()})
     return values
 
@@ -385,7 +387,7 @@ def _validate_members(members: list[Member]) -> None:
         reference_data = reference.config.data.model_dump(mode="json")
         other_data = other.config.data.model_dump(mode="json")
         for name, value in reference_data.items():
-            if other_data[name] != value:
+            if name not in MEMBER_DATA_FIELDS and other_data[name] != value:
                 raise ValueError(f"Checkpoints disagree on data.{name}")
 
 
