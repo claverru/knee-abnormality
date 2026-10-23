@@ -15,6 +15,7 @@
 | Reviewing the closed stride-16 truncation and stride-16/stride-32 fusion line, and recovering its code | [Stride-16 feature fusion](stride16-feature-fusion.md) |
 | Reviewing the closed oblique-groups line (own slot budget for tilted series, group embedding): paired submissions S41/S46, S48/S51, S50/S52, the three oblique campaigns, and recovering its code | [Oblique groups](oblique-groups.md) |
 | Reviewing what the fastMRI teacher-student chain built but did not adopt: joint training with external batches and a quarter-cosine fade, per-label ensemble weights (S164), silver15/teachers2 rounds, EfficientViT/FocalNet/MambaVision rebuild configs, and where the removed code is archived | [Retired fastMRI-chain pieces](fastmri-chain-retired-pieces.md) |
+| Reviewing the closed soft-tissue segmenter line (2026-10-14): why `aagatti/nnunet_knee` does not carry beyond DESS (contrast, not slice thickness; reach 1 of 65), the paired Dice tests, the unlaunched fine-tune and where its scripts are archived | [Soft-tissue segmenter](soft-tissue-segmenter.md) |
 | Reviewing the superseded 2026-09-19 inference-loading gain ranking and its bit-exact conversion and quantile measurements | [Loading speedup ranked by gain](loading-speedup-ranked-by-gain.md) |
 | Reviewing triplet-budget allocation experiments | [Triplet budget allocation](triplet-budget-allocation.md) |
 | Reading the original crop-selection design | [Crop selection implementation plan](crop-selection-plan.md) |
