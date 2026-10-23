@@ -20,6 +20,8 @@ dependencies = [
     "pydantic==2.13.5",
     "pydantic-settings==2.15.0",
     "pydicom==3.0.2",
+    "pylibjpeg==2.1.0",
+    "pylibjpeg-libjpeg==2.4.0",
     "pytorch-lightning==2.6.6",
     "pyyaml==6.0.3",
     "scikit-learn==1.6.1",

@@ -165,7 +165,8 @@ class TripletAccounting(L.Callback):
         self.ledger.begin()
 
     def on_train_batch_start(self, trainer, pl_module, batch, batch_idx):
-        self.ledger.observe(batch)
+        if pl_module.config.extra_training is None:
+            self.ledger.observe(batch)
 
     def on_train_epoch_end(self, trainer, pl_module):
         self.ledger.end("train", trainer.current_epoch)

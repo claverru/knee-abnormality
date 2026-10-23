@@ -74,6 +74,10 @@ class TrainOptions(ConfigOptions):
         default=None,
         description="Checkpoint to resume from; requires exactly one selected fold and reuses its seed",
     )
+    initial_weights: Path | None = Field(
+        default=None,
+        description="Training checkpoint whose model weights start this run in place of the pretrained ones",
+    )
     limit_train: int | None = Field(
         default=None,
         gt=0,
@@ -167,6 +171,7 @@ def run_fold(
     resume: Path | None,
     resume_checkpoint: dict | None,
     limit_train: int | None,
+    initial_weights: Path | None,
 ) -> None:
     L.seed_everything(config.seed, workers=True)
     setup_started = time.perf_counter()
@@ -175,9 +180,10 @@ def run_fold(
     labels = data.labels
     training_studies = len(data.train_dataset)
     class_balance = fixed_class_balance(
-        data.train_dataset.studies,
+        data.class_balance_studies,
         labels.targets,
         config.trainer.class_balance_exponent,
+        data.extra_dataset is not None,
     )
     input_identity = training_input_identity(
         config, labels, data.train_dataset.studies, data.validation_dataset.studies
@@ -212,6 +218,13 @@ def run_fold(
         class_balance,
         load_pretrained=False if resume is not None else None,
         input_identity=input_identity,
+        initial_weights={
+            name.removeprefix("model."): value
+            for name, value in read_checkpoint(initial_weights)["state_dict"].items()
+            if name.startswith("model.")
+        }
+        if initial_weights is not None
+        else None,
     )
     initialized_identity = (
         {
@@ -239,6 +252,14 @@ def run_fold(
                 "pretrained_weights": config.model.pretrained_weights,
                 "feature_mapping": module.model.feature_mapping_identity,
                 **initialized_identity,
+                **(
+                    {
+                        "initial_weights": str(initial_weights.expanduser().resolve()),
+                        "initial_weights_sha256": sha256_file(initial_weights),
+                    }
+                    if initial_weights is not None
+                    else {}
+                ),
             },
             indent=2,
             default=str,
@@ -368,6 +389,7 @@ def run_fold_process(
     fold_dir: Path,
     resume: Path | None,
     limit_train: int | None,
+    initial_weights: Path | None,
 ) -> None:
     multiprocessing.set_start_method("fork", force=True)
     for module in (KneeStudyDataset.__module__, predict_loader.__module__):
@@ -380,6 +402,7 @@ def run_fold_process(
         resume,
         read_checkpoint(resume) if resume is not None else None,
         limit_train,
+        initial_weights,
     )
 
 
@@ -392,6 +415,8 @@ def main() -> None:
     configure_cuda_allocator()
     config_path = args.config.expanduser().resolve()
     config = load_config(config_path, overrides=overrides)
+    if args.resume is not None and args.initial_weights is not None:
+        raise ValueError("--initial-weights starts a run; a resumed run has its own weights")
     if args.resume is not None and len(config.validation.folds) != 1:
         raise ValueError("--resume requires exactly one selected fold")
     resume_checkpoint = (
@@ -427,7 +452,14 @@ def main() -> None:
         fold_dir.mkdir()
         process = context.Process(
             target=run_fold_process,
-            args=(config, fold, fold_dir, args.resume, args.limit_train),
+            args=(
+                config,
+                fold,
+                fold_dir,
+                args.resume,
+                args.limit_train,
+                args.initial_weights,
+            ),
         )
         process.start()
         try:

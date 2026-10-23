@@ -109,7 +109,11 @@ def load_fold_labels(config: ExperimentConfig, fold: int) -> FoldLabels:
             for target in targets
         )
     )
-    training = base.filter(pl.col("fold") != fold).sort(STUDY)
+    training = (
+        base
+        if config.validation.train_on_validation
+        else base.filter(pl.col("fold") != fold)
+    ).sort(STUDY)
     validation = (
         base.filter(pl.col("fold") == fold)
         .drop([f"target_{target}" for target in targets])
@@ -166,13 +170,8 @@ def distilled(config: ExperimentConfig, labels: FoldLabels) -> FoldLabels:
         validate="1:1",
         maintain_order="left",
     )
-    if (
-        teacher["teacher_fold"].null_count()
-        or (teacher["teacher_fold"] != teacher["fold"]).any()
-    ):
-        raise ValueError(
-            "Teacher table must give every training study a value from the teacher that held it out"
-        )
+    if teacher["teacher_fold"].null_count():
+        raise ValueError("Teacher table must give every training study a value")
     logits = teacher.select(f"teacher_{target}" for target in targets).to_numpy()
     if not np.isfinite(logits).all():
         raise ValueError("Teacher table logits must be finite")

@@ -30,6 +30,7 @@ from knee_abnormality.modeling.augmentation import (
     apply_feature_statistics_augmentation,
     apply_reflection,
     augmented_to_prepared,
+    contrast_pair_slots,
     reflection_channels,
     reflection_inverse,
     reflection_valid_rects,
@@ -461,8 +462,12 @@ class KneeAbnormalityModel(nn.Module):
                 torch.full((len(ROUTING_WIDTHS),), initial_logit)
             )
             self.knee_level_scale = nn.Parameter(torch.zeros(len(self.channels)))
-        self.oa_indices = tuple(
-            targets.index(name) for name in (*COMPARTMENT_PAIRS["oa"], "PF OA")
+        self.register_buffer(
+            "oa_index",
+            torch.tensor(
+                [targets.index(name) for name in (*COMPARTMENT_PAIRS["oa"], "PF OA")]
+            ),
+            persistent=False,
         )
         with torch.random.fork_rng(devices=[]):
             self.oa_detector = nn.Linear(PROJECTION_WIDTH, 1, bias=False)
@@ -536,8 +541,10 @@ class KneeAbnormalityModel(nn.Module):
         return self.backbone_stages.deep(self.backbone_stages.to_stride_8(images))
 
     def _effective_presence(self, presence: torch.Tensor) -> torch.Tensor:
-        if not presence.any(dim=1).all():
-            raise ValueError("Every study must contain at least one present series")
+        torch._assert_async(
+            presence.any(dim=1).all(),
+            "Every study must contain at least one present series",
+        )
         return presence
 
     def _mix_contrast(
@@ -555,9 +562,7 @@ class KneeAbnormalityModel(nn.Module):
         settings = self.augmentation_settings.contrast_mixing_augmentation
         if not self.training or settings.probability == 0:
             return images
-        pairs = torch.tensor(
-            self.contrast_mixing_pairs, device=images.device, dtype=torch.long
-        )
+        pairs = contrast_pair_slots(self.contrast_mixing_pairs, images.device)
         parameters = sample_contrast_mixing_parameters(
             settings.probability, effective[:, pairs[:, 0]] & effective[:, pairs[:, 1]]
         )
@@ -666,16 +671,19 @@ class KneeAbnormalityModel(nn.Module):
             logit = logit + offset.float()
         nod, roll, turn = (FRAME_ROTATION_RANGE_RAD * torch.tanh(logit)).unbind(-1)
         zero = torch.zeros_like(nod)
-        return torch.linalg.matrix_exp(
-            torch.stack(
-                (
-                    torch.stack((zero, -turn, roll), -1),
-                    torch.stack((turn, zero, -nod), -1),
-                    torch.stack((-roll, nod, zero), -1),
-                ),
-                -2,
-            )
+        generator = torch.stack(
+            (
+                torch.stack((zero, -turn, roll), -1),
+                torch.stack((turn, zero, -nod), -1),
+                torch.stack((-roll, nod, zero), -1),
+            ),
+            -2,
         )
+        angle = (nod.square() + roll.square() + turn.square()).clamp_min(1e-24).sqrt()
+        first = torch.sinc(angle / torch.pi)[..., None, None]
+        second = 0.5 * torch.sinc(angle / (2 * torch.pi)).square()[..., None, None]
+        identity = torch.eye(3, dtype=generator.dtype, device=generator.device)
+        return identity + first * generator + second * (generator @ generator)
 
     @staticmethod
     def rotation_angles(rotation: torch.Tensor) -> torch.Tensor:
@@ -785,9 +793,8 @@ class KneeAbnormalityModel(nn.Module):
             torch.zeros_like(tilt),
             torch.ones_like(tilt),
         )
-        nod_only = torch.tensor([1.0, 0.0, 0.0], device=tokens.device)
         rotation = self.frame_rotation(
-            output[:, count : 2 * count] * nod_only
+            output[:, count : 2 * count] * unit[0]
         ) @ torch.stack(
             (
                 torch.stack((one, zero, zero), -1),
@@ -846,7 +853,9 @@ class KneeAbnormalityModel(nn.Module):
             response = torch.zeros(
                 (batch_size, 4), dtype=torch.float64, device=device
             ).index_add(0, study, points * (target * weight)[:, None])
-            solution = torch.linalg.solve(moments + eye, response + PLANE_RIDGE * prior)
+            solution = torch.linalg.solve_ex(
+                moments + eye, response + PLANE_RIDGE * prior
+            )[0]
             slope = solution[:, :3] / PLANE_SCALE_MM
             length = slope.norm(dim=-1, keepdim=True).clamp_min(1e-9)
             distance = (
@@ -927,13 +936,13 @@ class KneeAbnormalityModel(nn.Module):
 
     def _regions(self, encoded: dict, medial_sign: float) -> torch.Tensor:
         medial, front, height = self.frame(encoded, medial_sign).unbind(-1)
-        mirror = torch.tensor([medial_sign, 1.0, 1.0], device=medial.device)
+        box = encoded["token_box"].float()
         half = (
             0.5
             * torch.einsum(
                 "nac,nvc->nav",
                 encoded["frame_rotation"].detach().float(),
-                encoded["token_box"].float() * mirror,
+                torch.cat((box[..., :1] * medial_sign, box[..., 1:]), -1),
             )
             .abs()
             .sum(-1)
@@ -942,7 +951,7 @@ class KneeAbnormalityModel(nn.Module):
         top, bottom, core_radius, ring_radius = (
             encoded["frame_sizes"].float()[:, None].unbind(-1)
         )
-        step = torch.tensor(0.5, device=medial.device)
+        step = medial.new_full((), 0.5)
 
         def inside(distance: torch.Tensor, extent: torch.Tensor) -> torch.Tensor:
             soft = torch.sigmoid(distance / (2 * extent))
@@ -1043,9 +1052,7 @@ class KneeAbnormalityModel(nn.Module):
                     ringed * sector["posterolateral"] * heights[14],
                     kneecap * medial_side,
                     kneecap * lateral_side,
-                    shares[
-                        ..., [FEMUR_CLASS, TIBIA_CLASS, KNEECAP_CLASS, FIBULA_CLASS]
-                    ].sum(-1),
+                    shares[..., FEMUR_CLASS : FIBULA_CLASS + 1].sum(-1),
                 )
             )
         return torch.stack(
@@ -1252,9 +1259,11 @@ class KneeAbnormalityModel(nn.Module):
             pooled_evidence = torch.logsumexp(scores, -1) - counts.clamp_min(1).log()
             pooled_evidence = torch.where(empty, 0.0, pooled_evidence)
             correction = pooled_evidence * self.oa_detector_scale.float()[None]
-            logits[:, self.oa_indices] += correction
-        if not torch.isfinite(logits).all():
-            raise RuntimeError("Study attention pooling produced non-finite logits")
+            logits[:, self.oa_index] += correction
+        torch._assert_async(
+            torch.isfinite(logits).all(),
+            "Study attention pooling produced non-finite logits",
+        )
         return logits
 
     def encode_batch(self, batch: dict, view_pose: torch.Tensor | None = None) -> dict:
@@ -1336,15 +1345,10 @@ class KneeAbnormalityModel(nn.Module):
                 batch["reflection_eligible"],
             ).applied
         effective = self._effective_presence(presence)
-        all_study = batch["series_study_index"]
-        all_type = batch["series_type_index"]
-        keep_series = effective[all_study, all_type]
-        study_index = all_study[keep_series]
-        type_index = all_type[keep_series]
-        slice_mask = batch["slice_mask"][keep_series]
-        flat_indices = (
-            (keep_series[:, None] & batch["slice_mask"]).flatten().nonzero().flatten()
-        )
+        study_index = batch["series_study_index"]
+        type_index = batch["series_type_index"]
+        slice_mask = batch["slice_mask"]
+        flat_indices = slice_mask.flatten().nonzero().flatten()
         valid_rects = batch["valid_rects"].flatten(0, 1)[flat_indices]
         patient_maps = batch["patient_maps"].flatten(0, 1)[flat_indices].float()
         geometry_valid = batch["geometry_valid"].flatten()[
@@ -1371,7 +1375,7 @@ class KneeAbnormalityModel(nn.Module):
             and self.augmentation_settings.reflection_augmentation.probability > 0
         ):
             valid_images = apply_reflection(valid_images, reflected, sagittal)
-        view_index = batch["view_index"][keep_series][acquisition_index]
+        view_index = batch["view_index"][acquisition_index]
         primary_image = ~self.shared_slice_view[view_index]
         mixing_type = torch.where(primary_image, token_type, -1)
         valid_images = self._mix_contrast(
@@ -1438,7 +1442,7 @@ class KneeAbnormalityModel(nn.Module):
             patient_position = torch.einsum("nij,nkj->nki", middle, homogeneous)
             center = torch.stack(
                 [
-                    batch[key][keep_series][acquisition_index].float()
+                    batch[key][acquisition_index].float()
                     for key in (
                         "knee_center_x_mm",
                         "knee_center_y_mm",
@@ -1455,21 +1459,25 @@ class KneeAbnormalityModel(nn.Module):
             offset = torch.where(
                 valid_position[:, None, None], patient_position - center[:, None], 0.0
             ).detach()
-            source_middle = middle @ torch.linalg.inv(
+            source_middle = middle @ torch.linalg.inv_ex(
                 batch["crop_affine"].flatten(0, 1)[flat_indices].float()
-            )
+            )[0]
             row = source_middle[:, :2, 0]
             row = torch.where(row[:, :1] < 0, -row, row)
             length = row.norm(dim=-1)
             aligned = valid_position & ~sagittal & (length > 1e-6)
             axis = torch.zeros((batch_size, 2), device=features.device).index_add(
-                0, token_study[aligned], row[aligned] / length[aligned, None]
+                0,
+                token_study,
+                torch.where(
+                    aligned[:, None], row / length.clamp_min(1e-6)[:, None], 0.0
+                ),
             )
             axis_length = axis.norm(dim=-1, keepdim=True)
             axis = torch.where(
                 axis_length > 1e-6,
                 axis / axis_length.clamp_min(1e-6),
-                torch.tensor([1.0, 0.0], device=features.device),
+                nn.functional.pad(torch.ones_like(axis[:, :1]), (0, 1)),
             ).detach()
             cosine, sine = axis[token_study][:, None].unbind(-1)
             knee_x = offset[..., 0] * cosine + offset[..., 1] * sine
@@ -1499,7 +1507,7 @@ class KneeAbnormalityModel(nn.Module):
                 batch["knee_side_coordinates"],
                 batch["knee_side_left"],
             )
-            sign = batch["knee_side_sign"][keep_series][acquisition_index]
+            sign = batch["knee_side_sign"][acquisition_index]
             oa_trusted_geometry = (
                 geometry_valid[:, None] & (sign[:, None] != 0) & visual_valid
             )

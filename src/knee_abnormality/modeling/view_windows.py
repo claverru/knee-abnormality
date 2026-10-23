@@ -57,7 +57,7 @@ def rotated_rectangles(
     x = torch.stack((left, right, right, left), -1)
     y = torch.stack((top, top, bottom, bottom), -1)
     corners = torch.stack((x, y, torch.ones_like(x)), -1)
-    inverse = torch.linalg.inv(affine.float())
+    inverse = torch.linalg.inv_ex(affine.float())[0]
     placed = torch.einsum("ntij,ntckj->ntcki", inverse, corners)[..., :2]
     first = placed.amin(-2).clamp(0, size - 1)
     last = placed.amax(-2).clamp(0, size - 1)
@@ -322,9 +322,9 @@ class ViewWindows(nn.Module):
             point = torch.where(torch.isfinite(point), point, 0.0)
             gram = torch.einsum("ntpa,ntpb->ntab", linear, linear)
             gram = gram + 1e-6 * torch.eye(2, device=gram.device)
-            pixel = torch.linalg.solve(
+            pixel = torch.linalg.solve_ex(
                 gram, torch.einsum("ntpa,ntp->nta", linear, point)
-            )
+            )[0]
             margin = self.margin[batch["view_index"]][:, None, None]
             limit = self.shift_limit[batch["view_index"]][:, None, None]
             shift = (pixel - margin - pivot).clamp(-limit, limit).round()

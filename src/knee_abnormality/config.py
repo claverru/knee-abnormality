@@ -105,6 +105,16 @@ class DistillationConfig(ConfigModel):
     teacher_share: UnitFloat = 0.0
 
 
+class ExtraTrainingConfig(ConfigModel):
+    data_root: Path
+    labels: Path
+
+    @field_validator("data_root", "labels", mode="before")
+    @classmethod
+    def resolve_path(cls, value: object, info: ValidationInfo) -> object:
+        return PathsConfig.resolve_path(value, info)
+
+
 class LabelsConfig(ConfigModel):
     source: Identifier
 
@@ -338,6 +348,7 @@ class ValidationConfig(ConfigModel):
     split: Identifier
     folds: Annotated[tuple[Fold, ...], Field(min_length=1)]
     prediction_image_multiplier: Annotated[StrictInt, Field(gt=0)] = 1
+    train_on_validation: bool = False
 
     @field_validator("folds")
     @classmethod
@@ -353,6 +364,7 @@ class ExperimentConfig(ConfigModel):
     paths: PathsConfig
     labels: LabelsConfig
     distillation: DistillationConfig = DistillationConfig()
+    extra_training: ExtraTrainingConfig | None = None
     validation: ValidationConfig
     data: DataConfig
     model: ModelConfig

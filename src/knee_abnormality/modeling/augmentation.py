@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import cache, partial
 
 import torch
 import torch.nn.functional as F
@@ -83,14 +84,70 @@ def apply_reflection(
     )
 
 
+@cache
+def _reflection_matrices(
+    width: int, device: torch.device
+) -> tuple[torch.Tensor, torch.Tensor]:
+    with torch.inference_mode(False):
+        identity = torch.eye(3, dtype=torch.float32)
+        reversal = identity.clone()
+        reversal[0, 0] = -1
+        reversal[0, 2] = width - 1
+        return identity.to(device), reversal.to(device)
+
+
+@cache
+def _prepared_conversion(
+    height: int, width: int, device: torch.device
+) -> tuple[torch.Tensor, torch.Tensor]:
+    with torch.inference_mode(False):
+        conversion = torch.tensor(
+            [
+                [(width - 1) / width, 0, (width - 1) / (2 * width)],
+                [0, (height - 1) / height, (height - 1) / (2 * height)],
+                [0, 0, 1],
+            ],
+            device=device,
+        )
+        return torch.linalg.inv(conversion), conversion
+
+
+@cache
+def _plane_normal_axis(device: torch.device) -> torch.Tensor:
+    with torch.inference_mode(False):
+        return torch.tensor(PLANE_NORMAL_AXIS, dtype=torch.long).to(device)
+
+
+@cache
+def _normal_centre(height: int, width: int, device: torch.device) -> torch.Tensor:
+    with torch.inference_mode(False):
+        return torch.tensor([width / 2, height / 2, 1.0]).to(device)
+
+
+@cache
+def _normalized_to_pixel(height: int, width: int, device: torch.device) -> torch.Tensor:
+    with torch.inference_mode(False):
+        matrix = torch.eye(3, dtype=torch.float32)
+        matrix[0, 0] = width / 2
+        matrix[1, 1] = height / 2
+        matrix[0, 2] = (width - 1) / 2
+        matrix[1, 2] = (height - 1) / 2
+        return matrix.to(device)
+
+
+@cache
+def contrast_pair_slots(
+    pairs: tuple[tuple[int, int], ...], device: torch.device
+) -> torch.Tensor:
+    with torch.inference_mode(False):
+        return torch.tensor(pairs, dtype=torch.long).to(device)
+
+
 def reflection_inverse(
     inverse: torch.Tensor, reflected: torch.Tensor, sagittal: torch.Tensor, width: int
 ) -> torch.Tensor:
     with torch.autocast(device_type=inverse.device.type, enabled=False):
-        identity = torch.eye(3, device=inverse.device, dtype=torch.float32)
-        reversal = identity.clone()
-        reversal[0, 0] = -1
-        reversal[0, 2] = width - 1
+        identity, reversal = _reflection_matrices(width, inverse.device)
         return (
             torch.where((reflected & ~sagittal)[:, None, None], reversal, identity)
             @ inverse.float()
@@ -188,10 +245,7 @@ def aligned_contrast_donors(
 ) -> torch.Tensor:
     with torch.autocast(device_type=donors.device.type, enabled=False):
         height, width = donors.shape[-2:]
-        identity = torch.eye(3, device=donors.device, dtype=torch.float32)
-        reversal = identity.clone()
-        reversal[0, 0] = -1
-        reversal[0, 2] = width - 1
+        identity, reversal = _reflection_matrices(width, donors.device)
         pixel_transform = torch.where(
             column_reflected[:, None, None], reversal, identity
         )
@@ -205,12 +259,7 @@ def aligned_contrast_donors(
         relative_maps = target_maps.clone()
         relative_maps[..., 2] -= donor_maps[..., 2]
         affine = inverse @ donor_basis.transpose(1, 2) @ relative_maps
-        normalized_to_pixel = identity.clone()
-        normalized_to_pixel[0, 0] = width / 2
-        normalized_to_pixel[1, 1] = height / 2
-        normalized_to_pixel[0, 2] = (width - 1) / 2
-        normalized_to_pixel[1, 2] = (height - 1) / 2
-        theta = affine @ normalized_to_pixel
+        theta = affine @ _normalized_to_pixel(height, width, donors.device)
         theta[:, 0, 2] -= (width - 1) / 2
         theta[:, 1, 2] -= (height - 1) / 2
         theta[:, 0] *= 2 / width
@@ -245,61 +294,81 @@ def apply_contrast_mixing(
     device = images.device
     zero = torch.zeros((), device=device)
     with torch.autocast(device_type=device.type, enabled=False):
-        normal_axis = torch.tensor(PLANE_NORMAL_AXIS, device=device, dtype=torch.long)[
-            token_plane
-        ]
-        normal_rows = patient_maps[
-            torch.arange(len(images), device=device), 1, normal_axis
-        ]
+        normal_axis = _plane_normal_axis(device)[token_plane]
+        rows = len(images)
+        normal_rows = patient_maps[torch.arange(rows, device=device), 1, normal_axis]
         height, width = images.shape[-2:]
-        normal_position = normal_rows @ normal_rows.new_tensor(
-            [width / 2, height / 2, 1.0]
+        normal_position = normal_rows @ _normal_centre(height, width, device)
+        studies, planes = parameters.applied.shape
+        groups_total = studies * planes
+        slots = contrast_pair_slots(pairs, device)
+        first = parameters.target_first
+        target_slot = torch.where(first, slots[:, 0], slots[:, 1])
+        other_slot = torch.where(first, slots[:, 1], slots[:, 0])
+        study_rows = (
+            token_study == torch.arange(studies, device=device)[:, None]
+        ) & geometry_valid
+        candidate = study_rows[:, None] & parameters.applied[..., None]
+        target = (candidate & (token_type == target_slot[..., None])).reshape(
+            groups_total, rows
         )
-        mixed_acquisitions = 0
-        mixed_studies: set[int] = set()
-        mixed_groups = 0
-        lambdas, targets, matches, groups = [], [], [], []
-        for study in range(parameters.applied.shape[0]):
-            study_rows = (token_study == study) & geometry_valid
-            for plane, (slot_a, slot_b) in enumerate(pairs):
-                if not bool(parameters.applied[study, plane]):
-                    continue
-                target_slot, other_slot = (
-                    (slot_a, slot_b)
-                    if bool(parameters.target_first[study, plane])
-                    else (slot_b, slot_a)
-                )
-                target_rows = (study_rows & (token_type == target_slot)).nonzero(
-                    as_tuple=True
-                )[0]
-                other_rows = (study_rows & (token_type == other_slot)).nonzero(
-                    as_tuple=True
-                )[0]
-                if target_rows.numel() == 0 or other_rows.numel() == 0:
-                    continue
-                distances = (
-                    normal_position[target_rows][:, None]
-                    - normal_position[other_rows][None, :]
-                ).abs()
-                matched_rows = other_rows[distances.argmin(dim=1)]
-                unique_acquisitions, inverse = torch.unique(
-                    acquisition_index[target_rows], return_inverse=True
-                )
-                lam = sample_contrast_mixing_lambda(
-                    len(unique_acquisitions), weight_range, device
-                )[inverse]
-                lambdas.append(lam)
-                targets.append(target_rows)
-                matches.append(matched_rows)
-                groups.append(torch.full_like(target_rows, mixed_groups))
-                mixed_acquisitions += len(unique_acquisitions)
-                mixed_studies.add(study)
-                mixed_groups += 1
+        other = (candidate & (token_type == other_slot[..., None])).reshape(
+            groups_total, rows
+        )
+        valid = target.any(-1) & other.any(-1)
+        target = target & valid[:, None]
+        rank = torch.cat(
+            (
+                acquisition_index.new_zeros(1),
+                (acquisition_index[1:] != acquisition_index[:-1]).long(),
+            )
+        ).cumsum(0)
+        acquired = (
+            images.new_zeros((groups_total, rows)).index_add_(1, rank, target.float())
+            > 0
+        )
+        unique_counts = acquired.sum(-1)
+        row_counts = target.sum(-1)
+        fetched = torch.cat(
+            (
+                valid.long(),
+                unique_counts,
+                row_counts,
+                parameters.eligible.sum().reshape(1),
+            )
+        ).tolist()
+        valid_groups = [
+            group for group, flag in enumerate(fetched[:groups_total]) if flag
+        ]
+        group_acquisitions = fetched[groups_total : 2 * groups_total]
+        group_rows = fetched[2 * groups_total : 3 * groups_total]
+        eligible_count = fetched[-1]
+        mixed_groups = len(valid_groups)
+        mixed_acquisitions = sum(group_acquisitions[group] for group in valid_groups)
+        mixed_studies = len({group // planes for group in valid_groups})
+        lambdas = [
+            sample_contrast_mixing_lambda(
+                group_acquisitions[group], weight_range, device
+            )
+            for group in valid_groups
+        ]
         pixel_change = alignment_change = zero
-        if targets:
-            target_rows = torch.cat(targets)
-            matched_rows = torch.cat(matches)
-            group_index = torch.cat(groups)
+        if valid_groups:
+            target_count = sum(group_rows[group] for group in valid_groups)
+            positions = torch.nonzero_static(target.flatten(), size=target_count)[:, 0]
+            group_of = positions // rows
+            target_rows = positions % rows
+            used = unique_counts * valid
+            offset = used.cumsum(0) - used
+            inverse = acquired.long().cumsum(-1)[group_of, rank[target_rows]] - 1
+            row_lambda = torch.cat(lambdas)[offset[group_of] + inverse]
+            distances = (
+                (normal_position[target_rows][:, None] - normal_position[None, :])
+                .abs()
+                .masked_fill(~other[group_of], torch.inf)
+            )
+            matched_rows = distances.argmin(dim=1)
+            group_index = valid.long().cumsum(0)[group_of] - 1
             before = images[target_rows]
             donors = images[matched_rows]
             other = aligned_contrast_donors(
@@ -308,7 +377,7 @@ def apply_contrast_mixing(
                 patient_maps[matched_rows, 1],
                 reflected[target_rows] & (token_plane[target_rows] != 2),
             )
-            lam = torch.cat(lambdas)[:, None, None, None]
+            lam = row_lambda[:, None, None, None]
             alignment_change = (
                 ((1 - lam) * (other - donors).abs())
                 .masked_fill((before == 0) | (other == 0), 0)
@@ -326,13 +395,11 @@ def apply_contrast_mixing(
             )
             pixel_change = (group_changes / group_counts).mean()
     return images, ContrastMixingActivity(
-        torch.tensor(float(mixed_acquisitions), device=device),
-        torch.tensor(float(len(mixed_studies)), device=device),
-        torch.cat(lambdas).mean() if lambdas else zero,
+        zero.new_full((), float(mixed_acquisitions)),
+        zero.new_full((), float(mixed_studies)),
+        row_lambda.mean() if valid_groups else zero,
         pixel_change,
-        torch.tensor(
-            mixed_groups / max(int(parameters.eligible.sum()), 1), device=device
-        ),
+        zero.new_full((), mixed_groups / max(eligible_count, 1)),
         alignment_change,
     )
 
@@ -430,16 +497,20 @@ def sample_augmentation_parameters(
     )
 
 
+def selected_rows(selected: torch.Tensor, count: int) -> torch.Tensor:
+    return torch.nonzero_static(selected, size=count)[:, 0]
+
+
 def apply_intensity_augmentation(
     images: torch.Tensor,
     series_index: torch.Tensor,
     parameters: IntensityParameters,
+    rows: torch.Tensor,
 ) -> torch.Tensor:
-    selected = parameters.applied[series_index]
-    if not selected.any():
+    if not len(rows):
         return images
-    selected_series = series_index[selected]
-    values = images[selected]
+    selected_series = series_index[rows]
+    values = images[rows]
     background = values == 0
     values = adjust_gamma(values, parameters.gamma[selected_series])
     values = (
@@ -450,7 +521,7 @@ def apply_intensity_augmentation(
         .clamp_(0, 1)
     )
     values.masked_fill_(background, 0)
-    images[selected] = values
+    images[rows] = values
     return images
 
 
@@ -478,29 +549,24 @@ def augmented_to_prepared(
 ) -> torch.Tensor:
     matrices = matrices.float()
     with torch.autocast(device_type=matrices.device.type, enabled=False):
-        conversion = matrices.new_tensor(
-            [
-                [(width - 1) / width, 0, (width - 1) / (2 * width)],
-                [0, (height - 1) / height, (height - 1) / (2 * height)],
-                [0, 0, 1],
-            ]
+        inverse_conversion, conversion = _prepared_conversion(
+            height, width, matrices.device
         )
-        return torch.linalg.inv(conversion) @ torch.linalg.inv(matrices) @ conversion
+        return inverse_conversion @ torch.linalg.inv_ex(matrices)[0] @ conversion
 
 
 def apply_affine_augmentation(
     images: torch.Tensor,
     series_index: torch.Tensor,
-    parameters: AffineParameters,
     matrices: torch.Tensor,
+    rows: torch.Tensor,
 ) -> torch.Tensor:
-    selected = parameters.applied[series_index]
-    if not selected.any():
+    if not len(rows):
         return images
-    selected_series = series_index[selected]
+    selected_series = series_index[rows]
     height, width = images.shape[-2:]
-    images[selected] = warp_affine(
-        images[selected],
+    images[rows] = warp_affine(
+        images[rows],
         matrices[selected_series, :2],
         (height, width),
         mode="bilinear",
@@ -514,18 +580,18 @@ def sample_noise_values(
     images: torch.Tensor,
     series_index: torch.Tensor,
     parameters: NoiseParameters,
+    rows: torch.Tensor,
     generator: torch.Generator | None = None,
 ) -> torch.Tensor | None:
-    selected = parameters.applied[series_index]
-    if not selected.any():
+    if not len(rows):
         return None
     noise = torch.randn(
-        (int(selected.sum()), *images.shape[1:]),
+        (len(rows), *images.shape[1:]),
         device=images.device,
         dtype=images.dtype,
         generator=generator,
     )
-    return noise.mul_(parameters.std[series_index[selected], None, None, None])
+    return noise.mul_(parameters.std[series_index[rows], None, None, None])
 
 
 def geometric_valid_mask(
@@ -609,6 +675,19 @@ def sample_smoothing_parameters(
     )
 
 
+@cache
+def _space_kernel(
+    spatial_sigma: float, device: torch.device, dtype: torch.dtype
+) -> torch.Tensor:
+    with torch.inference_mode(False):
+        return get_gaussian_kernel2d(
+            (SMOOTHING_KERNEL_SIZE, SMOOTHING_KERNEL_SIZE),
+            (spatial_sigma, spatial_sigma),
+            device=device,
+            dtype=dtype,
+        ).reshape(1, 1, 1, 1, SMOOTHING_KERNEL_SIZE * SMOOTHING_KERNEL_SIZE)
+
+
 def apply_bilateral_smoothing(
     values: torch.Tensor,
     mask: torch.Tensor,
@@ -642,12 +721,7 @@ def apply_bilateral_smoothing(
         .reshape(-1, 1, 1, 1, 1)
     )
     color_kernel = (-0.5 * diff.square() / color_sigma.square()).exp()
-    space_kernel = get_gaussian_kernel2d(
-        (SMOOTHING_KERNEL_SIZE, SMOOTHING_KERNEL_SIZE),
-        (parameters.spatial_sigma, parameters.spatial_sigma),
-        device=values.device,
-        dtype=values.dtype,
-    ).reshape(1, 1, 1, 1, SMOOTHING_KERNEL_SIZE * SMOOTHING_KERNEL_SIZE)
+    space_kernel = _space_kernel(parameters.spatial_sigma, values.device, values.dtype)
     weights = space_kernel * color_kernel * unfolded_support
     denominator = weights.sum(-1).clamp_min(1e-6)
     numerator = (unfolded_input * weights).sum(-1)
@@ -681,11 +755,11 @@ def apply_resolution_degradation(
     mask: torch.Tensor,
     selected_series: torch.Tensor,
     parameters: ResolutionParameters,
+    axis_rows: tuple[torch.Tensor, torch.Tensor],
 ) -> torch.Tensor:
     values = values.masked_fill(~mask, 0)
-    for columns_axis, dimension in ((False, 2), (True, 3)):
-        on_axis = parameters.columns[selected_series] == columns_axis
-        if not on_axis.any():
+    for dimension, on_axis in zip((2, 3), axis_rows, strict=True):
+        if not len(on_axis):
             continue
         size = values.shape[dimension]
         frequency = torch.fft.rfft(values[on_axis], dim=dimension)
@@ -707,6 +781,15 @@ class GinParameters:
     layer_weights: tuple[torch.Tensor, ...]
 
 
+@cache
+def _gin_center_only(device: torch.device) -> torch.Tensor:
+    with torch.inference_mode(False):
+        center = GIN_KERNEL_SIZE // 2
+        center_only = torch.zeros(GIN_KERNEL_SIZE, GIN_KERNEL_SIZE)
+        center_only[center, center] = 1.0
+        return center_only.to(device)
+
+
 def sample_gin_parameters(
     settings: GinAugmentationConfig,
     series_count: int,
@@ -716,9 +799,7 @@ def sample_gin_parameters(
     draws = uniform_draws(settings.probability, (series_count, 3), device, generator)
     layer_weights = ()
     if settings.probability > 0:
-        center = GIN_KERNEL_SIZE // 2
-        center_only = torch.zeros(GIN_KERNEL_SIZE, GIN_KERNEL_SIZE, device=device)
-        center_only[center, center] = 1.0
+        center_only = _gin_center_only(device)
         kernel = torch.where(
             (draws[:, 1] < 0.5)[:, None, None],
             center_only,
@@ -773,17 +854,17 @@ def apply_gin_filter(
     network_output = hidden.reshape(triplets, channels, height, width)
     blend = parameters.blend[selected_series][:, None, None, None]
     blended = blend * network_output + (1 - blend) * values
-    unique_acquisitions, group = torch.unique(selected_series, return_inverse=True)
+    series_count = len(parameters.blend)
     valid_before = (values * mask).square().sum(dim=(1, 2, 3))
     valid_after = (blended * mask).square().sum(dim=(1, 2, 3))
-    sum_before = values.new_zeros(len(unique_acquisitions)).index_add_(
-        0, group, valid_before
+    sum_before = values.new_zeros(series_count).index_add_(
+        0, selected_series, valid_before
     )
-    sum_after = values.new_zeros(len(unique_acquisitions)).index_add_(
-        0, group, valid_after
+    sum_after = values.new_zeros(series_count).index_add_(
+        0, selected_series, valid_after
     )
     scale = (sum_before.clamp_min(1e-12).sqrt() / sum_after.clamp_min(1e-12).sqrt())[
-        group
+        selected_series
     ]
     return blended * scale[:, None, None, None]
 
@@ -793,25 +874,25 @@ def filter_regions(
     background: torch.Tensor,
     series_index: torch.Tensor,
     parameters: SmoothingParameters | ResolutionParameters | GinParameters,
+    rows: torch.Tensor,
     region_mask: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
     region_filter: Callable[..., torch.Tensor],
 ) -> tuple[torch.Tensor, AugmentationActivity]:
-    selected = parameters.applied[series_index]
     changed_elements = images.new_zeros((), dtype=torch.long)
     mean_change = images.new_zeros(())
-    if selected.any():
-        selected_series = series_index[selected]
-        values = images[selected]
-        mask = region_mask(selected, selected_series)
+    if len(rows):
+        selected_series = series_index[rows]
+        values = images[rows]
+        mask = region_mask(rows, selected_series)
         result = region_filter(values, mask, selected_series, parameters).clamp(0, 1)
         result.masked_fill_(~mask, 0)
-        support = mask & ~background[selected]
+        support = mask & ~background[rows]
         changed_elements = support.sum()
         mean_change = ((result - values).abs() * support).sum() / (
             changed_elements.clamp_min(1)
         )
-        images[selected] = result
-        background[selected] |= ~mask
+        images[rows] = result
+        background[rows] |= ~mask
     return images, AugmentationActivity(
         parameters.applied.sum().detach(),
         len(parameters.applied),
@@ -830,17 +911,12 @@ class ImageAugmentation(nn.Module):
         self.activity: dict[str, AugmentationActivity] = {}
 
     def _add_noise(
-        self,
-        images: torch.Tensor,
-        series_index: torch.Tensor,
-        parameters: NoiseParameters,
-        noise: torch.Tensor | None,
+        self, images: torch.Tensor, rows: torch.Tensor, noise: torch.Tensor | None
     ) -> torch.Tensor:
         if noise is None:
             return images
-        selected = parameters.applied[series_index]
-        values = images[selected]
-        images[selected] = self.noise(
+        values = images[rows]
+        images[rows] = self.noise(
             values,
             params={
                 "batch_prob": values.new_ones(len(values)),
@@ -883,67 +959,112 @@ class ImageAugmentation(nn.Module):
                 matrices = affine_matrices(parameters.affine, height, width)
 
             def prepared_mask(
-                selected: torch.Tensor, selected_series: torch.Tensor
+                rows: torch.Tensor, selected_series: torch.Tensor
             ) -> torch.Tensor:
                 return geometric_valid_mask(
-                    valid_rects[selected], inverse_affine[selected], height, width
+                    valid_rects[rows], inverse_affine[rows], height, width
                 )
 
             def warped_mask(
-                selected: torch.Tensor, selected_series: torch.Tensor
+                rows: torch.Tensor, selected_series: torch.Tensor
             ) -> torch.Tensor:
                 return warped_valid_mask(
-                    valid_rects[selected], matrices[selected_series], height, width
+                    valid_rects[rows], matrices[selected_series], height, width
                 )
 
+            primary_count = len(primary_image_index)
+            affine_selected = parameters.affine.applied[series_index]
+            intensity_selected = parameters.intensity.applied[series_index]
+            noise_selected = parameters.noise.applied[series_index[:primary_count]]
+            affine_count, intensity_count, noise_count = torch.stack(
+                (affine_selected.sum(), intensity_selected.sum(), noise_selected.sum())
+            ).tolist()
             images = apply_affine_augmentation(
-                images, series_index, parameters.affine, matrices
+                images,
+                series_index,
+                matrices,
+                selected_rows(affine_selected, affine_count),
             )
             background = images == 0
+            noise_rows = selected_rows(noise_selected, noise_count)
             noise = sample_noise_values(
-                images[: len(primary_image_index)],
-                series_index[: len(primary_image_index)],
+                images[:primary_count],
+                series_index[:primary_count],
                 parameters.noise,
+                noise_rows,
                 generator,
             )
             smoothing = sample_smoothing_parameters(
                 self.smoothing_settings, series_count, device, generator
             )
+            resolution = sample_resolution_parameters(
+                self.resolution_settings, series_count, device, generator
+            )
+            gin = sample_gin_parameters(
+                self.gin_settings, series_count, device, generator
+            )
+            smoothing_selected = smoothing.applied[series_index]
+            resolution_selected = resolution.applied[series_index]
+            gin_selected = gin.applied[series_index]
+            resolution_columns = resolution.columns[series_index]
+            (
+                smoothing_count,
+                resolution_count,
+                gin_count,
+                rows_axis_count,
+                columns_axis_count,
+            ) = torch.stack(
+                (
+                    smoothing_selected.sum(),
+                    resolution_selected.sum(),
+                    gin_selected.sum(),
+                    (resolution_selected & ~resolution_columns).sum(),
+                    (resolution_selected & resolution_columns).sum(),
+                )
+            ).tolist()
             images, smoothing_activity = filter_regions(
                 images,
                 background,
                 series_index,
                 smoothing,
+                selected_rows(smoothing_selected, smoothing_count),
                 prepared_mask,
                 apply_bilateral_smoothing,
             )
-            resolution = sample_resolution_parameters(
-                self.resolution_settings, series_count, device, generator
-            )
+            resolution_rows = selected_rows(resolution_selected, resolution_count)
+            resolution_axis = resolution_columns[resolution_rows]
             images, resolution_activity = filter_regions(
                 images,
                 background,
                 series_index,
                 resolution,
+                resolution_rows,
                 warped_mask,
-                apply_resolution_degradation,
+                partial(
+                    apply_resolution_degradation,
+                    axis_rows=(
+                        selected_rows(~resolution_axis, rows_axis_count),
+                        selected_rows(resolution_axis, columns_axis_count),
+                    ),
+                ),
             )
             images = apply_intensity_augmentation(
-                images, series_index, parameters.intensity
-            )
-            gin = sample_gin_parameters(
-                self.gin_settings, series_count, device, generator
+                images,
+                series_index,
+                parameters.intensity,
+                selected_rows(intensity_selected, intensity_count),
             )
             images, gin_activity = filter_regions(
-                images, background, series_index, gin, prepared_mask, apply_gin_filter
+                images,
+                background,
+                series_index,
+                gin,
+                selected_rows(gin_selected, gin_count),
+                prepared_mask,
+                apply_gin_filter,
             )
-            original = images[: len(primary_image_index)]
-            noisy = self._add_noise(
-                original.clone(),
-                series_index[: len(primary_image_index)],
-                parameters.noise,
-                noise,
-            )
+            original = images[:primary_count]
+            noisy = self._add_noise(original.clone(), noise_rows, noise)
             delta = (noisy - original).index_select(0, source_image_index)
             primary = source_image_index == torch.arange(len(images), device=device)
             images = torch.where(
