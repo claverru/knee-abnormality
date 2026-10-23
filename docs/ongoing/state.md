@@ -7,6 +7,14 @@ How the recipe got here is the [adoption history](../modeling/current-model.md#a
 measured outcomes are in the [validation results](../validation/results/INDEX.md) and
 [history](../history/INDEX.md).
 
+## Label audit snapshot (2026-10-19)
+
+The requested v3.1 residual-error audit is complete: [findings and artifacts](../public-labels/2026-10-19-v31-label-audit.md).
+The table is local at `data/labels/prepared/rebuild-state-v3-1/labels.csv`; its manifest and
+implementation are in the uncommitted `knee-abnormality-labels-v3` worktree. No labels were
+changed and no training was launched by this audit. The proposed follow-up is classified once
+in the [v3.2 investigation backlog](../backlog/big-bets.md#v32-label-threshold-and-rule-review).
+
 ## Recipe in force
 
 - **The recipe is the ResNet-50 on fold 2, since 2026-10-13 (user decision):** `configs/resnet50.yaml`
