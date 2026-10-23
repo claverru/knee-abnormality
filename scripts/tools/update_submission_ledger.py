@@ -106,10 +106,11 @@ def _submissions(api: KaggleApi, competition: str) -> list[dict]:
             api.competition_submissions(competition, page_number=page, page_size=100)
             or []
         )
+        known = len(rows)
         for row in batch:
             values = _jsonable(row)
             rows[values["ref"]] = values
-        if len(batch) < 100:
+        if len(batch) < 100 or len(rows) == known:
             break
         page += 1
     return sorted(rows.values(), key=lambda value: str(value["date"]))
@@ -119,10 +120,10 @@ def _bundle_path(recorded: str, exports: Path) -> Path | None:
     if not recorded:
         return None
     candidate = Path(recorded)
-    if candidate.is_dir():
+    if (candidate / "manifest.json").is_file():
         return candidate
     moved = exports / candidate.name
-    return moved if moved.is_dir() else None
+    return moved if (moved / "manifest.json").is_file() else None
 
 
 def _local_records(records: Path, exports: Path) -> dict[object, dict]:
@@ -190,7 +191,11 @@ def _validation(manifest: dict, bundle: Path) -> str:
             scores.append(float(value))
     if not scores:
         return "val0 unrecorded"
-    config = json.loads((bundle / "config.json").read_text(encoding="utf-8"))
+    config = (
+        json.loads((bundle / "config.json").read_text(encoding="utf-8"))
+        if (bundle / "config.json").is_file()
+        else {}
+    )
     multiplier = (
         (config.get("experiment") or {})
         .get("data", {})
@@ -217,14 +222,17 @@ def _notebook_dataset(api: KaggleApi, notebook: str, args: "RelabelCLI") -> str:
 
 
 def _fallback_label(slug: str) -> str:
-    stripped = re.sub(r"^s\d\d-|^knee-|-inference$", "", slug)
+    stripped = re.sub(r"^s\d+-|^knee-|-inference$", "", slug)
     return stripped.replace("-", " ")[:45]
 
 
 def build_ledger(args: RelabelCLI, api: KaggleApi) -> list[dict]:
     local = _local_records(args.records, args.exports)
     entries = []
-    for sequence, submission in enumerate(_submissions(api, COMPETITION), start=1):
+    live = _submissions(api, COMPETITION)
+    for position, submission in enumerate(live, start=1):
+        numbered = re.match(r"S(\d+)\b", submission.get("description") or "")
+        sequence = int(numbered.group(1)) if numbered else position
         match = re.match(
             r"/code/([^/?]+)/([^/?]+)\?scriptVersionId=(\d+)",
             submission.get("url") or "",
@@ -235,7 +243,12 @@ def build_ledger(args: RelabelCLI, api: KaggleApi) -> list[dict]:
         if not record and notebook:
             record = local.get(_notebook_dataset(api, notebook, args)) or {}
         bundle = record.get("bundle")
-        label = LABELS.get(sequence) or _fallback_label(slug)
+        described = (submission.get("description") or "").split("|")
+        label = (
+            LABELS.get(sequence)
+            or (described[1].strip() if numbered and len(described) > 1 else "")
+            or _fallback_label(slug)
+        )
         settings = "settings unrecorded"
         validation = "val0 unrecorded"
         if bundle is not None:
@@ -268,7 +281,47 @@ def build_ledger(args: RelabelCLI, api: KaggleApi) -> list[dict]:
                 "bundle_manifest_sha256": record.get("bundle_manifest_sha256") or "",
             }
         )
-    return entries
+    known = {entry["reference"] for entry in entries}
+    entries.extend(
+        entry
+        for entry in _recorded_entries(args.records, args.exports)
+        if entry["reference"] not in known
+    )
+    return sorted(entries, key=lambda entry: entry["sequence"])
+
+
+def _recorded_entries(records: Path, exports: Path) -> list[dict]:
+    entries = {}
+    for path in sorted(records.glob("*.json")):
+        try:
+            value = json.loads(path.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        submission = value.get("submission") or {}
+        description = submission.get("description") or ""
+        numbered = re.match(r"S(\d+)\b", description)
+        if not numbered or not submission.get("ref"):
+            continue
+        sequence = int(numbered.group(1))
+        bundle = _bundle_path(value.get("bundle") or "", exports)
+        label = description.split("|")[1].strip() if "|" in description else ""
+        entries[submission["ref"]] = {
+            "sequence": sequence,
+            "reference": submission["ref"],
+            "date": str(submission.get("date")),
+            "label": label,
+            "title": f"S{sequence:02d} {label}"[:50],
+            "description": description,
+            "previous_description": description,
+            "public_score": submission.get("publicScore"),
+            "status": str(submission.get("status")),
+            "notebook": value.get("notebook") or "",
+            "notebook_version": str(value.get("notebook_version") or ""),
+            "dataset": value.get("dataset"),
+            "bundle": str(bundle) if bundle else None,
+            "bundle_manifest_sha256": value.get("bundle_manifest_sha256") or "",
+        }
+    return list(entries.values())
 
 
 def _throttled(call: Callable[[], object], pause: float, attempts: int) -> object:
