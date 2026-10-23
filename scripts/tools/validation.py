@@ -12,7 +12,12 @@ from pydantic_settings import CliApp, CliSubCommand
 from knee_abnormality.cli import CLISettings, command, describe
 from knee_abnormality.config import STUDY_HEADERS, ExperimentConfig, load_config
 from knee_abnormality.data.labels import load_source
-from knee_abnormality.data.splits import STUDY, TARGET_THRESHOLD, require_unique_ids
+from knee_abnormality.data.splits import (
+    STUDY,
+    TARGET_THRESHOLD,
+    load_split,
+    require_unique_ids,
+)
 from knee_abnormality.evaluation.scoring import score
 from knee_abnormality.provenance import sha256_file
 
@@ -298,12 +303,19 @@ def prepare(
             for fold in range(n_splits)
         ],
     }
-    artifacts = {
-        "studies.csv": csv,
-        "label_counts.csv": counts.write_csv(),
-        "targets.csv": evaluation_csv,
-        "protocol.json": json.dumps(metadata, indent=2) + "\n",
-    }
+    write_split(
+        split_dir,
+        {
+            "studies.csv": csv,
+            "label_counts.csv": counts.write_csv(),
+            "targets.csv": evaluation_csv,
+            "protocol.json": json.dumps(metadata, indent=2) + "\n",
+        },
+    )
+    return metadata
+
+
+def write_split(split_dir: Path, artifacts: dict[str, str]) -> None:
     for name, content in artifacts.items():
         path = split_dir / name
         if path.exists() and path.read_text() != content:
@@ -316,6 +328,102 @@ def prepare(
         if not path.exists():
             with path.open("x") as stream:
                 stream.write(content)
+
+
+def retarget(
+    data_dir: Path,
+    source_dir: Path,
+    split_dir: Path,
+    config: ExperimentConfig,
+    label_manifest: Path,
+    label_source: str,
+) -> dict:
+    source = load_split(data_dir, source_dir)
+    targets = source.protocol["targets"]
+    labels, provenance = load_source(
+        config, json.loads(label_manifest.read_text()), label_source, tuple(targets)
+    )
+    official = pl.read_csv(data_dir / "train.csv", infer_schema_length=None).select(
+        STUDY, *targets
+    )
+    evaluation = (
+        source.membership.select(STUDY, "is_gold")
+        .join(official, on=STUDY, how="left", validate="1:1")
+        .join(
+            labels.rename({t: f"source_{t}" for t in targets}),
+            on=STUDY,
+            how="left",
+            validate="1:1",
+        )
+        .join(
+            source.evaluation.rename({t: f"frozen_{t}" for t in targets}),
+            on=STUDY,
+            how="left",
+            validate="1:1",
+        )
+        .with_columns(
+            pl.when(pl.col("is_gold"))
+            .then(pl.col(t))
+            .otherwise(pl.coalesce(f"source_{t}", f"frozen_{t}"))
+            .cast(pl.Float32)
+            .alias(t)
+            for t in targets
+        )
+        .select(STUDY, *targets)
+        .sort(STUDY)
+    )
+    evaluation_csv = evaluation.write_csv()
+    folds = source.membership.select(STUDY, "fold", "is_gold").join(
+        evaluation, on=STUDY, validate="1:1"
+    )
+    counts = []
+    for fold in range(source.protocol["n_splits"]):
+        valid = folds.filter(pl.col("fold") == fold)
+        gold = valid.filter(pl.col("is_gold"))
+        for target in targets:
+            positive = int((valid[target] >= TARGET_THRESHOLD).sum())
+            gold_positive = int((gold[target] >= TARGET_THRESHOLD).sum())
+            if min(positive, valid.height - positive) == 0:
+                raise ValueError(f"Fold {fold}, {target}: both classes are required")
+            counts.append(
+                {
+                    "fold": fold,
+                    "target": target,
+                    "positive": positive,
+                    "negative": valid.height - positive,
+                    "gold_positive": gold_positive,
+                    "gold_negative": gold.height - gold_positive,
+                }
+            )
+    metadata = {
+        **source.protocol,
+        "evaluation_target_policy": "gold where available, frozen report-derived probabilities otherwise, the source split's frozen value where the label source is null; threshold only for AUC",
+        "label_source": {
+            key: value for key, value in provenance.items() if key != "path"
+        },
+        "label_manifest_sha256": sha256_file(label_manifest),
+        "evaluation_targets_sha256": hashlib.sha256(
+            evaluation_csv.encode()
+        ).hexdigest(),
+        "retargeted_from": {
+            "split_dir": str(source_dir),
+            "protocol_sha256": sha256_file(source_dir / "protocol.json"),
+            "targets_sha256": sha256_file(source_dir / "targets.csv"),
+        },
+        "generator_sha256": {
+            **source.protocol["generator_sha256"],
+            "validation.py": sha256_file(Path(__file__)),
+        },
+    }
+    write_split(
+        split_dir,
+        {
+            "studies.csv": (source_dir / "studies.csv").read_text(),
+            "label_counts.csv": pl.DataFrame(counts).write_csv(),
+            "targets.csv": evaluation_csv,
+            "protocol.json": json.dumps(metadata, indent=2) + "\n",
+        },
+    )
     return metadata
 
 
@@ -382,6 +490,30 @@ class Prepare(ValidationCommand):
         print(json.dumps(result, indent=2))
 
 
+class Retarget(ValidationCommand):
+    model_config = describe(
+        "Copy a frozen split's folds and rebuild its frozen evaluation targets from another label source"
+    )
+
+    source_split_dir: Path = Field(description="Frozen split whose folds are kept")
+    label_manifest: Path = Field(
+        description="Label manifest pinning the new label source"
+    )
+    label_source: str = Field(description="Label table name inside the manifest")
+
+    def cli_cmd(self) -> None:
+        config, data_dir, split_dir = self.locations()
+        result = retarget(
+            data_dir,
+            self.source_split_dir.expanduser().resolve(),
+            split_dir,
+            config,
+            self.label_manifest,
+            self.label_source,
+        )
+        print(json.dumps(result["label_source"], indent=2))
+
+
 class Score(ValidationCommand):
     model_config = describe(
         "Score complete out-of-fold predictions with separate gold diagnostics"
@@ -396,10 +528,11 @@ class Score(ValidationCommand):
 
 class ValidationCLI(CLISettings):
     model_config = describe(
-        "Create the validation folds or score out-of-fold predictions"
+        "Create the validation folds, retarget frozen folds to a new label source, or score out-of-fold predictions"
     )
 
     prepare: CliSubCommand[Prepare] = command(Prepare)
+    retarget: CliSubCommand[Retarget] = command(Retarget)
     score: CliSubCommand[Score] = command(Score)
 
     def cli_cmd(self) -> None:

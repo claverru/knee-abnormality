@@ -198,10 +198,12 @@ def distilled(config: ExperimentConfig, labels: FoldLabels) -> FoldLabels:
     )
     columns = [f"target_{target}" for target in targets]
     shift = float(
-        np.abs(
-            training.select(columns).to_numpy()
-            - labels.training.select(columns).to_numpy()
-        ).mean()
+        np.nanmean(
+            np.abs(
+                training.select(columns).to_numpy()
+                - labels.training.select(columns).to_numpy()
+            )
+        )
     )
     return FoldLabels(
         targets,

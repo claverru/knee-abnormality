@@ -1,4 +1,5 @@
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -31,11 +32,26 @@ Z_CLIP = 0.02
 BOOTSTRAP_DRAWS = 10_000
 BOOTSTRAP_SEED = 20260927
 LOSS_CLIP = 1e-4
-STATE_TABLE = "rebuild_state_v2"
-MEAN_TABLE = "rebuild_mean_v2"
+STATE_TABLE = "rebuild_state_v3"
+MEAN_TABLE = "rebuild_mean_v3"
 STATE_RATE = {NM: 0.1347, LOW: 0.3448, HEDGED: 0.6125}
 SILENT_SYMBOLS = ("nm", "unk")
 DERIVED = {"zhen_v7": "pilkwang"}
+ANSWER_KEYS = (
+    "report",
+    "acl",
+    "mcl",
+    "medial_meniscus",
+    "lateral_meniscus",
+    "pf_cartilage",
+    "lateral_cartilage",
+    "effusion",
+    "synovitis",
+    "fracture",
+    "bone_edema",
+)
+TEMPLATE_BULLET = re.compile(r"(^|\n)\s*[>*] ")
+TEMPLATE_STRUCTURED = re.compile(r"JOINT SPACE:|FINDINGS:")
 PUBLIC = Path("data/labels/public")
 SNAPSHOT = "downloaded-{}"
 
@@ -53,10 +69,10 @@ class Root:
 class PrepareCLI(CLISettings):
     model_config = describe(
         "Rebuild all twelve training-label targets from lineage-level public report sources "
-        "and JevK5 attributes on a common state scale: rebuild_state_v2 (anchored Dawid-Skene "
-        "report states with a pooled gold semantic calibration) and rebuild_mean_v2 "
-        "(family-mean control), with "
-        "cross-fitted gold evaluation"
+        "and JevK5 attributes on a common state scale: rebuild_state_v3 (anchored Dawid-Skene "
+        "report states with a pooled gold semantic calibration, then the v3 report-reading rules "
+        "and report masks on silver rows) and rebuild_mean_v3 (family-mean control with the "
+        "same rules), with cross-fitted gold evaluation"
     )
 
     base_manifest: Path = Field(
@@ -66,6 +82,10 @@ class PrepareCLI(CLISettings):
     jevk5_attributes: Path = Field(
         default=Path("outputs/labels/jevk5-attributes-v3/attributes.parquet"),
         description="JevK5 v3 per-question option probabilities for every report",
+    )
+    report_answers: Path = Field(
+        default=Path("outputs/labels-v3-reading/answers_adjudicated.parquet"),
+        description="Adjudicated v3 report-reading answers for every study",
     )
     split_studies: Path = Field(
         default=Path("data/folds/all_5fold_scanner_v1/studies.csv"),
@@ -890,6 +910,210 @@ def gold_metrics(
     return report
 
 
+def load_answers(path: Path, studies: pl.DataFrame) -> dict[str, list[set[str]]]:
+    answers = pl.read_parquet(path)
+    require_unique_ids(answers, "Report answers")
+    if not set(ANSWER_KEYS) <= set(answers.columns):
+        raise ValueError("Report answers schema differs from the v3 question set")
+    answers = studies.select(STUDY).join(
+        answers.select(STUDY, *ANSWER_KEYS), on=STUDY, how="left", validate="1:1"
+    )
+    if answers.select(ANSWER_KEYS).null_count().sum_horizontal()[0]:
+        raise ValueError("Every study needs an answer to every v3 question")
+    return {
+        k: [set(v) if isinstance(v, list) else {v} for v in answers[k].to_list()]
+        for k in ANSWER_KEYS
+    }
+
+
+def apply_v3_rules(
+    values: np.ndarray,
+    rows: np.ndarray,
+    answers: dict[str, list[set[str]]],
+    reports: list[str],
+    targets: list[str],
+) -> tuple[np.ndarray, np.ndarray, list[dict], list[tuple]]:
+    values = np.array(values, dtype=float)
+    column = {t: i for i, t in enumerate(targets)}
+    log, cells = [], []
+
+    def has(key: str, *options: str) -> np.ndarray:
+        return np.array([bool(a & set(options)) for a in answers[key]])
+
+    def only(key: str, *options: str) -> np.ndarray:
+        return np.array([bool(a) and a <= set(options) for a in answers[key]])
+
+    def record(name, target, operation, value, mask, before):
+        after = values[:, column[target]]
+        changed = mask & (np.abs(after - before) > 1e-12)
+        log.append(
+            {
+                "rule": name,
+                "target": target,
+                "operation": operation,
+                "value": value,
+                "selected": int(mask.sum()),
+                "changed": int(changed.sum()),
+                "flips_down": int((mask & (before >= 0.5) & (after < 0.5)).sum()),
+                "flips_up": int((mask & (before < 0.5) & (after >= 0.5)).sum()),
+            }
+        )
+        cells.append((name, target, mask, before, after.copy()))
+
+    def cap(name, target, mask, value):
+        mask, j = mask & rows, column[target]
+        before = values[:, j].copy()
+        values[mask, j] = np.minimum(values[mask, j], value)
+        record(name, target, "cap", value, mask, before)
+
+    def floor(name, target, mask, value):
+        mask, j = mask & rows, column[target]
+        before = values[:, j].copy()
+        values[mask, j] = np.maximum(values[mask, j], value)
+        record(name, target, "floor", value, mask, before)
+
+    def shift(name, target, mask, rate):
+        mask, j = mask & rows, column[target]
+        before = values[:, j].copy()
+        z = logit(np.clip(values[mask, j], LOSS_CLIP, 1 - LOSS_CLIP))
+        values[mask, j] = expit(z - z.mean() + logit(rate))
+        record(name, target, "logit_shift", rate, mask, before)
+
+    acl_reported = values[:, column["ACL"]] >= TARGET_THRESHOLD
+    template = np.array(
+        [
+            bool(TEMPLATE_BULLET.search(r)) and not TEMPLATE_STRUCTURED.search(r)
+            for r in reports
+        ]
+    )
+    acl_high = has("acl", "complete_or_high_grade", "graft")
+    for name, option, value in (
+        ("A1", "interstitial", 0.20),
+        ("A2", "chronic_partial", 0.20),
+        ("A3", "single_bundle", 0.25),
+        ("A4", "grade2_injury_no_tear", 0.30),
+        ("A5", "small_or_le50", 0.15),
+        ("A6", "low_grade", 0.20),
+    ):
+        cap(name, "ACL", has("acl", option) & ~acl_high, value)
+    mcl_tear = has(
+        "mcl", "grade2_or_partial", "high_grade_or_complete", "possible_tear"
+    )
+    mcl_high = has("mcl", "high_grade_or_complete")
+    shift(
+        "M1",
+        "MCL",
+        has("mcl", "sprain_grade1")
+        & ~mcl_tear
+        & (values[:, column["MCL"]] < TARGET_THRESHOLD),
+        0.10,
+    )
+    cap("M2", "MCL", has("mcl", "chronic") & ~mcl_high, 0.15)
+    cap("M3", "MCL", has("mcl", "deep_layer_only") & ~mcl_high, 0.25)
+    for key, target, side in (
+        ("medial_meniscus", "Medial Meniscus", "MM"),
+        ("lateral_meniscus", "Lateral Meniscus", "LM"),
+    ):
+        floor(f"R2_{side}", target, has(key, "postop_or_substance_loss"), 0.75)
+        cap(
+            f"R1_{side}",
+            target,
+            has(key, "peripheral") & has(key, "possible_tear") & ~has(key, "tear"),
+            0.15,
+        )
+    floor(
+        "R3_MM",
+        "Medial Meniscus",
+        has("medial_meniscus", "grade3_no_tear_word") & ~has("medial_meniscus", "tear"),
+        0.85,
+    )
+    cap(
+        "R5_MM",
+        "Medial Meniscus",
+        has("medial_meniscus", "findings_tear_not_in_impression") & template,
+        0.35,
+    )
+    floor(
+        "R4_MM",
+        "Medial Meniscus",
+        has("medial_meniscus", "degeneration")
+        & has("medial_meniscus", "extrusion")
+        & ~has("medial_meniscus", "tear"),
+        0.55,
+    )
+    cap(
+        "OA_R2",
+        "Lateral OA",
+        has("lateral_cartilage", "high_grade_posterior_lateral_tibia_only"),
+        0.25,
+    )
+    tibiofemoral = np.maximum(
+        values[:, column["Medial OA"]], values[:, column["Lateral OA"]]
+    )
+    floor(
+        "OA_R1",
+        "PF OA",
+        has("pf_cartilage", "-") & (tibiofemoral >= TARGET_THRESHOLD),
+        0.40,
+    )
+    floor(
+        "S1",
+        "Synovitis",
+        has("synovitis", "-") & has("effusion", "moderate_or_large", "haemarthrosis"),
+        0.60,
+    )
+    cap("S3", "Synovitis", has("synovitis", "present", "possible") & template, 0.50)
+    cap(
+        "E3",
+        "Effusion",
+        has("effusion", "accentuated_fluid")
+        & ~has("effusion", "moderate_or_large", "unsized", "haemarthrosis"),
+        0.25,
+    )
+    cap("F1", "Fracture", only("fracture", "old_or_healed"), 0.05)
+    cap(
+        "F2_F4",
+        "Fracture",
+        only("fracture", "microtrabecular") & ~acl_reported,
+        0.35,
+    )
+    cap("F3", "Fracture", only("fracture", "osteochondral"), 0.30)
+    floor(
+        "F7",
+        "Fracture",
+        acl_reported
+        & has("bone_edema", "contusion")
+        & has("fracture", "-")
+        & ~has("bone_edema", "acute_osteochondral_injury"),
+        0.45,
+    )
+    cap(
+        "C1",
+        "Contusion",
+        has("bone_edema", "degenerative_called_contusion")
+        & ~acl_reported
+        & has("fracture", "-"),
+        0.12,
+    )
+    floor("C2", "Contusion", has("bone_edema", "possible_contusion"), 0.45)
+    floor("C5", "Contusion", has("bone_edema", "acute_osteochondral_injury"), 0.55)
+    masked = rows & np.array([a != {"ok"} for a in answers["report"]])
+    log.append(
+        {
+            "rule": "MASK",
+            "target": "all",
+            "operation": "null",
+            "value": None,
+            "selected": int(masked.sum()),
+            "changed": int(masked.sum()) * len(targets),
+            "flips_down": 0,
+            "flips_up": 0,
+        }
+    )
+    cells.append(("MASK", "all", masked, None, None))
+    return values, masked, log, cells
+
+
 def write_table(
     name: str,
     values: np.ndarray,
@@ -906,10 +1130,18 @@ def write_table(
         settings.manifest_dir / f"{name.replace('_', '-')}-label-sources.json"
     )
     table = studies.select(STUDY).with_columns(
-        [pl.Series(t, values[:, i]) for i, t in enumerate(targets)]
+        [pl.Series(t, values[:, i]).fill_nan(None) for i, t in enumerate(targets)]
     )
-    if not np.isfinite(values).all() or (values < 0).any() or (values > 1).any():
-        raise ValueError(f"{name} targets must be finite probabilities")
+    finite = np.isfinite(values)
+    if (
+        np.isinf(values).any()
+        or not finite[studies["is_gold"].to_numpy()].all()
+        or (values[finite] < 0).any()
+        or (values[finite] > 1).any()
+    ):
+        raise ValueError(
+            f"{name} targets must be probabilities, null only on silver rows"
+        )
     directory.mkdir(parents=True)
     path = directory / "labels.csv"
     table.sort(STUDY).write_csv(path)
@@ -930,28 +1162,34 @@ def write_table(
     silver = ~studies["is_gold"].to_numpy()
     old = base.select(targets).to_numpy()[silver]
     new = values[silver]
+    observed = np.isfinite(new)
     return {
         "label_manifest": fingerprint(manifest_path),
         "prepared_labels": prepared,
         "silver_positive_rate": {
             t: [
                 float((old[:, i] >= TARGET_THRESHOLD).mean()),
-                float((new[:, i] >= TARGET_THRESHOLD).mean()),
+                float((new[observed[:, i], i] >= TARGET_THRESHOLD).mean()),
             ]
             for i, t in enumerate(targets)
         },
         "silver_changed_calls": {
             t: int(
                 (
-                    (old[:, i] >= TARGET_THRESHOLD) != (new[:, i] >= TARGET_THRESHOLD)
+                    observed[:, i]
+                    & (
+                        (old[:, i] >= TARGET_THRESHOLD)
+                        != (new[:, i] >= TARGET_THRESHOLD)
+                    )
                 ).sum()
             )
             for i, t in enumerate(targets)
         },
         "silver_mean_absolute_change": {
-            t: float(np.abs(old[:, i] - new[:, i]).mean())
+            t: float(np.abs(old[observed[:, i], i] - new[observed[:, i], i]).mean())
             for i, t in enumerate(targets)
         },
+        "silver_null": {t: int((~observed[:, i]).sum()) for i, t in enumerate(targets)},
     }
 
 
@@ -970,7 +1208,7 @@ def prepare(settings: PrepareCLI) -> dict:
     base, base_record = base_labels(base_manifest)
     targets = pl.read_csv("data/raw/sample_submission.csv").columns[1:]
     official = pl.read_csv("data/raw/train.csv", infer_schema_length=None).select(
-        STUDY, *targets
+        STUDY, "Report", *targets
     )
     split = pl.read_csv(settings.split_studies, infer_schema_length=None).select(
         STUDY, "report_group"
@@ -1078,18 +1316,6 @@ def prepare(settings: PrepareCLI) -> dict:
         truth.ravel(),
         len(targets),
     )
-    rubric = gold_q[..., POS] + 0.5 * gold_q[..., HEDGED]
-    evaluation = gold_metrics(
-        {
-            "combined_v1": base_values[gold],
-            "A_state_calibrated_oof": oof,
-            "B_family_mean": mean_clean[gold],
-            "A0_state_rubric": rubric,
-        },
-        truth,
-        targets,
-    )
-
     all_target = np.repeat(np.arange(len(targets))[None], len(gold), axis=0)
     state_values = calibrated(
         params,
@@ -1098,8 +1324,40 @@ def prepare(settings: PrepareCLI) -> dict:
         z_clean.ravel(),
         len(targets),
     ).reshape(len(gold), len(targets))
+    reports = (
+        studies.join(official.select(STUDY, "Report"), on=STUDY, how="left")["Report"]
+        .fill_null("")
+        .to_list()
+    )
+    answers = load_answers(settings.report_answers, studies)
+    oof_values = state_values.copy()
+    oof_values[gold] = oof
+    oof_ruled, _, _, _ = apply_v3_rules(
+        oof_values, np.ones(len(gold), dtype=bool), answers, reports, targets
+    )
+    rubric = gold_q[..., POS] + 0.5 * gold_q[..., HEDGED]
+    evaluation = gold_metrics(
+        {
+            "combined_v1": base_values[gold],
+            "A_state_calibrated_oof": oof,
+            "A_state_calibrated_oof_v3_rules": oof_ruled[gold],
+            "B_family_mean": mean_clean[gold],
+            "A0_state_rubric": rubric,
+        },
+        truth,
+        targets,
+    )
+
+    state_values, state_masked, rule_log, rule_cells = apply_v3_rules(
+        state_values, silver, answers, reports, targets
+    )
+    mean_values, mean_masked, mean_rule_log, _ = apply_v3_rules(
+        mean_clean, silver, answers, reports, targets
+    )
+    state_values[state_masked] = np.nan
+    mean_values[mean_masked] = np.nan
     state_values = np.where(gold[:, None], base_values, state_values)
-    mean_values = np.where(gold[:, None], base_values, mean_clean)
+    mean_values = np.where(gold[:, None], base_values, mean_values)
 
     beta, alpha, gamma = params[: len(STATES)], params[len(STATES) : -1], params[-1]
     calibration = {
@@ -1139,6 +1397,7 @@ def prepare(settings: PrepareCLI) -> dict:
         "combined_v1": base_record,
         "base_manifest": fingerprint(settings.base_manifest),
         "split_studies": fingerprint(settings.split_studies),
+        "report_answers": fingerprint(settings.report_answers),
         "official": fingerprint(Path("data/raw/train.csv")),
         "roots": {r.name: [fingerprint(p) for p in r.paths] for r in roots},
     }
@@ -1149,7 +1408,12 @@ def prepare(settings: PrepareCLI) -> dict:
         f"derived roots {DERIVED} merged into their parent's family. Before averaging, "
         "not-mentioned, below-threshold and hedged codes (anchor maps and silent symbols) "
         f"take the pooled gold positive rate of their state from rebuild_state_v1 {STATE_RATE}; "
-        "negative and positive codes keep each source's own value."
+        "negative and positive codes keep each source's own value. Then the v3 report-reading "
+        "rules (apply_v3_rules on the adjudicated report answers: ACL caps, MCL low-grade logit "
+        "shift and caps, meniscus floors and caps, lateral and PF OA rules, synovitis and "
+        "effusion rules, fracture and contusion rules) on silver rows, and silver studies whose "
+        "report is not one usable knee report (two reports, empty findings, another body part) "
+        "are null on every target."
     )
     state_method = (
         "Anchored Dawid-Skene over five latent report states per target (NEG, NOT_MENTIONED, "
@@ -1163,6 +1427,41 @@ def prepare(settings: PrepareCLI) -> dict:
         + common
     )
     settings.analysis_dir.mkdir(parents=True)
+    pl.DataFrame(
+        [
+            {
+                STUDY: studies[STUDY][int(row)],
+                "target": target,
+                "truth": float(truth[gold_row, column]),
+                "state_oof": float(oof[gold_row, column]),
+                "v3_oof": float(oof_ruled[row, column]),
+            }
+            for gold_row, row in enumerate(np.flatnonzero(gold))
+            for column, target in enumerate(targets)
+        ]
+    ).write_parquet(settings.analysis_dir / "gold_estimates.parquet")
+    pl.DataFrame(
+        [
+            {
+                STUDY: studies[STUDY][int(i)],
+                "rule": name,
+                "target": target,
+                "before": None if before is None else float(before[i]),
+                "after": None if after is None else float(after[i]),
+            }
+            for name, target, mask, before, after in rule_cells
+            for i in np.flatnonzero(
+                mask if before is None else mask & (np.abs(after - before) > 1e-12)
+            )
+        ],
+        schema={
+            STUDY: pl.String,
+            "rule": pl.String,
+            "target": pl.String,
+            "before": pl.Float64,
+            "after": pl.Float64,
+        },
+    ).write_parquet(settings.analysis_dir / "rule_cells.parquet")
     tables = {
         STATE_TABLE: write_table(
             STATE_TABLE,
@@ -1211,6 +1510,7 @@ def prepare(settings: PrepareCLI) -> dict:
         "silver_state_argmax": distribution,
         "calibration": calibration,
         "gold_evaluation": evaluation,
+        "rules": {STATE_TABLE: rule_log, MEAN_TABLE: mean_rule_log},
         "tables": tables,
     }
     (settings.analysis_dir / "report.json").write_text(

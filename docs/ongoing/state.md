@@ -7,13 +7,14 @@ How the recipe got here is the [adoption history](../modeling/current-model.md#a
 measured outcomes are in the [validation results](../validation/results/INDEX.md) and
 [history](../history/INDEX.md).
 
-## Label audit snapshot (2026-10-19)
+## Label refinement snapshot (2026-10-19)
 
-The requested v3.1 residual-error audit is complete: [findings and artifacts](../public-labels/2026-10-19-v31-label-audit.md).
-The table is local at `data/labels/prepared/rebuild-state-v3-1/labels.csv`; its manifest and
-implementation are in the uncommitted `knee-abnormality-labels-v3` worktree. No labels were
-changed and no training was launched by this audit. The proposed follow-up is classified once
-in the [v3.2 investigation backlog](../backlog/big-bets.md#v32-label-threshold-and-rule-review).
+The v3.1 audit ([findings](../public-labels/2026-10-19-v31-label-audit.md)) led to an
+ensemble-guided v3.2 table: 81 changed silver cells in 78 studies. Against the fixed 26-submission
+panel its Spearman correlation with the public scores is 0.410608 against v3's 0.429769 (paired
+interval includes zero), and gold AUC 0.904136 against 0.906330. v3 stays the label table; v3.2 is
+recorded in [v3.2 labels](../public-labels/2026-10-19-v32-labels.md). The v3.1 and v3.2 tables
+were never used for training.
 
 ## Recipe in force
 
