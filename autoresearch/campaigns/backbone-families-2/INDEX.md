@@ -1,7 +1,7 @@
 # Backbone families 2 campaign
 
 **2026-10-17 13:55 to 2026-10-18 15:02 CEST, Codex, stopped by the user after 25 trainings; NextViT-S adopted
-(`configs/nextvit.yaml`, `318eba2`).** Backbone families against the [first round's](../backbone-families/INDEX.md)
+(`configs/nextvit.yaml`, `551427c`).** Backbone families against the [first round's](../backbone-families/INDEX.md)
 incumbent FocalNet-T SRF (`focalnet-silver-fold-2`, fold 2, ×4 0.938816): the user's six of 2026-10-17
 (OverLoCK-XT, TransNeXt-Micro, VSSD-Tiny, FlashInternImage-T, MedSAM2 Hiera-T, LingBot-Vision ViT-S/16), the
 original RadImageNet DenseNet-121, InceptionV3 and InceptionResNetV2, and measured new families of 2026-10-18

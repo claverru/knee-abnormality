@@ -28,7 +28,7 @@ adopted by user decision.
 ## Setup
 
 - **Branch and worktree:** `fixes-and-removals` in `../knee-abnormality-fixes-and-removals`, off
-  `7ccf505`. Source is unchanged from main: the seeds carry their own changes, because an edit to
+  `e63e927`. Source is unchanged from main: the seeds carry their own changes, because an edit to
   a hashed source in the worktree changes the baseline's identity.
 - **Links:** `outputs` and `data` in the worktree are links to the main checkout's.
 - **Reference:** `rn18-fold1` (`outputs/training/20261005-113728-rn18-fold1`), the recipe in

@@ -537,11 +537,11 @@ ideas:
     ResNet-50 as open. It has never run beside the routed shared OA head, which arrived
     a day after the removal. PF OA lost in the campaign''s first three runs. Guess,
     low: -0.0005 to +0.001 macro, PF OA first.'
-  mechanism: 'The code is in git, in the parent of the commit that removed it: 5145374^
-    (the removal itself is `git show 5145374 -- src/knee_abnormality/modeling/model.py
+  mechanism: 'The code is in git, in the parent of the commit that removed it: 3413775^
+    (the removal itself is `git show 3413775 -- src/knee_abnormality/modeling/model.py
     src/knee_abnormality/modeling/spatial_tokens.py src/knee_abnormality/training/lightning.py`;
     every removed line of that diff that names the detector, anterior_axis, trusted_geometry
-    or patient_y is the detector). Read `git show 5145374^:src/knee_abnormality/modeling/model.py`:
+    or patient_y is the detector). Read `git show 3413775^:src/knee_abnormality/modeling/model.py`:
     lines 201 to 207 build it, lines 415 to 441 apply it, and the region inputs are
     built where medial_axis is (search anterior_axis and trusted_geometry). Restore
     it unchanged in what it computes: one linear detector without bias on the tokens
@@ -581,12 +581,12 @@ ideas:
     (16.2 GB peak in run 3), RAM unchanged.
   implementation: 'Follow the environment paragraph of the developer instructions.
     A source change in modeling/model.py, modeling/spatial_tokens.py and training/lightning.py,
-    with no new configuration option. Port the removed lines from 5145374^ into today''s
+    with no new configuration option. Port the removed lines from 3413775^ into today''s
     code by hand, since the files have changed since: the region inputs go where the
     token geometry is built in _encode_crops, the correction goes at the end of _attention_pool,
     and the entry oa_shared_detector_regions returns to SPATIAL_TOKEN_IDENTITY with
     its old value. From the old lightning.py restore only the logging of the three
-    scales and of the weight norm at the end of the epoch (5145374^ lines 499 to 520),
+    scales and of the weight norm at the end of the epoch (3413775^ lines 499 to 520),
     not the per-step activity logging (lines 727 to 770): the contract allows no new
     diagnostics in the training step. Pass medial_axis from the original definition
     even where today''s code reads the side from the frame; if the middle slice''s
@@ -626,7 +626,7 @@ ideas:
     their attention runs over every allowed token of the study, with no routing weight,
     no position prior of the shared "oa" kind and no knee-level term, as before 2026-10-07.
     The detector of the seed oa-detector-beside-the-shared-head is then added to their
-    three logits, restored from the same commit in the same way (5145374^, model.py
+    three logits, restored from the same commit in the same way (3413775^, model.py
     lines 201 to 207 and 415 to 441; original regions from knee_side_sign, knee_center_x_mm,
     knee_center_y_mm and the patient map; scales starting at zero). The meniscus targets
     keep the shared "meniscus" channel and their routes; the frame, the maps and every
@@ -741,7 +741,7 @@ ideas:
     the head is the part left to test. Evidence for the doubt, weak; that the head
     is the cause is a guess. Guess: -0.0005 to +0.0005 macro.'
   mechanism: In configs/training.yaml, trainer.scanner_confusion_weight becomes 0.1
-    (it is 0.0), the adopted value (configs/training.yaml at commit 1f6d8ac). The
+    (it is 0.0), the adopted value (configs/training.yaml at commit 14c2f33). The
     head, its ramp and its step are in the code (training/auxiliary/scanner_confusion.py
     and _scanner_confusion_step in training/lightning.py, built when the weight is
     above zero). L2-SP (optimizer.anchor_alpha_early and _late) is untouched. Nothing
@@ -827,8 +827,8 @@ ideas:
     tests the first half; this one tests the second. Evidence, weak, one pair. The
     routed heads now place these four labels by the knee frame, so the bias may add
     nothing. Guess: -0.0005 to +0.0005 macro.'
-  mechanism: 'The code is in git at 609a489^, the last commit that still had it behind
-    model.anatomical_bias: `git show 609a489^:src/knee_abnormality/modeling/model.py`,
+  mechanism: 'The code is in git at 030a583^, the last commit that still had it behind
+    model.anatomical_bias: `git show 030a583^:src/knee_abnormality/modeling/model.py`,
     lines 150 to 175 (the compartment signs and families and the parameter anatomical_log_strength,
     one log strength per family, zero start) and lines 373 to 377 (the term). Restore
     the term as it was: for Medial Meniscus, Lateral Meniscus, Medial OA and Lateral
@@ -854,9 +854,9 @@ ideas:
   budget: The reference's training time; two scalars. GPU memory and RAM as the reference.
   implementation: 'Follow the environment paragraph of the developer instructions.
     A source change in modeling/model.py and training/lightning.py with no new configuration
-    option: the bias is on. Port the lines from 609a489^ by hand, since _attention_pool
+    option: the bias is on. Port the lines from 030a583^ by hand, since _attention_pool
     has changed; from the old lightning.py restore the per-epoch logging of the strengths
-    (609a489^ lines 488 to 495). If the seed oa-detector-beside-the-shared-head has
+    (030a583^ lines 488 to 495). If the seed oa-detector-beside-the-shared-head has
     run, reuse its construction of the original medial_axis. Check on the CPU that
     the model builds without weights and that with the strengths'' term multiplied
     by zero the logits equal the incumbent''s code on one synthetic batch.'

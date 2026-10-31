@@ -98,7 +98,7 @@ the network, and it holds no credentials, agents or records.
 ## How a result is read
 
 One run is weak evidence. Every run is read against the incumbent and against the plain control
-(fold 3 of `rn50-main-0bd598f-folds-3-4`, ×1 0.925655, ×4 0.931023), at ×4 and ×1, per label from
+(fold 3 of `rn50-main-ab7854a-folds-3-4`, ×1 0.925655, ×4 0.931023), at ×4 and ×1, per label from
 largest gain to largest loss, with PF OA, MCL, Effusion and Fracture named apart: they are the
 labels the first joint run lost most on. A per-label effect is read on the ×1 AUC averaged over
 epochs 6 to 10 together with ×4. Reruns of one recipe land within ±0.0003 at ×4. A change of the

@@ -22,7 +22,7 @@ removed on 2026-10-14).
   [section below](#same-cost-backbone-candidates).
 - **History:** the crop-era budget, with the MobileNetV3 scout, its delta formula and its code
   requirements, is in the
-  learned-zoom snapshot (`f076a09:docs/history/crop-selection-sources/learned-zoom-backbone-swaps.md.txt`).
+  learned-zoom snapshot (`ecdc9cd:docs/history/crop-selection-sources/learned-zoom-backbone-swaps.md.txt`).
 
 ## Current budget
 

@@ -12,7 +12,7 @@ itself was later retired
 
 ## Setup of the first round
 
-- **Pseudo-labels:** five ResNet-50 fold models of main's recipe at `0bd598f` (seed 1110484336;
+- **Pseudo-labels:** five ResNet-50 fold models of main's recipe at `ab7854a` (seed 1110484336;
   folds 0 to 2 trained locally, 3 and 4 on the rented machine), ×4, τ 0.9, mirror TTA. One row per
   study and teacher in `/workspace/data/labels/prepared/fastmri-rn50-main-x4-tau09-tta/`; the
   scripts that made them are beside the predictions in
@@ -24,7 +24,7 @@ itself was later retired
   came from the Kaggle rows only. Validation was the Kaggle fold alone. Code on branch
   `fastmri-pretraining` (`extra_training` option).
 
-## ResNet-50 on fold 3, `rn50-joint-fastmri-fold-3` against `rn50-main-0bd598f-folds-3-4`
+## ResNet-50 on fold 3, `rn50-joint-fastmri-fold-3` against `rn50-main-ab7854a-folds-3-4`
 
 Same machine, recipe, seed and fold. One run each.
 
@@ -160,7 +160,7 @@ were added from the second round on ([bone masks](../../../modeling/external-dat
 The three ConvNeXt runs lie within 0.0011 at ×4 on one fold and one seed each; the order A < B < C
 was not established beyond that.
 
-### Run B adopted for the ConvNeXt, and main at `288e50a` brought in (2026-10-13)
+### Run B adopted for the ConvNeXt, and main at `8012575` brought in (2026-10-13)
 
 The user adopted run B's order (fastMRI only, then joint) as the ConvNeXt recipe, as the one that
 keeps fastMRI in every step to the end. Main's three adoptions of the targets-and-inputs campaign

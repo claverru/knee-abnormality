@@ -12,7 +12,7 @@ reference_config_exceptions:
 - paths.report_attribute_manifest
 reference_identity_exceptions: []
 additional_evidence_runs:
-- outputs/training/rn50-main-0bd598f-folds-3-4
+- outputs/training/rn50-main-ab7854a-folds-3-4
 training_host:
   address: 82.169.119.213
   port: 55084
@@ -76,7 +76,7 @@ policy:
   researcher_instructions: 'The campaign has no end: it runs until the user stops it. Never return an empty report
     and never declare the directions exhausted. Research starts after the forced seeds. Your first product after
     every completed run is its analysis: both multipliers against the incumbent and against the plain control (fold
-    3 of rn50-main-0bd598f-folds-3-4), the x1 change per epoch, the per-label AUC changes from the runs'' fold_3/validation_predictions.csv
+    3 of rn50-main-ab7854a-folds-3-4), the x1 change per epoch, the per-label AUC changes from the runs'' fold_3/validation_predictions.csv
     sorted from largest gain to largest loss with PF OA, MCL, Effusion and Fracture named apart, the step from x1
     to x4, the two training losses per epoch, the training and prediction seconds and the peak GPU memory. Adoption
     is by the runtime: strictly above the incumbent at both multipliers; say which side of that rule the run falls

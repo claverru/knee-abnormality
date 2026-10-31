@@ -22,8 +22,8 @@ its code remains in this run's `source_snapshot.zip`. The shared settings are
 [combined labels](../../../public-labels/combined-labels.md), class-balanced BCE with k=0.5, seed
 2263738815 (training is not deterministic) and ten epochs. The input identities differ only in the
 preprocessing block (feature stride, anchor stride, source hash). `stride16` was trained from the
-uncommitted working tree on `ab49830`, captured in its `source_snapshot.zip`; `k_05` was trained on
-`79d5ba8` and re-predicted at ×4 ([class-balance result](../labels-and-losses/2026-09-21-class-balance-exponent.md)).
+uncommitted working tree on `0afa93d`, captured in its `source_snapshot.zip`; `k_05` was trained on
+`e0f8a82` and re-predicted at ×4 ([class-balance result](../labels-and-losses/2026-09-21-class-balance-exponent.md)).
 Both selected epoch 8 at ×1 and were scored at ×4, τ 1.
 
 | Run | Selection score (×1) | Macro AUC (×4) | Training | Peak allocated | Parameters |

@@ -12,7 +12,7 @@ unless a line says otherwise. Intervals are the central 80% of a paired report-g
 ## Models
 
 `rn50-aligned-mixing-folds-0-2` (`outputs/training/rn50-aligned-mixing-folds-0-2`):
-`configs/refined-resnet50.yaml` (removed) as on main at `0bd598f` (aligned contrast mixing, usual labels,
+`configs/refined-resnet50.yaml` (removed) as on main at `ab7854a` (aligned contrast mixing, usual labels,
 teacher share 0), seed 1110484336, about 265 s per epoch, best epoch 10 of 10 on each fold.
 
 | Fold | Studies | ×4, τ 1, no TTA | ×1 |

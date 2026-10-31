@@ -17,7 +17,7 @@ best. **Public leaderboard: 0.938 (S61), a tie with the control's 0.938 (S60)**,
 | Seed, fold | 1485198267, fold 1 of `all_5fold_scanner_v1` | same |
 | Training and validation rows | SHA-256 `d7688619…`, `361d5d06…` | identical |
 
-The control ran before commit 665af0e removed retired options (`gated_attention`,
+The control ran before commit d1feec6 removed retired options (`gated_attention`,
 `residual_readout`, `oa_readout.shared_detector`, `repeated_series_share`, `class_balanced_bce`).
 Its settings used the code paths the current code runs unconditionally, so the source-hash
 difference changes no computation. Comparison:

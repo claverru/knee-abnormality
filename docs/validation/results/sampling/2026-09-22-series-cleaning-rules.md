@@ -17,7 +17,7 @@ frames are at or below 0.00001. No model was retrained for these measurements; `
   directory's `effective_config.json`, selected checkpoint and saved validation predictions, the
   series-filtering census and `outputs/analysis/r/repeated-series-20260922/files.parquet`. The
   checkpoint must match the executing preprocessing identity; the script was written against
-  `b483140` and may not run on later source:
+  `aeb19b8` and may not run on later source:
   `env CUDA_VISIBLE_DEVICES= uv run --locked python -m scripts.adhoc.score_series_cleaning_rules --output-dir outputs/analysis/series-cleaning-rules-new`.
 
 | Rule | Fold-0 studies | Mean shift | Max shift | Studies moved >0.05 | Fold-0 macro Δ [95%] |
@@ -87,7 +87,7 @@ Scratch evaluation scripts are not kept; the rule's inputs are the census parque
 
 `k05-clean` (2026-09-23) retrains `k_05`'s recipe on the source with all four rules: `configs/k05.yaml` (removed),
 seed 2263738815, fold 0 of `all_5fold_scanner_v1`, combined labels. The loader and inference
-changes made since `b483140` leave the prepared images bit-identical, so the difference from `k_05`
+changes made since `aeb19b8` leave the prepared images bit-identical, so the difference from `k_05`
 is the cleaning plus same-seed training divergence.
 
 | Run | Selected epoch | ×1 epoch macro AUC | ×4 τ 1 macro AUC | Public (×4 τ 0.75) |

@@ -20,7 +20,7 @@ No retraining: the model saw single-plane studies only through series dropout.
 - **Reference:** the run's saved ×4 validation predictions on the same studies. Intervals are a
   paired study bootstrap (2,000 draws, seed 20260914), not the report-group bootstrap.
 - **Script and outputs:** [`score_axial_only.py`](../../../../scripts/adhoc/score_axial_only.py)
-  (`--plane`) at commit `338431d` plus the script;
+  (`--plane`) at commit `7816786` plus the script;
   `outputs/analysis/{axial,coronal,sagittal}-only-scanner-confusion-control-20260927/`
   (`results.json`, `axial_only_predictions.csv`, which holds the kept plane's predictions).
 

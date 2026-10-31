@@ -245,7 +245,7 @@ the fix keep the old shape, and `loading_summary` no longer reads them.
 - **`build_series_index` was counted twice**, as its own row and inside `setup_seconds`. The
   summary now publishes `setup_other = setup_seconds − build_series_index` beside it.
 - **`project_reference` does not exist.** The summary's sampling formula still added
-  `timing["project_reference"]`, but the function was removed from the package in `f076a09`, so the
+  `timing["project_reference"]`, but the function was removed from the package in `ecdc9cd`, so the
   term was always zero and nothing was missing from the `timed()` list. The real gap was that the
   published table **omitted the `getitem_other` row**, 0.351 s cold, which together with the double
   count explains the 2.9 s by which the rows overshot the 82.1 s total. Every row is now published

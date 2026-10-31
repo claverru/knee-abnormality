@@ -1,6 +1,6 @@
 # 2026-10-05 code-audit measurements
 
-**An external read-only audit of `ca0f91c` listed eleven mechanisms; every one exists in the code,
+**An external read-only audit of `d9b3642` listed eleven mechanisms; every one exists in the code,
 and none measurably hurts the recipe of 2026-10-05 on the training data.** The largest measured effect
 is the reflection-TTA coordinate mismatch, worth +0.000024 pooled out of fold when corrected.
 Three items stay open because they need a training run. Nothing was changed in `src/`.
@@ -107,7 +107,7 @@ Script: `scripts/adhoc/measure_bag_normalization_drift.py`. Outputs:
 Three further scripts measured the audit's side questions without a finding recorded anywhere (the
 reflection tilt of the series, the DICOM header window against the pixel window, and the shortfall
 of delivered triplets against each study's budget), and a fourth compared bag-window estimators.
-They were deleted; the last commit holding them is `d8def44:scripts/adhoc/`, files
+They were deleted; the last commit holding them is `2b16bef:scripts/adhoc/`, files
 `census_reflection_tilt.py`, `measure_header_window.py`, `measure_slice_budget_shortfall.py` and
 `measure_window_estimators.py`. The centre-inside-slab census, `scripts/adhoc/census_centre_slab_guard.py`
 (outputs `outputs/analysis/c/centre-slab-guard-20261005/summary.json`), is kept: it is the evidence

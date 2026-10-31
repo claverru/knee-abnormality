@@ -207,7 +207,7 @@ No defect found in the adapter or the pipeline:
   0.836); attention to it 6–16% in blocks 1–3, at most 0.6% from block 5.
 
 **A third of the ×4 gap is the mask decoder.** The reference trained with the mask decoder's
-supervision, removed by 9a93087. `mamba-silver-fold-2`, MambaVision-T on the same config and fold
+supervision, removed by f00eafb. `mamba-silver-fold-2`, MambaVision-T on the same config and fold
 without it, scores ×4 0.935160 (−0.0026 from the reference), ×1 0.9301. Against it, RadioDINO's gap
 is ×4 −0.0055 and ×1 −0.0058. Seed 1's per-label comparison with the reference carries that change:
 against the decoder-free run Contusion is +0.0046 and Fracture −0.0061. The comparisons between

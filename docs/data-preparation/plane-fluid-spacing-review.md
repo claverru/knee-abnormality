@@ -179,7 +179,7 @@ The crop-retention observations above come from this repository's images, not th
 
 ## Reproduction and artifact identity
 
-Checkout at review: `ad51d43f6fbb83e13ba077ac611852084841aeab`, with uncommitted investigation
+Checkout at review: `ff468fe51512d7cfad018ede5359b9eb6e4d3c98`, with uncommitted investigation
 scripts. The rendering script is
 [`inspect_plane_fluid_windows.py`](../../scripts/adhoc/inspect_plane_fluid_windows.py).
 Run it with `PYTHONPATH` pointing to the archived `source/src` of

@@ -22,7 +22,7 @@ ideas:
     invalid geometry. (3) Midline: medial_mm uses the fitted centre's x instead of the median
     series x. Unknown side still gives no bias.
   precedents:
-  - 'outputs/analysis/r/robust-center-rescore-20260923/robust_center.patch: robust refit and fallback, applies to d914079; inference gate +0.0001, bias alone +0.00009 [80% +0.00003, +0.00015].'
+  - 'outputs/analysis/r/robust-center-rescore-20260923/robust_center.patch: robust refit and fallback, applies to 61c00b9; inference gate +0.0001, bias alone +0.00009 [80% +0.00003, +0.00015].'
   - 'outputs/analysis/m/midline-vs-centre-20260923/result.md: midline vs fitted x, median 1.55 mm, p95 8.6 mm, 12.5% above 5 mm; worst cases are off-centre sagittal slabs.'
   - 'docs/research/data-and-validation/series-filtering-signals/findings-by-case.md#contralateral-knee: seven bilateral studies, X sign separates the knees.'
   novelty: >-
@@ -101,7 +101,7 @@ ideas:
     other eight labels are unchanged.
   precedents:
   - 'outputs/training/side-mask and outputs/analysis/s/side-mask-vs-k05-clean: trained mask for both families; strata Medial Meniscus +0.0031/+0.0056, Lateral Meniscus +0.0063/+0.0047 (sibling-clean/sibling-positive).'
-  - 'outputs/analysis/s/side-mask-vs-k05-clean/side_mask.patch: implementation (model.compartment_evidence), applies to d914079.'
+  - 'outputs/analysis/s/side-mask-vs-k05-clean/side_mask.patch: implementation (model.compartment_evidence), applies to 61c00b9.'
   novelty: >-
     Restricts the measured mask to the family it helped; the OA loss that cancelled the gain is
     removed by design.

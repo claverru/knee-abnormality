@@ -137,7 +137,7 @@ followed learned the views instead ([learnable views](2026-10-03-learnable-views
   predicted 0.0001 to 0.0005 lower and none is distinguishable from zero. Untested: anything
   finer than 84 mm on T1/PD, 93 mm on fluid or 120 mm on axial. The per-run label table that fed
   it, `scripts/adhoc/tabulate_view_run_labels.py`, was deleted; the last commit holding it is
-  `d8def44:scripts/adhoc/tabulate_view_run_labels.py`.
+  `2b16bef:scripts/adhoc/tabulate_view_run_labels.py`.
 
 ## Adoption on main
 

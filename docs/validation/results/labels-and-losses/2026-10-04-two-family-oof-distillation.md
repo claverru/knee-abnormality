@@ -33,7 +33,7 @@ The blend is +0.028 over the silver labels (80% [+0.018, +0.039], 2,000 draws).
 
 ## Teachers and children
 
-×4, τ 1, no TTA. Teachers used seed 1533697213; children trained from main at `3fee190` with
+×4, τ 1, no TTA. Teachers used seed 1533697213; children trained from main at `60407ce` with
 `--paths.label-manifest` and `--labels.source oof_blend_v2`.
 
 | Fold | ResNet-50 teacher | Child | Δ | Seed | ReXNet-200 teacher | Child | Δ | Seed |

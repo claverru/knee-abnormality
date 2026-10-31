@@ -58,8 +58,8 @@ The rented-machine code of these steps is kept as a frozen record in
   therefore requires a teacher value for every training study rather than an equal fold. Local
   validation of a student is inflated by this leak, so students were judged on the public board.
 - **Code at the time:** the chain ran on main's code with the uncommitted fastMRI branch changes;
-  the S188 bundle records `included_git_commit` `6f78b4f` with local modifications. The kept
-  pieces were committed on 2026-10-23 (`9f277d4`, `363b027`); the pieces not adopted are in the
+  the S188 bundle records `included_git_commit` `a51776a` with local modifications. The kept
+  pieces were committed on 2026-10-23 (`f0600f7`, `fa39219`); the pieces not adopted are in the
   [retired pieces](../../history/fastmri-chain-retired-pieces.md).
 
 ## Families and teachers

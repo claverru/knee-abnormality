@@ -97,7 +97,7 @@ Baker's is worth watching if the width moves again: it keeps 80% of its coronal 
 ## What the evidence does not cover
 
 - **The second control was never scored at ×4.** `04-total-topup-26` carries
-  `robust_center_outlier_mm`, removed in `df4b6cd`, so the production path rejects its saved config.
+  `robust_center_outlier_mm`, removed in `06cea9e`, so the production path rejects its saved config.
   It scores 0.88848 at ×1, above this run. Every ×4 comparison here is therefore against one
   control, not against the control spread.
 - **One run, one fold, one seed**, against a cohort whose seed spread is 0.0037 — four times the

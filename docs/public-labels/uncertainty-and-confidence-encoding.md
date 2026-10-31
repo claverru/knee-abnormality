@@ -112,7 +112,7 @@ The audit pins the prediction bytes; the run's
 [provenance](../../outputs/training/balanced-bce/provenance.json) and
 [source snapshot](../../outputs/training/balanced-bce/source_snapshot.zip)
 retain its settings and implementation. Its base commit is
-`f4c340bab4518aa743acb7a6e4649e9d3719b9b3` with recorded working-tree changes.
+`69066959cf010a1c3b14b703eee73fbb88c0438a` with recorded working-tree changes.
 
 ### Implications and untested alternatives
 

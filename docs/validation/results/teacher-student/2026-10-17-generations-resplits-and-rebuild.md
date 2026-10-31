@@ -80,7 +80,7 @@ level, and the joint stage adds nothing once the share is in (S168 below S167).
 - **NextViT-S as a sixth gen-3 family (2026-10-18, user decision):** the backbone-families-2 campaign's incumbent
   (fold 2 x4 0.938851, ties FocalNet SRF; third family over ResNet-50 + FocalNet +0.00093, logit correlation 0.958
   with the ResNet-50). Tree `/home/claudio/src/knee-abnormality-nextvit` on the machine (this worktree's code, main
-  `318eba2` + the `distilled()` fix; sync-free venv). `configs/nextvit-teachers2-pretrain.yaml` (removed) and
+  `551427c` + the `distilled()` fix; sync-free venv). `configs/nextvit-teachers2-pretrain.yaml` (removed) and
   `configs/nextvit-gen3mixed-finetune.yaml` (removed) differ from `configs/nextvit.yaml` exactly as ConvNeXt's do from
   `configs/convnext.yaml`. Pretraining seed 4213577004 (old split fold 0, external only, 10 epochs); fine-tunes on
   `all_5fold_scanner_v2_r6` (split seed 1624582548), seeds 4081590439 3631603500 763392539 14540636 952220979.

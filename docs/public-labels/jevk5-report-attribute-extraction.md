@@ -209,7 +209,7 @@ with torch pinned to the project's cu128 build. Outputs go to `outputs/labels/je
 A shard of 200 reports takes about 12 minutes alone on the 3090 (v1 took 10.6; v2 and v3 prompts
 are about 13% longer), so the full run is about 4.5 hours and the two-shard check about 25 minutes.
 
-The target-table step (`scripts.tools.prepare_report_attribute_targets`) was retired on 2026-10-14 with the report-attribute heads; it is at `7770ce9:scripts/tools/prepare_report_attribute_targets.py`.
+The target-table step (`scripts.tools.prepare_report_attribute_targets`) was retired on 2026-10-14 with the report-attribute heads; it is at `6f847a0:scripts/tools/prepare_report_attribute_targets.py`.
 
 ```bash
 uv run --locked --with "transformers==5.17.0" --with "flash-linear-attention==0.5.0" --with "torch==2.10.0+cu128" --index https://download.pytorch.org/whl/cu128 --index-strategy unsafe-best-match python -m scripts.adhoc.score_jevk5_report_attributes --output-dir outputs/labels/jevk5-attributes-v3

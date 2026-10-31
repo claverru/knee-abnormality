@@ -6,14 +6,14 @@ of the first run: [fastMRI joint training](../../../docs/validation/results/teac
 ## The reference
 
 Fold 3 of `outputs/training/rn50-joint-fastmri-fold-3`: main's `configs/refined-resnet50.yaml`
-at `c1d973b` with `extra_training` set. Every Kaggle batch is followed by a fastMRI batch
+at `d293d0a` with `extra_training` set. Every Kaggle batch is followed by a fastMRI batch
 labelled by teacher 3; one optimizer step covers the pair at equal weight; L2-SP is applied on
 the Kaggle batch only; class weights come from the Kaggle rows only. **×1 0.926211 (epoch 10 of
 10), ×4 0.930745, 4,530 s of training** (about 450 s per epoch) on the rented RTX 5090, peak GPU
 memory 16.6 GB. **Public: S148 0.962 at ×4 τ 0.9, the best public score on 2026-10-12** (S140, five teachers, 0.961;
 S143, a single ResNet-50 on fold 1, 0.960). The plain fold 3 control was not submitted.
 
-The plain control is fold 3 of `outputs/training/rn50-main-0bd598f-folds-3-4`, same machine,
+The plain control is fold 3 of `outputs/training/rn50-main-ab7854a-folds-3-4`, same machine,
 recipe and seed without fastMRI: ×1 0.925655, ×4 0.931023, 2,247 s.
 
 | | Joint | Control | Δ |

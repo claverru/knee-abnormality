@@ -12,7 +12,7 @@ and [modeling summary](../../../modeling/retired-side-and-compartment-variants.m
 
 | Original path | Source snapshot | SHA-256 |
 |---|---|---|
-| `scripts/adhoc/analyze_meniscus_coupling.py` (removed) | analyze_meniscus_coupling.py.txt (`f076a09:docs/history/meniscus-coupling-sources/analyze_meniscus_coupling.py.txt`) | `f52cbc311c6c22e0b5742faa8238af9a9f6e6be86321ac329b712f99f354ce47` |
+| `scripts/adhoc/analyze_meniscus_coupling.py` (removed) | analyze_meniscus_coupling.py.txt (`ecdc9cd:docs/history/meniscus-coupling-sources/analyze_meniscus_coupling.py.txt`) | `f52cbc311c6c22e0b5742faa8238af9a9f6e6be86321ac329b712f99f354ce47` |
 
 The comparison that produced `outputs/analysis/m/meniscus-coupling-20260914/` ran the earlier
 version kept in its `source/` directory, which imported the metrics from the since-removed

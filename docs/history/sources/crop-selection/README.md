@@ -21,12 +21,12 @@ their original locations.
 
 | Original path | Snapshot | Taken before | SHA-256 |
 |---|---|---|---|
-| `docs/modeling/active-spatial-token-model.md` | active-spatial-token-model.md.txt (`f076a09:docs/history/crop-selection-sources/active-spatial-token-model.md.txt`) | The learned-zoom rewrite (shared-crops recipe) | `352f44168f6a9702945d8a668e4793572de23775481f8989fa6cd98c6876934b` |
-| `docs/model-shapes.md` | model-shapes.md.txt (`f076a09:docs/history/crop-selection-sources/model-shapes.md.txt`) | The learned-zoom rewrite (shared-crops diagram) | `16262d282f8ef2c41dfd3ae0b187720b9feba1d97eb4a4a3e552159a9e225d47` |
-| `docs/modeling/active-spatial-token-model.md` | learned-zoom-active-spatial-token-model.md.txt (`f076a09:docs/history/crop-selection-sources/learned-zoom-active-spatial-token-model.md.txt`) | The full-slice restoration (learned-zoom recipe and profile) | `946f3567846854fdc311f3a3613bcb877850c196747ed4e1c5a83174da53170b` |
-| `docs/model-shapes.md` | learned-zoom-model-shapes.md.txt (`f076a09:docs/history/crop-selection-sources/learned-zoom-model-shapes.md.txt`) | The full-slice restoration (learned-zoom diagram) | `65e096815722cba6f44acd9eb7207e8126a339d7f1737dad78a33b87d2b5e57b` |
-| `docs/modeling/backbones/backbone-swaps.md` | learned-zoom-backbone-swaps.md.txt (`f076a09:docs/history/crop-selection-sources/learned-zoom-backbone-swaps.md.txt`) | The full-slice restoration (learned-zoom budget, scout formula and requirements) | `0e3796bb645ff68f74d264ddfe5447b27f024aa286b4febbf8ee3f5af08a0d35` |
-| `docs/ongoing.md` | ongoing.md.txt (`f076a09:docs/history/crop-selection-sources/ongoing.md.txt`) | The full-slice restoration (results, findings, open options, glimpse plan and candidate runs) | `f51a0b38eec78b2f13ba0e225390edb7bf240d3020573d82554c2ee13e00152c` |
+| `docs/modeling/active-spatial-token-model.md` | active-spatial-token-model.md.txt (`ecdc9cd:docs/history/crop-selection-sources/active-spatial-token-model.md.txt`) | The learned-zoom rewrite (shared-crops recipe) | `352f44168f6a9702945d8a668e4793572de23775481f8989fa6cd98c6876934b` |
+| `docs/model-shapes.md` | model-shapes.md.txt (`ecdc9cd:docs/history/crop-selection-sources/model-shapes.md.txt`) | The learned-zoom rewrite (shared-crops diagram) | `16262d282f8ef2c41dfd3ae0b187720b9feba1d97eb4a4a3e552159a9e225d47` |
+| `docs/modeling/active-spatial-token-model.md` | learned-zoom-active-spatial-token-model.md.txt (`ecdc9cd:docs/history/crop-selection-sources/learned-zoom-active-spatial-token-model.md.txt`) | The full-slice restoration (learned-zoom recipe and profile) | `946f3567846854fdc311f3a3613bcb877850c196747ed4e1c5a83174da53170b` |
+| `docs/model-shapes.md` | learned-zoom-model-shapes.md.txt (`ecdc9cd:docs/history/crop-selection-sources/learned-zoom-model-shapes.md.txt`) | The full-slice restoration (learned-zoom diagram) | `65e096815722cba6f44acd9eb7207e8126a339d7f1737dad78a33b87d2b5e57b` |
+| `docs/modeling/backbones/backbone-swaps.md` | learned-zoom-backbone-swaps.md.txt (`ecdc9cd:docs/history/crop-selection-sources/learned-zoom-backbone-swaps.md.txt`) | The full-slice restoration (learned-zoom budget, scout formula and requirements) | `0e3796bb645ff68f74d264ddfe5447b27f024aa286b4febbf8ee3f5af08a0d35` |
+| `docs/ongoing.md` | ongoing.md.txt (`ecdc9cd:docs/history/crop-selection-sources/ongoing.md.txt`) | The full-slice restoration (results, findings, open options, glimpse plan and candidate runs) | `f51a0b38eec78b2f13ba0e225390edb7bf240d3020573d82554c2ee13e00152c` |
 
 ## Removed code
 

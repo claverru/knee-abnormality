@@ -68,7 +68,7 @@ The ResNet-50's steps rise 8.5 times with depth because its weights shrink; Radi
 
 | Mechanism | Setting | Run | Macro change | Source |
 |---|---|---|---|---|
-| Backbone | Swin-T on the MambaVision recipe | fold 2, 2026-10-14 | ×4 0.937176 against 0.937801 | `docs/validation/results/` and main 3639bac |
+| Backbone | Swin-T on the MambaVision recipe | fold 2, 2026-10-14 | ×4 0.937176 against 0.937801 | `docs/validation/results/` and main 8de95be |
 | Rate | 2e-4 flat against 5e-5 (MambaVision-T) | backbone-rate-2e-4 | ×4 +0.0024 | [MambaVision findings](../mambavision-settings/findings.md) |
 | Rate | 4e-4 flat (MambaVision-T) | backbone-rate-4e-4 | ×4 +0.0004 | same |
 | Rate profile | 6e-4 top, 0.6 per stage (MambaVision-T) | stage-rates-by-weight-scale | ×4 -0.0028 | same |
@@ -88,8 +88,8 @@ reference here.
 
 ## The reference against today's source
 
-`mambavision-t-combined-12-epochs` was trained before main's cleanups of 2026-10-14 (94868bf,
-9a93087). Declared in `campaign.yaml`, by the user's choice of this run as reference:
+`mambavision-t-combined-12-epochs` was trained before main's cleanups of 2026-10-14 (e66eaa8,
+f00eafb). Declared in `campaign.yaml`, by the user's choice of this run as reference:
 
 - **Equivalences:** the run's code applied linear decay and the late anchor's schedule without
   options and had no stage decay, so `optimizer.lr_decay: linear`,
@@ -108,5 +108,5 @@ reference here.
   seal; that runtime is kept as `outputs/autoresearch/radiodino-settings.failed-seal-20261015T0140`).
 - **Not covered by any key:** the reference trained with the mask decoder's training-only
   supervision (`mask_decoder_bone_loss` and `mask_decoder_soft_tissue_loss` in its logs), which
-  9a93087 removed. Seed 1's comparison with the reference therefore carries the decoder's
+  f00eafb removed. Seed 1's comparison with the reference therefore carries the decoder's
   removal as well as the backbone; every later seed compares RadioDINO with RadioDINO.

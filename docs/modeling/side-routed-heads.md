@@ -11,14 +11,14 @@ adopted version is run 24 of a 31-run line on ResNet-18 (fold 1 of `all_5fold_sc
 Built 2026-10-05 and 2026-10-06 in worktree `knee-abnormality-side-routed-heads` (branch
 `side-routed-heads`), designed with the user after the
 [fixes-and-removals campaign](../../autoresearch/campaigns/fixes-and-removals/INDEX.md) left every
-position encoding at a tie. Adopted on main on 2026-10-07 (`609a489`, first as run 24 with the
-height cuts from the spots; `99dfcee` kept run 24 itself as the recipe). The anatomy-map and
+position encoding at a tie. Adopted on main on 2026-10-07 (`030a583`, first as run 24 with the
+height cuts from the spots; `673d664` kept run 24 itself as the recipe). The anatomy-map and
 posed-crop recipe of 2026-10-08 kept the shared heads and replaced their frame and sections, and
 later recipes followed ([adoption history](current-model.md#adoption-history)). Runs and
 measurements: [side-routed heads results](../validation/results/pooling-and-attention/side-routed-heads/INDEX.md).
 
 The session's one-off analysis and drawing scripts other than the ones those results name were deleted;
-the last commit holding them is `d8def44:scripts/adhoc/side_routed_session/`.
+the last commit holding them is `2b16bef:scripts/adhoc/side_routed_session/`.
 
 ## Principle
 

@@ -1,6 +1,6 @@
 # Fixes-and-removals prior work
 
-What the 2026-10-05 audit of `ca0f91c` found and what was measured the same day. Full tables are
+What the 2026-10-05 audit of `d9b3642` found and what was measured the same day. Full tables are
 in the [code-audit measurements](../../../docs/validation/results/campaigns-and-queues/2026-10-05-code-audit-measurements.md).
 
 ## Precedents

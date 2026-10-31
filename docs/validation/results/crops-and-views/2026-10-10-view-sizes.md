@@ -9,7 +9,7 @@ the [view-poses run notes](../../../../autoresearch/campaigns/view-poses/run-not
 
 ## Setup
 
-- **Recipe:** main at `7f7c30f` (meniscus map and posed canvases, the
+- **Recipe:** main at `d4daa71` (meniscus map and posed canvases, the
   [recipe of that date](../../../final-solution.md#model-and-per-family-recipes)), ResNet-18, `configs/resnet50.yaml`
   with only the view table changed (`data.series_types[*].views[*].field_mm`, and for the last
   run the number of views and their slices).

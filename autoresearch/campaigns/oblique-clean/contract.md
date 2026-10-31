@@ -2,8 +2,8 @@
 
 Defined 2026-09-22; not started. It succeeds the retired [x4 oblique campaign](../oblique-x4/INDEX.md)
 on the same topic and the same shared evaluation, after main gained per-study series cleaning
-(`b483140`: superseded retakes, contrast relabel, exact copies and near-empty frames) and the
-loader and inference speedups (`4d23276`, `9e0c3ee`). The x4 campaign's frozen source predates
+(`aeb19b8`: superseded retakes, contrast relabel, exact copies and near-empty frames) and the
+loader and inference speedups (`d399752`, `566e96a`). The x4 campaign's frozen source predates
 both, so its candidates could not carry them; this campaign seals the current source and a control
 retrained on it.
 

@@ -16,7 +16,7 @@ ideas:
   - 'outputs/training/side-mask and outputs/analysis/s/side-mask-vs-k05-clean: trained mask for both families;
     strata Medial Meniscus +0.0031/+0.0056, Lateral Meniscus +0.0063/+0.0047 (sibling-clean/sibling-positive).'
   - 'outputs/analysis/s/side-mask-vs-k05-clean/side_mask.patch: implementation (model.compartment_evidence),
-    applies to d914079.'
+    applies to 61c00b9.'
   novelty: Parked after its repair could not carry the undecided geometry bundle; it never trained. Restricts
     the measured mask to the family it helped; the OA loss that cancelled the gain is removed by design.
   coverage: The two meniscus labels; every study with a resolved side and valid geometry.

@@ -44,7 +44,7 @@ hand-set, frozen views were not candidates, until the user made one the referenc
 ## Setup
 
 - **Branch and worktree:** `view-optimisation` in `../knee-abnormality-view-optimisation`, off
-  `8ef12dc`. The build was uncommitted while the campaign ran (the runtime works from
+  `b513f0c`. The build was uncommitted while the campaign ran (the runtime works from
   uncommitted source) and is committed on the branch as `b290da6`.
 - **Recipe:** `configs/training.yaml`, which on this branch holds the learnable recipe at its
   starting values (the 120 mm centre crop, `data.learn_views: [spacing_mm, offset_mm, slices]`),

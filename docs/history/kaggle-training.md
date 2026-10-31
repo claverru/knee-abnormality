@@ -44,7 +44,7 @@ preparation on the GPU (four vCPUs) and 4 loader workers per rank.
 Never committed. The completed run's output, including its `source_snapshot.zip` (the exact code
 that trained on Kaggle), checkpoint, predictions and logs, is in
 `outputs/kaggle-training/kaggle-fold0-20260924d-output/`; each attempt's launch record is in
-`outputs/kaggle-training/`. The worktree's changes against `70a9a24` are archived in
+`outputs/kaggle-training/`. The worktree's changes against `d5b6244` are archived in
 `outputs/analysis/k/kaggle-training-20260924/`: `worktree.patch` (config, dataset, series index,
 checkpoints, Lightning module, train script) and `untracked-files.tar.gz` (the launcher, a
 series-index builder and the original status document). The Kaggle datasets

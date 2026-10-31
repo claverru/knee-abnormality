@@ -26,7 +26,7 @@ when it was launched, and its `effective_config.json` records `"compartment_adap
 The live config was reverted to `null` after the run. Both controls come from the
 [2026-09-20 queue](../campaigns-and-queues/2026-09-20-overnight-hyperparameter-results.md)
 (`outputs/training/overnight-20260919T235434Z-8ol_1c30/runs/`), which is the same recipe on the
-prior commit `d5f352a`.
+prior commit `070d593`.
 
 Against the mean of the two controls (0.894902) the candidate gains **+0.000197**, against a
 control-to-control spread of **0.003360**. The sign of the macro delta depends on which control is

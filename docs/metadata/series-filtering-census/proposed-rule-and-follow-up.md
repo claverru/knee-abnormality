@@ -41,7 +41,7 @@ Kaggle inference it must run on the same tags and thresholds.
 
 ## Follow-up measurements (2026-09-17)
 
-Measured, CPU only. Script: `followup_geometry.py` (`041bd16:docs/history/series-and-sampling-sources/series-filtering/followup_geometry.py.txt`), which reruns the
+Measured, CPU only. Script: `followup_geometry.py` (`c48eae2:docs/history/series-and-sampling-sources/series-filtering/followup_geometry.py.txt`), which reruns the
 loader's indexing. Tables: `outputs/analysis/s/series-filtering-20260917/followup/`
 (`reference_after_drops.parquet`, `reflection_eligibility_series.parquet`,
 `items_1_2_summary.json`).
@@ -103,7 +103,7 @@ ineligible.
 
 Reports and Steven v4 labels of the 8 non-knee studies (measured), plus a rough visual check of
 three series (`outputs/analysis/s/series-filtering-20260917/offknee-review.png`, 27 thumbnails,
-`render.py` (`041bd16:docs/history/series-and-sampling-sources/offknee-review/render.py.txt`)):
+`render.py` (`c48eae2:docs/history/series-and-sampling-sources/offknee-review/render.py.txt`)):
 
 - The ankle study `…93672103` has a knee-only report and labels; the ankle series carry nothing
   labelled. No non-knee study has a positive Fracture label, and of 28 training reports mentioning

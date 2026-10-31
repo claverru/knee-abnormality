@@ -28,7 +28,7 @@ measurement; one backbone per plane ties; nothing else passed
 
 ## Setup
 
-- **Branch and worktree:** `revisits` in `../knee-abnormality-revisits`, off `00f2f32`.
+- **Branch and worktree:** `revisits` in `../knee-abnormality-revisits`, off `35c0337`.
 - **Reference:** `rn18-l2sp-no-confusion` (×4 0.928062, 0.943 public as S86). It was trained from
   the since-removed `rn18-l2sp-confusion` worktree, so its `paths.label_manifest` and
   `paths.report_attribute_manifest` are declared config exceptions: its recorded

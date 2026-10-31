@@ -176,9 +176,9 @@ on 2026-09-25 ([overnight](../validation/results/campaigns-and-queues/2026-09-18
 
 **Count-normalised attention** (`model.count_normalized_attention`) and the **robust study centre**
 (`data.robust_center_outlier_mm`) were removed as config options (the latter on 2026-09-18, the
-former in commit `665af0e`); configs and checkpoints that carry them fail validation and need their archived sources.
+former in commit `d1feec6`); configs and checkpoints that carry them fail validation and need their archived sources.
 
-**Removed 2026-10-14** (no recipe used them; code at `7770ce9`): weight averaging
+**Removed 2026-10-14** (no recipe used them; code at `6f847a0`): weight averaging
 (`optimizer.weight_averaging`, its `live_state_dict`, `val_live_*` metrics and
 `batch_norm_refresh_seconds`), the report-attribute heads (`trainer.report_attribute_loss_weight`,
 `paths.report_attribute_manifest`), the scanner confusion head (`trainer.scanner_confusion_weight`),

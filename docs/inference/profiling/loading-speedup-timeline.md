@@ -13,7 +13,7 @@ The loader buffer pool, the early worker exit, the startup page pre-read, export
 that keep only the network, and convolution and linear weights stored in FP16. Exports choose
 `--backbone graph` (default: the backbone compiled inside its CUDA graph, with the compile cache
 the submission job builds on Kaggle) or `--backbone eager` (for ensembles whose graph pools do not
-fit); both hold the backbone in FP16 on the GPU (commits `22b5043`, `5bb5cd2`). Compiled graphs fit
+fit); both hold the backbone in FP16 on the GPU (commits `b234518`, `c844f58`). Compiled graphs fit
 a 20-member ensemble that plain graphs could not
 ([compile](2026-10-19-torch-compile-backbone.md#a-graph-sized-ensemble)); the FP16 backbone took
 another 0.8–1.0 GiB off that ensemble's peak, with predictions within 0.002. Never done: a
@@ -46,7 +46,7 @@ Kaggle image change.
   about 270 s (273.3 s for the code it held) against 429.5 s for production code, with prepared
   images bit-identical to production
   ([profile](2026-09-22-kaggle-x4-startup-and-gpu-preparation.md)). The branch lived in the worktree
-  `../knee-inference-opt`, based on `ab49830`, and was never merged or committed as such; its
+  `../knee-inference-opt`, based on `0afa93d`, and was never merged or committed as such; its
   pieces reached main through the later steps.
   - *Retrain-free part:* torch-free coordinator, index built during imports, loader workers forked
     before model load at niceness 10, blocking CUDA sync, CUDA graph for the backbone chunk, the

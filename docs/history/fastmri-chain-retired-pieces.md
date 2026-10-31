@@ -9,7 +9,7 @@ adopted recipe is pretraining on fastMRI + OAI pseudo-labels, then Kaggle-only s
 **Recovering the code:** the removed code was never committed. The full uncommitted state just
 before the removal is in the main checkout at
 `outputs/archive/removed-non-adopted-20261023/`: `worktree-diff-before-removal.patch` (tracked
-files, against `5bb5cd2`) and `untracked-before-removal.tgz` (the configs and other new files).
+files, against `c844f58`) and `untracked-before-removal.tgz` (the configs and other new files).
 
 ## Joint training with external batches
 

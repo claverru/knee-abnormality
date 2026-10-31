@@ -22,7 +22,7 @@ recipe trained twice (campaign build and main) differs by 0.0008 at ×4.
   [learnable-views campaign](../../../../autoresearch/campaigns/learnable-views/INDEX.md).
 - **Build, checks, the runs before the campaign and two reviews of its first 33 runs:**
   [build notes](../../../../autoresearch/campaigns/learnable-views/build-notes.md).
-- **Code:** branch `view-optimisation`, commit `b290da6` (off `8ef12dc`); it is not on main.
+- **Code:** branch `view-optimisation`, commit `b290da6` (off `b513f0c`); it is not on main.
 - **Artifacts:** `outputs/autoresearch/learnable-views/` (state, and per run under
   `experiments/<run>/` the frozen source, `changes.diff`, config, logs, predictions and
   comparison), `outputs/analysis/l/learnable-views-review-20261003/` (review tables).

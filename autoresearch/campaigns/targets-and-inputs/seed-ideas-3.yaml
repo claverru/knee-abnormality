@@ -13,11 +13,11 @@ ideas:
     open. It has never run beside the routed shared OA head, which arrived a day after the removal.
     PF OA lost in the campaign's first three runs. Guess, low: -0.0005 to +0.001 macro, PF OA first.
   mechanism: >-
-    The code is in git, in the parent of the commit that removed it: 5145374^ (the removal itself is
-    `git show 5145374 -- src/knee_abnormality/modeling/model.py src/knee_abnormality/modeling/spatial_tokens.py
+    The code is in git, in the parent of the commit that removed it: 3413775^ (the removal itself is
+    `git show 3413775 -- src/knee_abnormality/modeling/model.py src/knee_abnormality/modeling/spatial_tokens.py
     src/knee_abnormality/training/lightning.py`; every removed line of that diff that names the
     detector, anterior_axis, trusted_geometry or patient_y is the detector). Read
-    `git show 5145374^:src/knee_abnormality/modeling/model.py`: lines 201 to 207 build it, lines 415
+    `git show 3413775^:src/knee_abnormality/modeling/model.py`: lines 201 to 207 build it, lines 415
     to 441 apply it, and the region inputs are built where medial_axis is (search anterior_axis and
     trusted_geometry). Restore it unchanged in what it computes: one linear detector without bias on
     the tokens (xavier start, created under torch.random.fork_rng so no other initialization moves);
@@ -50,11 +50,11 @@ ideas:
   implementation: >-
     Follow the environment paragraph of the developer instructions. A source change in modeling/model.py,
     modeling/spatial_tokens.py and training/lightning.py, with no new configuration option. Port the
-    removed lines from 5145374^ into today's code by hand, since the files have changed since: the
+    removed lines from 3413775^ into today's code by hand, since the files have changed since: the
     region inputs go where the token geometry is built in _encode_crops, the correction goes at the
     end of _attention_pool, and the entry oa_shared_detector_regions returns to
     SPATIAL_TOKEN_IDENTITY with its old value. From the old lightning.py restore only the logging of
-    the three scales and of the weight norm at the end of the epoch (5145374^ lines 499 to 520), not
+    the three scales and of the weight norm at the end of the epoch (3413775^ lines 499 to 520), not
     the per-step activity logging (lines 727 to 770): the contract allows no new diagnostics in the
     training step. Pass medial_axis from the original definition even where today's code reads the
     side from the frame; if the middle slice's patient map is not available for a view, say which and
@@ -84,7 +84,7 @@ ideas:
     get no route: their attention runs over every allowed token of the study, with no routing weight,
     no position prior of the shared "oa" kind and no knee-level term, as before 2026-10-07. The
     detector of the seed oa-detector-beside-the-shared-head is then added to their three logits,
-    restored from the same commit in the same way (5145374^, model.py lines 201 to 207 and 415 to
+    restored from the same commit in the same way (3413775^, model.py lines 201 to 207 and 415 to
     441; original regions from knee_side_sign, knee_center_x_mm, knee_center_y_mm and the patient
     map; scales starting at zero). The meniscus targets keep the shared "meniscus" channel and their
     routes; the frame, the maps and every other label are untouched. The soft-tissue read that is

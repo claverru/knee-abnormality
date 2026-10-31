@@ -42,7 +42,7 @@ Drawing: the grid at 224 and 225 px (`outputs/analysis/c/centred-token-grid/toke
 ResNet-18 recipe with the anatomy map and posed crops, fold 1 of `all_5fold_scanner_v2`, seed
 1110484336, ten epochs, `trainer.report_attribute_loss_weight: 0`. The reference is the
 anatomy-recipe campaign's incumbent `report-attribute-loss-off-2`, the same recipe at 224 px.
-Worktree `side-routed-heads` at `64e905f` plus uncommitted changes; each run's
+Worktree `side-routed-heads` at `93ebe70` plus uncommitted changes; each run's
 `source_snapshot.zip` holds its code. Runs under `outputs/training/`; checkpoints deleted except
 the reference's and the two submitted bundles'.
 

@@ -51,14 +51,14 @@ with the result of each. Do not propose them again.
 ## Sibling runs for the run report
 
 The 12 same-fold runs of the old recipe that give the per-target noise range
-(`--siblings` of `609a489:scripts/tools/report_side_routing.py`): every
+(`--siblings` of `030a583:scripts/tools/report_side_routing.py`): every
 `outputs/autoresearch/fixes-and-removals/experiments/*/training` with a
 `fold_1/validation_predictions.csv`, except `slab-rule-and-positive-std-requeue-*`, which is the
 old reference. Their ×4 macro spans 0.9234 to 0.9248.
 
 ## Lineage marks for the run report
 
-`--lineage` of `609a489:scripts/tools/report_side_routing.py` starts as the fourth and the fifth run
+`--lineage` of `030a583:scripts/tools/report_side_routing.py` starts as the fourth and the fifth run
 (`outputs/training/20261005-202001-side-routed-run4`,
 `outputs/training/20261005-205251-side-routed-run5`); the keeper appends every adopted run's
 training directory. Adopted so far: `outputs/autoresearch/side-routing/experiments/separate-oa-frame-with-knee-level-term-20261006T020231Z-52418f08/training` (2026-10-06). `--base` is the incumbent's training directory.

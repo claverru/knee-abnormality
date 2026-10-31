@@ -12,7 +12,7 @@ is chosen by end-to-end effect rather than by the size of the stage it touches. 
 to ship, and what it has to audit, stays in [candidates](../backlog/untried-ideas.md#inference-loading); this document only ranks
 them.
 
-Produced 2026-09-19 from an external optimization review of revision `f4c340b`, reconciled against
+Produced 2026-09-19 from an external optimization review of revision `6906695`, reconciled against
 the [post-cluster profile](../inference/profiling/2026-09-18-kaggle-x4-profile-after-cpu-cluster.md) and two
 local measurements recorded below.
 
@@ -95,7 +95,7 @@ the combined arm comes back ambiguous or negative.
 
 ## Measurement behind rank 1
 
-2026-09-19, local box, revision `f4c340b`. 120 real train frames across five source shapes
+2026-09-19, local box, revision `6906695`. 120 real train frames across five source shapes
 (256², 400², 512², 640², 704²), payloads pre-loaded so no I/O is timed, each arm run seven times and
 the best taken. **Median retained source area 0.686** (mean 0.704, range 0.545–0.774).
 
@@ -121,7 +121,7 @@ A useful side result: the **existing column band's strided operand costs nothing
 
 ## Measurement behind rank 5
 
-2026-09-19, local box, NumPy 2.0.2, revision `f4c340b`. Twenty-four real train acquisitions built
+2026-09-19, local box, NumPy 2.0.2, revision `6906695`. Twenty-four real train acquisitions built
 through the repository's own `read_header`, `read_frame` and `resample_crop` at `spacing_mm` 0.625
 and `image_size` 224, then quantiled with the shipped `_linear_quantiles` and with a formulation that
 replaces the single four-`kth` `partition` by two single-`kth` partitions plus two tail reductions.

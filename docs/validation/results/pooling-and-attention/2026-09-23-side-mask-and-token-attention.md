@@ -5,7 +5,7 @@ Two fold-0 training runs against `k05-clean` (×4, τ 1 macro 0.902760), both at
 [knee-geometry campaign](../../../../autoresearch/campaigns/knee-geometry/INDEX.md), which adopted a
 meniscus-only mask with a half-knee loss. They ran on the unmerged `sibling-masking` and
 `token-attention` branches, retired 2026-09-24; their code is preserved as patches that apply to
-`d914079`.
+`61c00b9`.
 
 ## Trained side mask (`side-mask`)
 

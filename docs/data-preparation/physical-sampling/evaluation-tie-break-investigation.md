@@ -102,7 +102,7 @@ rule itself.
 ## Follow-up measurements (2026-09-17)
 
 Measured, CPU only, on fold 0 at the validation budget. Script:
-`followup_coverage.py` (`041bd16:docs/history/series-and-sampling-sources/tiebreak-design/followup_coverage.py.txt`). Tables:
+`followup_coverage.py` (`c48eae2:docs/history/series-and-sampling-sources/tiebreak-design/followup_coverage.py.txt`). Tables:
 `outputs/analysis/s/series-filtering-20260917/followup/tiebreak_coverage.json` and
 `tiebreak_coverage_series.parquet`. The re-run reproduces the proposed rule's triplets in all 661
 slots.
@@ -207,7 +207,7 @@ CPU, [snapshot scripts](../../history/sources/series-and-sampling/README.md#dete
 
 Inference only, RTX 3090, bf16, batch size 8 in dataset order, fold 0 (904 studies), new code with
 the preprocessing-identity check bypassed in the scratch script only (
-`rescore.py` (`041bd16:docs/history/series-and-sampling-sources/deterministic-selection/rescore.py.txt`); `outputs/analysis/d/deterministic-selection-20260917/rescore/`
+`rescore.py` (`c48eae2:docs/history/series-and-sampling-sources/deterministic-selection/rescore.py.txt`); `outputs/analysis/d/deterministic-selection-20260917/rescore/`
 `rescore.json` and per-checkpoint predictions). "Saved" is each run's selected-epoch validation
 (its own training seed decided the old ties); the saved prediction files reproduce the selected
 scores. Paired report-group bootstrap, 2,000 draws.

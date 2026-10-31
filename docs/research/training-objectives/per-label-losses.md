@@ -49,7 +49,7 @@ objective survey should not override the trusted per-label results or our strong
 ## Fit to our model
 
 Code inspected on 2026-09-20, working tree based on
-`dc3f410fe53c0d33995e8582ad7f6be3cdc9c69d`, with unrelated local changes present:
+`2e15e8c94a17748132cb10239c7bca0702d053a9`, with unrelated local changes present:
 
 - [Training](../../../src/knee_abnormality/training/lightning.py) uses masked soft-target BCE.
   [Class balancing](../../modeling/supervision.md#fixed-class-balanced-bce) is enabled in

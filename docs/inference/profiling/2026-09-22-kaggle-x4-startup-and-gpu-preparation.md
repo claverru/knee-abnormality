@@ -3,8 +3,8 @@
 Kaggle A/B runs of the full inference command on 2026-09-22, taking **429.5 s to about 270 s
 (−37%)** with prepared images bit-identical to production. Supersedes the
 [post-CPU-cluster profile](2026-09-18-kaggle-x4-profile-after-cpu-cluster.md) as the runtime
-picture of 2026-09-22. The code was developed on branch `inference-opt` (based on `ab49830`) and
-reached `main` as commit `4d23276`.
+picture of 2026-09-22. The code was developed on branch `inference-opt` (based on `0afa93d`) and
+reached `main` as commit `d399752`.
 
 Every run: two T4s, four vCPUs (two physical cores), 1,300 studies (fold 0 of
 `all_5fold_scanner_v1` padded from other folds), ×4, τ 0.75, batch 4 per GPU, 16 loader workers,

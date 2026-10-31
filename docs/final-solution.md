@@ -101,7 +101,7 @@ studies in both. v3 raised the gen-1 teachers' gold AUC by +0.0067 but tied v2 o
 | TTA | mirror (study-level reflection) |
 | Batch, workers | 2 per device, 8 in total |
 | Backbone mode | eager (no CUDA graph; from the bundle name `v2v3-gen2gen3-x60-eager-x4-tau04eff-tta`), precision by the manifest's automatic policy (FP16 on the T4) |
-| Bundle | `outputs/submission/exports/v2v3-gen2gen3-x60-eager-x4-tau04eff-tta` (manifest only locally), built 2026-10-20 from code at `6f78b4f` with local modifications |
+| Bundle | `outputs/submission/exports/v2v3-gen2gen3-x60-eager-x4-tau04eff-tta` (manifest only locally), built 2026-10-20 from code at `a51776a` with local modifications |
 
 The bundle was assembled from earlier bundles' members. The same 60 members export directly from
 their selected checkpoints, one per run, at an effective τ of 0.4 for every member (the export's

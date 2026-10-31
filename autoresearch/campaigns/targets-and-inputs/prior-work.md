@@ -5,7 +5,7 @@ Fold 2 of `all_5fold_scanner_v2`, seed 1110484336, one run per design unless sai
 ## The reference
 
 Fold 2 of `outputs/training/rn50-aligned-mixing-folds-0-2`: `configs/refined-resnet50.yaml` as on
-main at `0bd598f` (the soft-tissue line, the sagittal fluid detail view, aligned contrast mixing,
+main at `ab7854a` (the soft-tissue line, the sagittal fluid detail view, aligned contrast mixing,
 labels `rebuild_state_v2`, teacher share 0). **×1 0.928460 (epoch 10 of 10), ×4 0.937000, 2,691 s
 of training** (about 267 s per epoch), 82 s of ×4 prediction, peak GPU memory 16.2 GB. The same
 run holds folds 0 and 1 (×4 0.940906 and 0.933392)

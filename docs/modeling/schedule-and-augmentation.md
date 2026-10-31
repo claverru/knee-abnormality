@@ -53,8 +53,8 @@ with per-series parameters and seeded draws from the shared implementation.
 
 EMA and SWA (`optimizer.weight_averaging`, 2026-09-16) were removed from the code on 2026-10-14
 after no recipe used them; the implementation and its design notes are at
-`7770ce9:src/knee_abnormality/training/lightning.py` and
-`7770ce9:docs/modeling/schedule-and-augmentation.md#weight-averaging`. The pre-clip total gradient
+`6f847a0:src/knee_abnormality/training/lightning.py` and
+`6f847a0:docs/modeling/schedule-and-augmentation.md#weight-averaging`. The pre-clip total gradient
 norm that shipped with them is still logged as `grad_norm` from `on_before_optimizer_step`; it draws
 no randomness and does not clip.
 

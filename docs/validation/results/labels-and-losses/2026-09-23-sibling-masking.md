@@ -12,7 +12,7 @@ the sibling hidden. The training-time test, `side-mask`, is recorded in the
 
 - **Checkpoint:** `k05-clean` fold 0, epoch 8, ×4 images, attention temperature 1, split
   `all_5fold_scanner_v1`, combined labels. Scored on the `sibling-masking` worktree code
-  (main at `d914079`). The checkpoint predates the oblique-code removal, so the script skips the
+  (main at `61c00b9`). The checkpoint predates the oblique-code removal, so the script skips the
   preprocessing-identity check; the intact arm reproduces the saved predictions to 5.5e-5.
 - **Side:** each token's signed medial position, the side-resolved `medial_axis` that anatomical
   attention already uses. Tokens within ±10 mm of the study centre (the midline band) stay visible

@@ -1,7 +1,7 @@
 # Backbone families 2: prior work
 
 Measured 2026-10-17 on the CPU (torch 2.10, timm 1.0.26) with the official weights; no training yet.
-The campaign runs on main's Kaggle-aligned environment (a89bb1c: Python 3.13.15, torch 2.11, timm
+The campaign runs on main's Kaggle-aligned environment (1bb495b: Python 3.13.15, torch 2.11, timm
 1.0.29); FocalNet-T's backbone outputs are bit-identical between the two on the CPU in float32.
 Tags: measured here, from source (linked), or a guess.
 
@@ -15,7 +15,7 @@ training 4,067 s locally, peak 21.5 GiB (23.0 GB). Its recipe is `configs/focaln
 and patience twelve (`configs/campaign.yaml`, uncommitted; main's config trains ten).
 
 Its source snapshot is the first round's worktree before the EfficientViT-B2 merge. Against main
-(485e779) the training code differs only by EfficientViT-B2 additions (`efficientvit` branches in
+(792249b) the training code differs only by EfficientViT-B2 additions (`efficientvit` branches in
 `model.py`, `backbone_stages(backbone, stochastic_depth)`, the EfficientViT mapping) and harness files;
 no FocalNet-T path changed (measured: `diff` of the extracted snapshot and main). Declared as reference
 exceptions: `paths.label_manifest` (the old worktree's path) and `preprocessing_identity.sources_sha256`.
@@ -171,7 +171,7 @@ unnormalised (no softmax) modulation, on a value projection; pre-norm blocks wit
 - **The DCNv4 op is CUDA only:** no CPU kernel and no prebuilt wheel (PyPI holds source distributions only;
   no releases). `import DCNv4` fails without a GPU (it reads the device's compute capability at import;
   7.5 and 8.6 are listed). It needs nvcc matching torch's CUDA 12.x, `TORCH_CUDA_ARCH_LIST` 8.6 here and 7.5
-  for Kaggle's T4s, and one build per torch version. Since main a89bb1c the local environment is
+  for Kaggle's T4s, and one build per torch version. Since main 1bb495b the local environment is
   Kaggle's (Python 3.13, torch 2.11), so one wheel built for compute 7.5 and 8.6 serves both: the
   private notebook `claverru/knee-kernel-wheels-build` builds it in Kaggle's image. nvcc is not
   installed here. A search on 2026-10-17 found no usable build: PyPI holds only source distributions; the TestPyPI

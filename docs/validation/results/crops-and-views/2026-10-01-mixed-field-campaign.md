@@ -121,7 +121,7 @@ User decision, 2026-10-01, on the public pair S90 against S86:
 ## Control on the adopted recipe
 
 `rn18-field-120-control` (`outputs/training/rn18-field-120-control`), `configs/resnet50.yaml` at
-`6a99439`, fold 0, seed 1533697213, trained on 2026-10-01: the first run to combine the 120 mm
+`d940dda`, fold 0, seed 1533697213, trained on 2026-10-01: the first run to combine the 120 mm
 field and middle-slice augmentation with the plane-contrast readouts and no anatomical bias.
 
 | Run | Recipe | ×4 macro | Δ of the control (80%; 95%) | Training s | Public |

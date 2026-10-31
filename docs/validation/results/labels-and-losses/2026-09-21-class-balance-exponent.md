@@ -15,7 +15,7 @@ All five runs are ReXNet-200 on `all_5fold_scanner_v1` fold 0, trained on
 deterministic), for ten epochs. The only difference between them is the weighting.
 `optimizer.warmup_start_ratio: 0.1` equals the previously hard-coded warm-up start, so the
 control is unchanged. The [supervision section](../../../modeling/supervision.md#fixed-class-balanced-bce) owns the
-formula. The candidates were trained from the uncommitted working tree on `79d5ba8`; each run's
+formula. The candidates were trained from the uncommitted working tree on `e0f8a82`; each run's
 `source_snapshot.zip` captures it. `k_025` and `k_075` were added on 2026-09-22.
 
 | Run | Weighting | Best epoch | Best / last macro AUC (×1, τ 1) | Submission | Public |

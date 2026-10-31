@@ -10,11 +10,11 @@ requires the corresponding original run or analysis source bundle and saved
 configuration, including its old dataset and checkpoint contract; copying one
 file into the current package does not reproduce that environment.
 
-- Original modeling description (`f076a09:docs/history/regional-sources/modeling-before.md.txt`)
-- Regional module (`f076a09:docs/history/regional-sources/spatial_pooling.py.txt`)
-- Coverage measurement (`f076a09:docs/history/regional-sources/measure_fusion_coverage.py.txt`)
-- Runtime profile (`f076a09:docs/history/regional-sources/profile_spatial_fusion.py.txt`)
-- Regional usage diagnosis (`f076a09:docs/history/regional-sources/diagnose_fusion_usage.py.txt`)
+- Original modeling description (`ecdc9cd:docs/history/regional-sources/modeling-before.md.txt`)
+- Regional module (`ecdc9cd:docs/history/regional-sources/spatial_pooling.py.txt`)
+- Coverage measurement (`ecdc9cd:docs/history/regional-sources/measure_fusion_coverage.py.txt`)
+- Runtime profile (`ecdc9cd:docs/history/regional-sources/profile_spatial_fusion.py.txt`)
+- Regional usage diagnosis (`ecdc9cd:docs/history/regional-sources/diagnose_fusion_usage.py.txt`)
 
 Measurements and original artifact locations remain in
 [validation](../../../validation/results/pooling-and-attention/2026-09-13-per-plane-fusion-usage-diagnosis.md) and

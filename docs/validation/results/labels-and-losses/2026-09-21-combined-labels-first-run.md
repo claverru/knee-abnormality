@@ -16,7 +16,7 @@ fold changed together, so this is one submission, not an isolated label effect.
   [combined labels](../../../public-labels/combined-labels.md) on
   [`all_5fold_scanner_v1`](../../validation-splits.md#superseded-splits), fold 0, seed 2263738815. Ten epochs;
   epoch 9 selected at 0.90205.
-- Artifacts: `outputs/training/fold0-combined-scanner/`, built from source at `a960863` plus
+- Artifacts: `outputs/training/fold0-combined-scanner/`, built from source at `e808b38` plus
   uncommitted label and split changes, captured in `source_snapshot.zip`.
 - Training took 1,576 s, with 21.0 GB peak allocated GPU memory.
 

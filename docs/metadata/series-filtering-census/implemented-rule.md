@@ -19,7 +19,7 @@ Preprocessing identity `ranked_filtered_physical_gaussian_overlap_spatial_tokens
   implemented (evidence above).
 
 Verification, CPU, all 24,386 series of the 4,407 training and 3 example-test studies (
-`index_census.py` (`041bd16:docs/history/series-and-sampling-sources/deterministic-selection/index_census.py.txt`); `outputs/analysis/d/deterministic-selection-20260917/`
+`index_census.py` (`c48eae2:docs/history/series-and-sampling-sources/deterministic-selection/index_census.py.txt`); `outputs/analysis/d/deterministic-selection-20260917/`
 `index_report.json`, `index_series.parquet`, `index_studies.parquet`):
 
 | Check | Result |
@@ -41,7 +41,7 @@ orientation and frame-of-reference UID, and the copy check compares only the mid
 census measures what those omissions let through on the training data.
 
 Method: the loader's own `index_series`, `non_knee_coils`, `superseded_series`, `relabelled_slots`
-and `exact_copies` in the `clean_series` order, on `configs/resnet50.yaml` at `ca0f91c`; for each
+and `exact_copies` in the `clean_series` order, on `configs/resnet50.yaml` at `d9b3642`; for each
 deleted series, the volume-centre offset to the series kept from its group, the header
 differences, and a pixel comparison of every frame. CPU only, 58 s with 6 workers.
 

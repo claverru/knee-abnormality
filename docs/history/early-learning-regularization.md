@@ -36,7 +36,7 @@ reproduce `evaluation.metrics` exactly on the unweighted draw.
   seeds.
 
 **Artifacts:** `outputs/analysis/e/elr-per-label-20260924/` (`elr_per_label.py`,
-`elr_per_label.json`), computed on 2026-09-24 at commit `70a9a24`.
+`elr_per_label.json`), computed on 2026-09-24 at commit `d5b6244`.
 
 ### Against `k05-clean`
 

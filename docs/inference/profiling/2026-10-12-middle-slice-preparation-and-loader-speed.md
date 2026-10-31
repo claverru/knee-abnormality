@@ -23,7 +23,7 @@ all three channels as before.
 
 ## Parity
 
-Old code at `0bd598f` against the changes, main ResNet-50 recipe, fold 1 of `all_5fold_scanner_v2`:
+Old code at `ab7854a` against the changes, main ResNet-50 recipe, fold 1 of `all_5fold_scanner_v2`:
 every tensor and metadata field of every batch hashed and compared.
 
 | Pass | Batches | Studies | Differing fields |

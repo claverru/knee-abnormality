@@ -193,7 +193,7 @@ all 126 installed packages compatible.
 
 Checks completed on 2026-09-09 and 2026-09-10, before the Lightning installation: the original 13
 Kaggle-reference pins matched the installed versions; a smoke script (later removed from the
-repository, last in commit `fc90227`) passed a Polars Parquet round trip, synthetic uncompressed DICOM
+repository, last in commit `b2d9286`) passed a Polars Parquet round trip, synthetic uncompressed DICOM
 decoding, scikit-learn scoring, a timm ResNet-18 BF16 forward/backward pass, an AdamW update and
 TorchVision CUDA NMS on the RTX 3090, with random weights and synthetic targets; and
 `uv run --locked kaggle --version` reported 2.0.2. These checks did not validate real MRI

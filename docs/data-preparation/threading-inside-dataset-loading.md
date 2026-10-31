@@ -40,7 +40,7 @@ also set to one. The calling process uses 16 PyTorch threads.
 
 The profiler is historical since the 2026-09-22 row-trimmed reads: its threaded arm patches
 `read_frame`, which the native decode path no longer calls, so run it against the source of
-`ab49830` or earlier. It subclasses the dataset at `_decode_series` and leaves production loading
+`0afa93d` or earlier. It subclasses the dataset at `_decode_series` and leaves production loading
 unchanged. `--decode-threads` threads whole `decode_slice` calls, which is more than the shipped
 change; `--read-threads` is the shipped form, prefetching payloads on a pool with `read_frame`'s
 validation and decoding serially (the 2026-09-18 cold comparison is in

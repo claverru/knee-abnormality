@@ -7,8 +7,8 @@ own macro minus the kept run's.
 ## The control
 
 `outputs/training/resnet50-silver-fold2`: `configs/resnet50.yaml` with only `validation.folds`
-overridden to `[2]`, trained 2026-10-14 from clean commit `9a93087`; ×4 0.937820, best epoch 9 of
-10, training 2,617 s, peak 16.4 GB. Its input config equals `configs/resnet50.yaml` at `485e779`.
+overridden to `[2]`, trained 2026-10-14 from clean commit `f00eafb`; ×4 0.937820, best epoch 9 of
+10, training 2,617 s, peak 16.4 GB. Its input config equals `configs/resnet50.yaml` at `792249b`.
 The commits since add the FocalNet-T and EfficientViT-B2 adapters and the autoresearch preflight;
 the backbone-families campaign recorded that they leave the ResNet-50 path unchanged. Declared
 exceptions: the machine paths and `preprocessing_identity.sources_sha256`.
@@ -100,7 +100,7 @@ Multiply-adds per image (timm, measured): ResNet-50 4.09 GMAC at 224 px; ResNet-
 and 3.0 at 368 px. Per study the control spends about 143 ResNet-50 forward equivalents: 111 for
 training (37 images, forward and backward) and 32 for the no-gradient first look. The
 Refined-RadImageNet ResNet-10t (`resnet10t.c3_in1k`, `refined_radimagenet_resnet10t.pth`, sha256
-`f5219dff…a079ab`) is in the torch hub cache; its registry entry was removed at `94868bf`.
+`f5219dff…a079ab`) is in the torch hub cache; its registry entry was removed at `e66eaa8`.
 
 ## Coverage
 

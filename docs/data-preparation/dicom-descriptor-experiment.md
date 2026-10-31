@@ -71,6 +71,6 @@ superseded by the corrected fixtures with explicit dispatch assertions. No
 timing code changed for that correction. The starting source was already dirty;
 the saved source snapshots and manifest hashes identify the implementation.
 The `dicom-suite` and `dicom-audit` modes of the removed dataloader benchmark
-(`aec290d:scripts/adhoc/benchmark_dataloader_optimizations.py`) ran them. The current baseline uses `all_5fold_v3`; use the saved
+(`277a8a2:scripts/adhoc/benchmark_dataloader_optimizations.py`) ran them. The current baseline uses `all_5fold_v3`; use the saved
 `workload.yaml` with this saved cohort, or generate a new matched cohort when
 benchmarking the current split.

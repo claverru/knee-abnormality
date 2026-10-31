@@ -8,9 +8,9 @@ stayed.**
 
 ## Setup
 
-- **Pseudo-labels:** the five teachers of main's recipe at `288e50a`, ×4, τ 0.9, mirror TTA, 41
-  minutes; `/workspace/predictions/fastmri/rn50-main-288e50a-5fold-x4-tau09-tta/` (scripts in
-  `source/`) and `data/labels/prepared/fastmri-rn50-main-288e50a-x4-tau09-tta/`. Against the first
+- **Pseudo-labels:** the five teachers of main's recipe at `8012575`, ×4, τ 0.9, mirror TTA, 41
+  minutes; `/workspace/predictions/fastmri/rn50-main-8012575-5fold-x4-tau09-tta/` (scripts in
+  `source/`) and `data/labels/prepared/fastmri-rn50-main-8012575-x4-tau09-tta/`. Against the first
   round, same study and fold: correlation 0.978 to 0.995 per label, mean absolute difference 0.015
   to 0.026 (the spread between teachers inside one round is 0.018 to 0.030).
 - **Averaged labels (user decision):** `training_table_averaged.parquet`, the mean of the five

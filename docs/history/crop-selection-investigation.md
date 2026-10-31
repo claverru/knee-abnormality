@@ -14,7 +14,7 @@ at a fixed field of view is deferred to the
 The original rationale is in the [implementation plan](crop-selection-plan.md). Documentation
 snapshots, source archives and retired scripts are listed in the
 [historical crop-selection sources](sources/crop-selection/README.md), including the last
-`docs/ongoing.md` (`f076a09:docs/history/crop-selection-sources/ongoing.md.txt`) with every open option in full.
+`docs/ongoing.md` (`ecdc9cd:docs/history/crop-selection-sources/ongoing.md.txt`) with every open option in full.
 
 ## Goal
 
@@ -73,14 +73,14 @@ The runs differed as follows:
   - *Conditioning:* a zero-initialised label FiLM at ReXNet-200's `features.10`.
 - **shared crops:** every label pooled all 24 crops, FiLM was removed, and the attention prior
   was retired. The full recipe and shape diagram are in the
-  shared-crops snapshot (`f076a09:docs/history/crop-selection-sources/active-spatial-token-model.md.txt`).
+  shared-crops snapshot (`ecdc9cd:docs/history/crop-selection-sources/active-spatial-token-model.md.txt`).
 
 ### Learned zoom
 
 Candidate run 0 of the glimpse plan, implemented and trained on 2026-09-16. The full recipe,
 profile and shape diagram are in the
-learned-zoom snapshot (`f076a09:docs/history/crop-selection-sources/learned-zoom-active-spatial-token-model.md.txt`)
-and its shape diagram (`f076a09:docs/history/crop-selection-sources/learned-zoom-model-shapes.md.txt`).
+learned-zoom snapshot (`ecdc9cd:docs/history/crop-selection-sources/learned-zoom-active-spatial-token-model.md.txt`)
+and its shape diagram (`ecdc9cd:docs/history/crop-selection-sources/learned-zoom-model-shapes.md.txt`).
 
 - **Canvases:** 360 px at 0.4167 mm (150 mm). The scout read a 300 px antialiased downsample.
 - **Context:** one centred 336 px (140 mm) window per canvas, read at 160 px (0.875 mm, 5×5
@@ -180,7 +180,7 @@ These are single-seed fold-0 results.
 ## Options not pursued
 
 When the investigation stopped, these were open hypotheses with no measured support. The
-ongoing snapshot (`f076a09:docs/history/crop-selection-sources/ongoing.md.txt`) has their full design notes, costs and
+ongoing snapshot (`ecdc9cd:docs/history/crop-selection-sources/ongoing.md.txt`) has their full design notes, costs and
 risks.
 
 | Option | Idea |
@@ -212,5 +212,5 @@ the gated coarse pool, a study-dependent gate and a soft per-label bias.
   took about 200 s for crop224 and per-label, 234 s for label-private, 237 s for shared crops and
   246–262 s for learned zoom.
 - **Backbone costs:** the learned-zoom budget, scout delta formula and scout code requirements
-  are in the backbone-swap snapshot (`f076a09:docs/history/crop-selection-sources/learned-zoom-backbone-swaps.md.txt`).
+  are in the backbone-swap snapshot (`ecdc9cd:docs/history/crop-selection-sources/learned-zoom-backbone-swaps.md.txt`).
   The scout survey is in [scout backbone candidates](../research/backbones-and-pretraining/scout-backbones.md).

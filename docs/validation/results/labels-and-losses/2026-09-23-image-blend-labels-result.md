@@ -82,7 +82,7 @@ Fold-0 class-balance weights (k = 0.5) shift mildly:
 ## Fold-0 result
 
 Run `outputs/training/image-blend` was trained on the `label-grades` worktree. Its recipe was
-`k05-clean`'s (`def54f9`, seed 2263738815, k = 0.5, no oblique groups) with only
+`k05-clean`'s (`5197eb4`, seed 2263738815, k = 0.5, no oblique groups) with only
 `labels.source: image_blend_v1` and its manifest changed. It selected epoch 9, trained in 1,592 s,
 and scored 0.904133 at ×1 and 0.906294 at ×4.
 
@@ -126,7 +126,7 @@ All three fold-0 numbers are upper bounds. The teachers trained on studies that
   `oblique_tilt_deg` field, and the preprocessing identity. `k05-clean` ran the main tree's
   uncommitted oblique code with the feature off, which follows `HEAD`'s code path.
 - **Log warnings:** the run's "preparation conditions" all come from the near-empty-frame guard added
-  with series cleaning (`b483140`). Every logged study was traced to a frame under 1% non-zero pixels.
+  with series cleaning (`aeb19b8`). Every logged study was traced to a frame under 1% non-zero pixels.
 
 ## Public result
 

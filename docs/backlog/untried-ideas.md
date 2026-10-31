@@ -95,7 +95,7 @@ records under `autoresearch/campaigns/`); hidden-test risks that were measured o
   ([public research](../research/competition-and-prior-art/public-research.md#validation-and-ensembling)).
   Cost: 1.56× the pixels at 280 px; the estimated 31 GB peak at batch 8 needs accumulation or
   activation checkpointing on a 24 GB GPU (the removed `model.checkpoint_backbone` is at
-  `7770ce9:src/knee_abnormality/modeling/model.py`); host memory:
+  `6f847a0:src/knee_abnormality/modeling/model.py`); host memory:
   [larger inputs](../modeling/training-runtime-and-memory.md#host-memory-with-larger-inputs).
 - **36 training triplets on the final recipe** (evidence-backed, one pair). On the RadImageNet
   ResNet-18, `data.study_slice_total` 26 → 36 gained +0.0018 at ×4 (0.927806 → 0.929586; 80%

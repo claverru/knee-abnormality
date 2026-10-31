@@ -29,10 +29,10 @@ continued as the [learnable-views campaign](../learnable-views/INDEX.md).
 
 ## Setup
 
-- **Branch and worktree:** `smart-crops` in `../knee-abnormality-smart-crops`, off `6a99439`.
+- **Branch and worktree:** `smart-crops` in `../knee-abnormality-smart-crops`, off `d940dda`.
 - **Reference:** `rn18-field-120-control` (`outputs/training/rn18-field-120-control`, ×4
   0.930666, 0.947 public as S92), the `configs/training.yaml` recipe in force, trained on 2026-10-01 from the main
-  checkout at `6a99439`: 120 mm, middle-slice augmentation, plane-contrast readouts, no anatomical
+  checkout at `d940dda`: 120 mm, middle-slice augmentation, plane-contrast readouts, no anatomical
   bias. Its `paths.label_manifest` and `paths.report_attribute_manifest` name the main checkout
   and are declared config exceptions.
 - **Budget:** range 0.5–1.5 of the reference's 1,149 s training time (575–1,724 s; user,

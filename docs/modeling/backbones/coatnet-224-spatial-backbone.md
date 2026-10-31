@@ -1,6 +1,6 @@
 # CoAtNet 224 spatial backbone
 
-**Removed from the code on 2026-10-14:** CoAtNet has no stage adapter and its mapping was deleted with the ReXNet and EfficientNet ones; the code is at `7770ce9:src/knee_abnormality/modeling/spatial_tokens.py`. The rest of this page describes it as it was.
+**Removed from the code on 2026-10-14:** CoAtNet has no stage adapter and its mapping was deleted with the ReXNet and EfficientNet ones; the code is at `6f847a0:src/knee_abnormality/modeling/spatial_tokens.py`. The rest of this page describes it as it was.
 
 These notes describe the [full-slice model](../current-model.md), which supports
 CoAtNet again since the restoration of 2026-09-16. The

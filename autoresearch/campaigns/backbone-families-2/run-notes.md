@@ -82,7 +82,7 @@ reading (not a campaign result): ResNet-50 + FocalNet-T SRF + FocalNet-T LRF 0.9
 
 ## After the campaign
 
-NextViT-S was merged on main as `configs/nextvit.yaml` (`318eba2`) and trained on folds 0, 1, 3 and
+NextViT-S was merged on main as `configs/nextvit.yaml` (`551427c`) and trained on folds 0, 1, 3 and
 4 with one seed per fold (451509333, 1514023685, 350704958, 1277371158; fold 2 used 1110484336) as
 `outputs/training/nextvit-silver-fold-{k}`: ×4 0.93819 (fold 0), 0.93127 (fold 1), 0.93469 (fold
 3); fold 4 was training when this was written.

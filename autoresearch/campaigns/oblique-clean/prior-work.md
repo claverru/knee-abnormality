@@ -24,8 +24,8 @@ outputs are in `outputs/analysis/a/acquisition-geometry-20260922/` unless stated
 ## Reference run
 
 The reference is `outputs/training/oblique-clean`, the oblique recipe retrained at seed 2263738815
-on the source with series cleaning (`b483140`) and the loader and inference speedups (`4d23276`,
-`9e0c3ee`). The speedups leave prepared images bit-identical
+on the source with series cleaning (`aeb19b8`) and the loader and inference speedups (`d399752`,
+`566e96a`). The speedups leave prepared images bit-identical
 ([parity](../../../docs/inference/profiling/2026-09-22-kaggle-x4-startup-and-gpu-preparation.md)); series
 cleaning changes which series some studies contain. Applied at prediction time only, on the
 `oblique-x4` checkpoint, the cleaning rules moved fold 0 by at most +0.00015

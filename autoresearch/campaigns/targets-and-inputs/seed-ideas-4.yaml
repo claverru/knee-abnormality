@@ -47,7 +47,7 @@ ideas:
     the cause is a guess. Guess: -0.0005 to +0.0005 macro.
   mechanism: >-
     In configs/training.yaml, trainer.scanner_confusion_weight becomes 0.1 (it is 0.0), the adopted
-    value (configs/training.yaml at commit 1f6d8ac). The head, its ramp and its step are in the code
+    value (configs/training.yaml at commit 14c2f33). The head, its ramp and its step are in the code
     (training/auxiliary/scanner_confusion.py and _scanner_confusion_step in training/lightning.py,
     built when the weight is above zero). L2-SP (optimizer.anchor_alpha_early and _late) is
     untouched. Nothing else changes.
@@ -115,8 +115,8 @@ ideas:
     weak, one pair. The routed heads now place these four labels by the knee frame, so the bias
     may add nothing. Guess: -0.0005 to +0.0005 macro.
   mechanism: >-
-    The code is in git at 609a489^, the last commit that still had it behind model.anatomical_bias:
-    `git show 609a489^:src/knee_abnormality/modeling/model.py`, lines 150 to 175 (the compartment
+    The code is in git at 030a583^, the last commit that still had it behind model.anatomical_bias:
+    `git show 030a583^:src/knee_abnormality/modeling/model.py`, lines 150 to 175 (the compartment
     signs and families and the parameter anatomical_log_strength, one log strength per family,
     zero start) and lines 373 to 377 (the term). Restore the term as it was: for Medial Meniscus,
     Lateral Meniscus, Medial OA and Lateral OA, sign * exp(log strength of the label's family) *
@@ -139,8 +139,8 @@ ideas:
   implementation: >-
     Follow the environment paragraph of the developer instructions. A source change in
     modeling/model.py and training/lightning.py with no new configuration option: the bias is on.
-    Port the lines from 609a489^ by hand, since _attention_pool has changed; from the old
-    lightning.py restore the per-epoch logging of the strengths (609a489^ lines 488 to 495). If
+    Port the lines from 030a583^ by hand, since _attention_pool has changed; from the old
+    lightning.py restore the per-epoch logging of the strengths (030a583^ lines 488 to 495). If
     the seed oa-detector-beside-the-shared-head has run, reuse its construction of the original
     medial_axis. Check on the CPU that the model builds without weights and that with the strengths'
     term multiplied by zero the logits equal the incumbent's code on one synthetic batch.

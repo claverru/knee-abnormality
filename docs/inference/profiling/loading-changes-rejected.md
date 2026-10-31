@@ -121,7 +121,7 @@ which two Kaggle runs showed and a third did not reproduce.
 - **Removing the unused `patient_maps` from the model hot path.** `prepare_series` builds them and
   `collate_studies` drops them, so they are genuinely dead weight for the model — but measured at
   0.01% of an item's CPU (68 tensors, 33,480 elements over 12 studies). Only
-  `scripts/adhoc/inspect_physical_preparation.py` (removed; last in commit `df4b6cd`) read them, so removing the field costs a script
+  `scripts/adhoc/inspect_physical_preparation.py` (removed; last in commit `06cea9e`) read them, so removing the field costs a script
   port and an identity bump for nothing.
 - **Trimming the diagnostics and sampling metadata carried on every batch.** Measured at 0.14 ms and
   0.22 MiB per batch of four studies, against 82.8 MiB of tensors in the same batch — 0.2% of the

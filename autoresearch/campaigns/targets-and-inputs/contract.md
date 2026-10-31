@@ -14,7 +14,7 @@ The development backbone is the ResNet-50 itself, because the ResNet-18's struct
 reach it ([prior work](prior-work.md)).
 
 The reference and first incumbent is fold 2 of `outputs/training/rn50-aligned-mixing-folds-0-2`
-(trained 2026-10-12 from main at `0bd598f`: `configs/refined-resnet50.yaml`, seed 1110484336, ten
+(trained 2026-10-12 from main at `ab7854a`: `configs/refined-resnet50.yaml`, seed 1110484336, ten
 epochs, aligned contrast mixing, usual labels, teacher share 0). Its scores and training time are
 in [prior work](prior-work.md).
 
@@ -52,7 +52,7 @@ values differ from this worktree's recipe and are declared as `reference_config_
 
 - `preprocessing_identity.sources_sha256` (a `reference_identity_exception`, added by the keeper
   on 2026-10-12 when the calibration paused on it, authorized by the user the same day): the
-  reference was trained at `0bd598f` and this worktree holds the loader changes of `c1d973b`,
+  reference was trained at `ab7854a` and this worktree holds the loader changes of `d293d0a`,
   which edit hashed preprocessing sources. Their recorded parity is zero differing fields over
   every training, validation and ×4 prediction batch of a fold
   ([profile](../../../docs/inference/profiling/2026-10-12-middle-slice-preparation-and-loader-speed.md#parity)).

@@ -16,7 +16,7 @@ against `k_05`).
 equals `k_05`'s except `model.stride16_fusion` and the byte-identical label-manifest path: fold 0 of
 `all_5fold_scanner_v1`, [combined labels](../../../public-labels/combined-labels.md), class-balanced
 BCE with k=0.5, seed 2263738815 (training is not deterministic), ten epochs. It was trained from
-the uncommitted working tree on `ab49830`, captured in `source_snapshot.zip`, and selected epoch 10
+the uncommitted working tree on `0afa93d`, captured in `source_snapshot.zip`, and selected epoch 10
 at ×1; the ×1 curve was still rising (0.8976 at epoch 9, 0.8988 at epoch 10), while `k_05` and
 `stride16` peaked at epoch 8.
 
@@ -100,7 +100,7 @@ Deep-branch dropout and per-scale heads tested it (below).
 `fusion-deepdrop25` added `model.deep_branch_dropout: 0.25` to `fusion-sum`: during training
 only, each study lost the resampled deep term in all its triplets with probability 0.25, without
 rescaling. Its configuration otherwise equals `fusion-sum`'s; it was trained from the uncommitted
-tree on `ab49830` with the dropout code added, selected epoch 10 at ×1, and took 1,591 s and
+tree on `0afa93d` with the dropout code added, selected epoch 10 at ×1, and took 1,591 s and
 21.1 GB. It scored 0.899699 at ×4 (0.895556 at ×1). The option was removed after this run.
 
 | Group | vs `fusion-sum` [95%] | vs `k_05` [95%] |
@@ -140,7 +140,7 @@ map kept its native 7×7 stride-32 tokens (49 per triplet) and the existing atte
 fine map's 196 stride-16 tokens got a separate head with its own embeddings, LayerNorm, attention,
 anatomical strength and readout, and the logit was the sum of both. Training added BCE on each
 head's own logits to BCE on the sum, weight 1 each; inference used the sum, with τ applied to both
-heads. It was trained from the uncommitted tree on `ab49830` (`source_snapshot.zip`), selected
+heads. It was trained from the uncommitted tree on `0afa93d` (`source_snapshot.zip`), selected
 epoch 10 at ×1 (0.899284; epochs 9–10: 0.8991, 0.8993), and took 1,642 s and 20.5 GB with 14.72M
 parameters. It scored 0.903023 at ×4.
 

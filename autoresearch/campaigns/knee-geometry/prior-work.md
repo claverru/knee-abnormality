@@ -37,7 +37,7 @@ marked with their source; hypotheses are marked as such.
   fallback; out-of-range series sample locally; token geometry no longer requires physical
   sampling. Implemented 2026-09-23 behind `data.robust_study_center` and removed uncommitted the
   same day; preserved as `outputs/analysis/r/robust-center-rescore-20260923/robust_center.patch`,
-  which applies cleanly to `d914079`. Its `identity.py` hunk must move into `RELIABILITY`, since
+  which applies cleanly to `61c00b9`. Its `identity.py` hunk must move into `RELIABILITY`, since
   `identity.py` is protected.
 - **Robust-centre gate** (measured 2026-09-23, `image-blend` epoch 8, ×4, τ 1, inference only):
   the refit rescues all 30 rejected fold-0 studies. Robust centre plus bias +0.00010 hard
@@ -103,7 +103,7 @@ Measured 2026-09-23 from headers, 4,410 studies
   remove sibling pixels from each token.
 - **Trained side mask, `side-mask`** ([result](../../../docs/validation/results/pooling-and-attention/2026-09-23-side-mask-and-token-attention.md#trained-side-mask-side-mask); 2026-09-23, `model.compartment_evidence: side_mask` on the
   `sibling-masking` branch, patch in
-  `outputs/analysis/s/side-mask-vs-k05-clean/side_mask.patch`, applies to `d914079`): the four
+  `outputs/analysis/s/side-mask-vs-k05-clean/side_mask.patch`, applies to `61c00b9`): the four
   compartment labels attend only to own-side tokens plus the ±10 mm band; unknown side or invalid
   geometry stays visible to both sides. Epoch 8 selected (×1 0.90191), 1,583 s, 20.9 GB.
   - Macro ×4 0.903969 against 0.902760, **+0.0012**, 80% [−0.0004, +0.0028], misses the rule;

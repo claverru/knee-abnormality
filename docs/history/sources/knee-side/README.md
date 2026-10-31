@@ -13,11 +13,11 @@ commit `ea19772`. They are historical records, not active entry points. The
 
 | Original path | Source snapshot | SHA-256 |
 |---|---|---|
-| Tracked changes to `src/`, `configs/baseline.yaml` (removed), `scripts/adhoc/analyze_physical_sampling.py` and `scripts/tools/diagnose_encoding_usage.py` | integration.patch.txt (`f076a09:docs/history/knee-side-sources/integration.patch.txt`) | `f191411fe06c68e0d3df44bc91cfb082d8828ade77f8f15bc9edc5eddfb997bd` |
-| `src/knee_abnormality/data/preprocessing/laterality.py` | laterality.py.txt (`f076a09:docs/history/knee-side-sources/laterality.py.txt`) | `c9df46e39d7621a4b887248fa46c46cf24348c42fa039f1e82b0b50157aeda34` |
-| `scripts/adhoc/audit_knee_side_policy.py` (removed) | audit_knee_side_policy.py.txt (`f076a09:docs/history/knee-side-sources/audit_knee_side_policy.py.txt`) | `3755b7c05f3078e7c3bd5797b7e3bda5687c472236af5a1f64882ff03ed10240` |
-| `knee-side-embedding-plan.md` | knee-side-embedding-plan.md.txt (`f076a09:docs/history/knee-side-sources/knee-side-embedding-plan.md.txt`) | `b91d187762b4d9fcff67333afcca7c29188c6eb08084ccf1dd1e6bb830e19eb4` |
-| `scripts/adhoc/analyze_knee_side_embedding.py` (removed) | analyze_knee_side_embedding.py.txt (`f076a09:docs/history/knee-side-sources/analyze_knee_side_embedding.py.txt`) | `2737f01f10687f3a3e7f7e8837547eb18eaaa6f725751ab9cdf4b25b5d744f09` |
+| Tracked changes to `src/`, `configs/baseline.yaml` (removed), `scripts/adhoc/analyze_physical_sampling.py` and `scripts/tools/diagnose_encoding_usage.py` | integration.patch.txt (`ecdc9cd:docs/history/knee-side-sources/integration.patch.txt`) | `f191411fe06c68e0d3df44bc91cfb082d8828ade77f8f15bc9edc5eddfb997bd` |
+| `src/knee_abnormality/data/preprocessing/laterality.py` | laterality.py.txt (`ecdc9cd:docs/history/knee-side-sources/laterality.py.txt`) | `c9df46e39d7621a4b887248fa46c46cf24348c42fa039f1e82b0b50157aeda34` |
+| `scripts/adhoc/audit_knee_side_policy.py` (removed) | audit_knee_side_policy.py.txt (`ecdc9cd:docs/history/knee-side-sources/audit_knee_side_policy.py.txt`) | `3755b7c05f3078e7c3bd5797b7e3bda5687c472236af5a1f64882ff03ed10240` |
+| `knee-side-embedding-plan.md` | knee-side-embedding-plan.md.txt (`ecdc9cd:docs/history/knee-side-sources/knee-side-embedding-plan.md.txt`) | `b91d187762b4d9fcff67333afcca7c29188c6eb08084ccf1dd1e6bb830e19eb4` |
+| `scripts/adhoc/analyze_knee_side_embedding.py` (removed) | analyze_knee_side_embedding.py.txt (`ecdc9cd:docs/history/knee-side-sources/analyze_knee_side_embedding.py.txt`) | `2737f01f10687f3a3e7f7e8837547eb18eaaa6f725751ab9cdf4b25b5d744f09` |
 
 To reproduce, check out `ea19772` in an isolated worktree, apply the patch, and restore
 `laterality.py` and the audit script. Alternatively, use `outputs/training/knee-side-embedding/source_snapshot.zip`,

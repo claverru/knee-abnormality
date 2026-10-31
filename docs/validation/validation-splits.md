@@ -49,7 +49,7 @@ Hitachi are pooled as `minor`, one English-reporting site
 `outputs/analysis/s/sharing-disagreement-20260914/study_headers.parquet`, whose hash
 `protocol.json` records. The table holds the headers of one representative series per study; its
 generator is `collect_headers` in
-`038c8a1:docs/history/sharing-sources/audit_sharing_disagreements.py.txt`. Regenerated from
+`9e5486c:docs/history/sharing-sources/audit_sharing_disagreements.py.txt`. Regenerated from
 `data/raw` on 2026-10-23 after a disk cleanup removed it, the file hash changed (Polars writer
 metadata) but `validation prepare` with seed 1533697213 on `rebuild_state_v2` reproduced every
 fold assignment and the manifest hash `4b4563c3…` of `all_5fold_scanner_v2`. Studies are grouped by SHA-256 of the report text with whitespace

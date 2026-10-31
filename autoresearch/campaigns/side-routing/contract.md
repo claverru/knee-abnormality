@@ -95,7 +95,7 @@ repairs it or returns it blocked. The script is not edited by a seed.
 | Loss terms | Only the target loss, the side loss, the report-attribute loss and the anchor penalty |
 | Mirror | A mirrored pass keeps every token's anatomical position |
 
-**After a run**, `609a489:scripts/tools/report_side_routing.py` writes the table the next design
+**After a run**, `030a583:scripts/tools/report_side_routing.py` writes the table the next design
 is written from, the flags below and `joins_lineage`:
 
 | Flag | Raised when |

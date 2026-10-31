@@ -79,7 +79,7 @@ The script replays the real dataset path with the configured training seed, one 
 the selections are the ones training sees. It records the pipeline's own bounds and recomputes
 pooled quantiles from the decode cache; the recomputed 0.995 level reproduces the recorded high
 bound. CPU only, refusing an existing output directory. It is historical since intensity bounds moved
-to the GPU on 2026-09-22, so run it against the source of `ab49830` or earlier:
+to the GPU on 2026-09-22, so run it against the source of `0afa93d` or earlier:
 
 ```bash
 uv run --locked python -m scripts.adhoc.measure_intensity_bound_stability --output-dir outputs/analysis/intensity-bound-stability-new --studies 40 --epochs 6
