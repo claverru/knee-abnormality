@@ -12,8 +12,7 @@ on branch `meniscus-soft-coupling` as uncommitted changes on parent commit `ea19
   code went back to the full-slice `00-baseline` recipe
   ([current model](../../../modeling/current-model.md)).
 
-The [implementation plan](../../crop-selection-plan.md) and the
-[learned-zoom diagram](../../learned-zoom.png) sit next to the investigation record.
+The [implementation plan](../../crop-selection-plan.md) sits next to the investigation record.
 
 ## Documentation snapshots
 

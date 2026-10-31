@@ -21,4 +21,3 @@
 | Reading the original crop-selection design | [Crop selection implementation plan](crop-selection-plan.md) |
 | Recovering the sources of a closed historical investigation | [Historical sources](sources/INDEX.md) |
 | Reading the original spatial-token implementation plan | [Spatial token implementation plan snapshot](spatial-token-plan.md) |
-| Viewing the learned-zoom diagram embedded in the crop-selection investigation | [Learned zoom diagram](learned-zoom.png) |

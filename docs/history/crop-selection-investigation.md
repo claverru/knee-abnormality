@@ -82,8 +82,6 @@ profile and shape diagram are in the
 learned-zoom snapshot (`f076a09:docs/history/crop-selection-sources/learned-zoom-active-spatial-token-model.md.txt`)
 and its shape diagram (`f076a09:docs/history/crop-selection-sources/learned-zoom-model-shapes.md.txt`).
 
-![Learned zoom on full context](learned-zoom.png)
-
 - **Canvases:** 360 px at 0.4167 mm (150 mm). The scout read a 300 px antialiased downsample.
 - **Context:** one centred 336 px (140 mm) window per canvas, read at 160 px (0.875 mm, 5×5
   tokens).
