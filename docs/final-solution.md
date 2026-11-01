@@ -11,9 +11,15 @@ the same 60 at τ 0.5, is second. Every member is a student of the same teacher-
 gen-1 teachers on Kaggle labels → pseudo-labels for 19,265 fastMRI and OAI studies → pretraining on
 them → Kaggle-only fine-tunes whose targets mix silver labels with teacher predictions.
 
-Not recorded in this repository: the private-leaderboard score, the team's final public or
-private rank, which two submissions were selected for the private leaderboard (the Kaggle API
-does not expose selections), and the final efficiency-leaderboard row.
+**Final results:** S188 took 14th of 6,299 teams (gold) at 0.956 private, 7th on the public board.
+S167, one ConvNeXt fold, took 2nd on the efficiency leaderboard and a $6,000 prize: 0.95278 private,
+379 s, efficiency score −2.0560. Kaggle truncates displayed scores to three decimals. The
+[solution write-up](https://www.kaggle.com/competitions/rsna-knee-abnormality-detection/writeups/14th-gold-and-2nd-efficiency-one-architecture-t)
+and [S167's weights](https://www.kaggle.com/datasets/claverru/knee-convnext-silver15-share075-ft-f0-x4-tau085)
+are public.
+
+Not recorded in this repository: which two submissions were selected for the private leaderboard
+(the Kaggle API does not expose selections).
 
 ## The ensemble
 
