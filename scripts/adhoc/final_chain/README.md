@@ -44,7 +44,6 @@ placeholders. The download links lived in input files that were deleted on the m
 | `rebuild_process.sh` | Built a layout environment, unzipped Kaggle with `parallel_unzip.py`, extracted the fastMRI batches, then ran `fastmri_layout.py` and `uncompress_fastmri.py sample/convert/verify`. |
 | `parallel_unzip.py` | Extracted a zip with parallel workers and checked the file sizes. |
 | `fastmri_layout.py` | Cataloged every fastMRI series (plane, fat suppression from header and name, geometry) and named studies `fastmri-<patient>-<study>`. It linked the kept series into the competition layout with a 0.5 placeholder `sample_submission.csv`, and dropped the studies in `fastmri_rejected.csv`. |
-| `fastmri_rejected.csv` | The two studies that the pipeline loader could not decode. |
 | `uncompress_fastmri.py` | Rewrote fastMRI as uncompressed DICOM with Pillow's decoder, hashing 4,000 sampled images before and after ([why](../../../docs/modeling/external-data-and-distillation/external-data.md#fastmri)). |
 | `fastmri_study_headers.py` | Wrote `study_headers.parquet` (manufacturer, model, field strength per study). |
 | `oai_download.sh`, `oai_extract.sh` | Downloaded OAI with aria2 from signed links and extracted each archive when it finished. |
